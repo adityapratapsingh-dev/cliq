@@ -2,23 +2,52 @@
 
 import { useEffect, useState } from "react";
 import { useCliq } from "@/components/CliqProvider";
+import { AuthScreen } from "@/components/AuthScreen";
 import { BottomNav, Header, Sidebar } from "@/components/Shell";
 import { CreateModal } from "@/components/CreateModal";
 import { ToastHost } from "@/components/ToastHost";
+import { NotificationDrawer } from "@/components/NotificationDrawer";
 import { VideosTab } from "@/components/tabs/VideosTab";
 import { PhotosTab } from "@/components/tabs/PhotosTab";
 import { ChatPostsTab } from "@/components/tabs/ChatPostsTab";
 import { FriendsTab } from "@/components/tabs/FriendsTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
 import { accentVars } from "@/lib/theme";
+import { Spinner } from "@/components/ui/Primitives";
 
 export function CliqApp() {
-  const { tab, settings } = useCliq();
-  const [ready, setReady] = useState(false);
+  const { user, loading, settings, tab, setTab, refreshUser, bump } = useCliq();
+  const [search, setSearch] = useState("");
+  const [bellOpen, setBellOpen] = useState(false);
 
   useEffect(() => {
-    setReady(true);
-  }, []);
+    if (tab !== "friends") setBellOpen(false);
+  }, [tab]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-zinc-950">
+        <div className="flex flex-col items-center gap-3">
+          <Spinner className="h-6 w-6" />
+          <p className="text-xs text-zinc-500">Warming up Cliq...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div style={accentVars(settings.accent)}>
+        <AuthScreen
+          onAuthed={() => {
+            void refreshUser();
+            setTab("videos");
+          }}
+        />
+        <ToastHost />
+      </div>
+    );
+  }
 
   return (
     <div style={accentVars(settings.accent)} className="min-h-dvh bg-zinc-950 text-zinc-100">
@@ -34,20 +63,27 @@ export function CliqApp() {
       </div>
 
       <div className="relative">
-        <Header />
+        <Header
+          search={search}
+          onSearch={setSearch}
+          bellCount={0}
+          onBell={() => setBellOpen((v) => !v)}
+          onProfile={() => setTab("profile")}
+        />
+        {bellOpen ? (
+          <NotificationDrawer onClose={() => setBellOpen(false)} onOpenChats={() => setTab("friends")} />
+        ) : null}
         <div className="mx-auto flex max-w-7xl">
           <Sidebar />
           <main className="cliq-scroll min-w-0 flex-1 pb-24 lg:pb-8">
-            {!ready ? (
-              <TabSkeleton />
-            ) : tab === "videos" ? (
-              <VideosTab />
+            {tab === "videos" ? (
+              <VideosTab search={search} />
             ) : tab === "photos" ? (
-              <PhotosTab />
+              <PhotosTab search={search} />
             ) : tab === "chatposts" ? (
-              <ChatPostsTab />
+              <ChatPostsTab search={search} />
             ) : tab === "friends" ? (
-              <FriendsTab />
+              <FriendsTab search={search} onDataChanged={bump} />
             ) : (
               <ProfileTab />
             )}
@@ -58,25 +94,6 @@ export function CliqApp() {
       <BottomNav />
       <CreateModal />
       <ToastHost />
-    </div>
-  );
-}
-
-function TabSkeleton() {
-  return (
-    <div className="mx-auto w-full max-w-2xl space-y-4 px-3 py-4 sm:px-4">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="cliq-skeleton rounded-3xl border border-zinc-800/80 bg-zinc-900/60 p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-zinc-800" />
-            <div className="flex-1 space-y-2">
-              <div className="h-3 w-32 rounded bg-zinc-800" />
-              <div className="h-2.5 w-20 rounded bg-zinc-800" />
-            </div>
-          </div>
-          <div className="mt-3 h-40 rounded-2xl bg-zinc-800" />
-        </div>
-      ))}
     </div>
   );
 }

@@ -1,141 +1,121 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Bookmark,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  EyeOff,
-  Flag,
-  Heart,
-  Link2,
-  MessageCircle,
-  MoreHorizontal,
-  Plus,
-  Share2,
-  ThumbsDown,
-  ThumbsUp,
-} from "lucide-react";
+import { Bookmark, EyeOff, Heart, Image as ImageIcon, MessageCircle, MoreHorizontal, Send, Share2 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
+import { api } from "@/lib/api-client";
+import { Avatar, EmptyState, IconButton, Modal, SkeletonCard } from "@/components/ui/Primitives";
+import { CommentThread, HashtagText, LikePair } from "@/components/ui/FeedBits";
 import { ShareSheet } from "@/components/CreateModal";
-import { Avatar, GradientArt } from "@/components/ui/Primitives";
-import { CommentThread, HashtagText } from "@/components/ui/FeedBits";
-import { cx, formatCount, timeAgo } from "@/lib/utils";
+import { matchesSearch, useComments, useFeed } from "@/components/tabs/useFeed";
+import type { Post } from "@/types/cliq";
+import { cx, timeAgo } from "@/lib/utils";
 
-export function PhotosTab() {
-  const { photos, userMap, followingIds, toggleFollowingId, me, searchQuery, settings } = useCliq();
+export function PhotosTab({ search }: { search: string }) {
+  const { posts, loading, removePost } = useFeed("photo");
+  const { setCreateOpen, settings, user } = useCliq();
+  const [draft, setDraft] = useState("");
+  const [commentTarget, setCommentTarget] = useState<Post | null>(null);
+  const [hidden, setHidden] = useState<string[]>([]);
 
-  const visible = photos.filter((p) => {
-    if (p.hidden) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase().replace("#", "");
-    const a = userMap[p.authorId];
+  const visible = posts.filter((p) => !hidden.includes(p.id) && matchesSearch(p, search));
+
+  if (loading) {
     return (
-      p.caption.toLowerCase().includes(q) ||
-      p.hashtags.some((h) => h.toLowerCase().includes(q)) ||
-      (a && (a.name.toLowerCase().includes(q) || a.handle.toLowerCase().includes(q)))
+      <div className="mx-auto w-full max-w-2xl space-y-5 px-3 py-4 sm:px-4">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
     );
-  });
+  }
 
   if (visible.length === 0) {
     return (
-      <div className="flex h-[50vh] flex-col items-center justify-center gap-2 text-center">
-        <span className="text-4xl">📸</span>
-        <p className="text-sm font-semibold text-zinc-200">Nothing here yet</p>
-        <p className="text-xs text-zinc-500">Adjust your search or create a new photo post.</p>
+      <div className="mx-auto w-full max-w-2xl px-4 py-10">
+        <EmptyState
+          icon={<ImageIcon size={26} />}
+          title={search ? "No photos match that search" : "No photos on Cliq yet"}
+          hint={
+            search
+              ? "Try a different vibe or clear the search bar."
+              : "Be the first to post a Photo! Paste an image link or upload one."
+          }
+          actionLabel={search ? undefined : "Post a Photo"}
+          onAction={search ? undefined : () => setCreateOpen(true)}
+        />
       </div>
     );
   }
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5 px-3 py-4 sm:px-4">
-      {visible.map((photo) => (
+      {visible.map((post) => (
         <PhotoCard
-          key={photo.id}
-          photoId={photo.id}
-          isFollowing={followingIds.includes(photo.authorId) || photo.authorId === me.id}
-          onToggleFollow={() => toggleFollowingId(photo.authorId)}
-          hideDislikes={settings.hideDislikes && userMap[photo.authorId]?.id === me.id}
+          key={post.id}
+          post={post}
+          onComment={() => setCommentTarget(post)}
+          onHide={() => {
+            setHidden((prev) => [...prev, post.id]);
+            void removePost(post.id);
+          }}
+          hideDislikes={settings.hideDislikes && post.userId === user?.id}
         />
       ))}
+
+      <CommentModal
+        post={commentTarget}
+        onClose={() => setCommentTarget(null)}
+        draft={draft}
+        setDraft={setDraft}
+      />
     </div>
   );
 }
 
-function PhotoCard({
-  photoId,
-  isFollowing,
-  onToggleFollow,
+export function PhotoCard({
+  post,
+  onComment,
+  onHide,
   hideDislikes,
 }: {
-  photoId: string;
-  isFollowing: boolean;
-  onToggleFollow: () => void;
+  post: Post;
+  onComment: () => void;
+  onHide: () => void;
   hideDislikes: boolean;
 }) {
-  const {
-    photos,
-    userMap,
-    me,
-    togglePhotoLike,
-    togglePhotoDislike,
-    togglePhotoSave,
-    hidePhoto,
-    addComment,
-    toggleCommentLike,
-    toast,
-  } = useCliq();
-  const photo = photos.find((p) => p.id === photoId);
-  const [index, setIndex] = useState(0);
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  const { toast, apiError, savedIds, toggleSaved } = useCliq();
+  const [liked, setLiked] = useState(post.myReaction === "like");
+  const [likes, setLikes] = useState(post.likesCount);
+  const [disliked, setDisliked] = useState(post.myReaction === "dislike");
+  const [dislikes, setDislikes] = useState(post.dislikesCount);
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [burst, setBurst] = useState(0);
-  const [lastTap, setLastTap] = useState(0);
+  const [broken, setBroken] = useState(false);
 
-  if (!photo) return null;
-  const author = userMap[photo.authorId];
-  if (!author) return null;
-  const total = photo.images.length;
+  const saved = savedIds.includes(post.id);
 
-  function handleDoubleTap() {
-    const now = Date.now();
-    if (now - lastTap < 320) {
-      setBurst((b) => b + 1);
-      if (!photo?.liked) togglePhotoLike(photoId);
+  async function react(kind: "like" | "dislike") {
+    try {
+      const { post: updated } = await api.react(post.id, kind);
+      setLiked(updated.myReaction === "like");
+      setLikes(updated.likesCount);
+      setDisliked(updated.myReaction === "dislike");
+      setDislikes(updated.dislikesCount);
+    } catch (error) {
+      apiError(error);
     }
-    setLastTap(now);
   }
 
   return (
     <article className="cliq-rise overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/80 backdrop-blur-md">
       <header className="flex items-center gap-3 px-4 py-3">
-        <Avatar user={author} size={42} ring={author.online} />
+        {post.author ? <Avatar user={post.author} size={42} ring /> : <span className="h-10 w-10 rounded-full bg-zinc-800" />}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-bold text-zinc-100">{author.name}</span>
-            {author.verified ? <span className="text-[var(--accent-2)]">✦</span> : null}
-          </div>
+          <p className="truncate text-sm font-bold text-zinc-100">{post.author?.displayName ?? "Cliq User"}</p>
           <p className="truncate text-[11px] text-zinc-500">
-            @{author.handle} · {author.age} · {author.vibe} · {timeAgo(photo.createdAt)}
+            @{post.author?.username ?? "unknown"} · {timeAgo(post.createdAt)}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onToggleFollow}
-          disabled={author.id === me.id}
-          className={cx(
-            "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition disabled:opacity-0",
-            isFollowing
-              ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-              : "border-[var(--accent)] bg-[var(--accent-soft)] text-zinc-100",
-          )}
-        >
-          {isFollowing ? <Check size={12} strokeWidth={3} /> : <Plus size={12} strokeWidth={3} />}
-          {isFollowing ? "In Cliq" : "Cliq Up"}
-        </button>
         <div className="relative">
           <button
             type="button"
@@ -154,216 +134,163 @@ function PhotoCard({
                 className="fixed inset-0 z-10 cursor-default"
               />
               <div className="cliq-pop absolute right-0 top-9 z-20 w-44 overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/95 py-1 shadow-2xl backdrop-blur-xl">
-                {[
-                  {
-                    label: photo.saved ? "Unsave Post" : "Save Post",
-                    icon: Bookmark,
-                    run: () => togglePhotoSave(photo.id),
-                  },
-                  { label: "Hide", icon: EyeOff, run: () => hidePhoto(photo.id) },
-                  {
-                    label: "Report",
-                    icon: Flag,
-                    run: () => toast("Report sent to Cliq safety team 🛡️", "danger"),
-                  },
-                  {
-                    label: "Copy Link",
-                    icon: Link2,
-                    run: () => toast("Link copied to clipboard 🔗", "success"),
-                  },
-                ].map(({ label, icon: Icon, run }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                      run();
-                      setMenuOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-zinc-300 transition hover:bg-zinc-800/70 hover:text-zinc-100"
-                  >
-                    <Icon size={14} /> {label}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleSaved(post.id);
+                    setMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-zinc-300 transition hover:bg-zinc-800/70 hover:text-zinc-100"
+                >
+                  <Bookmark size={14} /> {saved ? "Unsave Post" : "Save Post"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onHide();
+                    setMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-zinc-300 transition hover:bg-zinc-800/70 hover:text-zinc-100"
+                >
+                  <EyeOff size={14} /> Hide
+                </button>
               </div>
             </>
           ) : null}
         </div>
       </header>
 
-      <div className="relative select-none" onClick={handleDoubleTap}>
-        <GradientArt art={photo.images[index]} className="aspect-square w-full sm:aspect-[4/3]">
-          {burst > 0 ? (
-            <span key={burst} className="cliq-heart-pop pointer-events-none absolute inset-0 grid place-items-center">
-              <Heart size={90} className="text-rose-500 drop-shadow-[0_0_24px_rgba(244,63,94,0.8)]" fill="currentColor" />
-            </span>
-          ) : null}
-        </GradientArt>
-
-        {total > 1 ? (
-          <>
-            <button
-              type="button"
-              aria-label="Previous photo"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIndex((i) => (i - 1 + total) % total);
-              }}
-              className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-zinc-950/50 text-white backdrop-blur transition hover:bg-zinc-950/80"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              type="button"
-              aria-label="Next photo"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIndex((i) => (i + 1) % total);
-              }}
-              className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full border border-white/15 bg-zinc-950/50 text-white backdrop-blur transition hover:bg-zinc-950/80"
-            >
-              <ChevronRight size={18} />
-            </button>
-            <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
-              {photo.images.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  aria-label={`Go to photo ${i + 1}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIndex(i);
-                  }}
-                  className={cx(
-                    "h-1.5 rounded-full transition-all",
-                    i === index ? "w-5 bg-white" : "w-1.5 bg-white/50",
-                  )}
-                />
-              ))}
-            </div>
-            <span className="absolute right-3 top-3 rounded-full bg-zinc-950/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur">
-              {index + 1}/{total}
-            </span>
-          </>
+      <div className="relative aspect-square w-full bg-zinc-950 sm:aspect-[4/3]">
+        {post.mediaUrl && !broken ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={post.mediaUrl}
+            alt={post.content || "Cliq photo"}
+            className="h-full w-full object-cover"
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <div className="grid h-full place-items-center bg-gradient-to-br from-violet-900/40 via-fuchsia-900/30 to-cyan-900/40">
+            <p className="text-xs text-zinc-400">{post.mediaUrl ? "This image can't load" : "No image attached"}</p>
+          </div>
+        )}
+        {liked ? (
+          <span className="pointer-events-none absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-rose-500/90 text-white">
+            <Heart size={16} className="fill-current" />
+          </span>
         ) : null}
-
-        <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-zinc-950/60 px-2.5 py-1 text-[10px] font-semibold text-zinc-100 backdrop-blur">
-          {photo.images[index].emoji} {photo.images[index].label}
-        </span>
       </div>
 
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-0.5">
+          <LikePair
+            likes={likes}
+            liked={liked}
+            dislikes={dislikes}
+            disliked={disliked}
+            hideDislikes={hideDislikes}
+            onLike={() => void react("like")}
+            onDislike={() => void react("dislike")}
+          />
+          <IconButton
+            icon={<MessageCircle size={19} />}
+            count={post.commentCount}
+            onClick={onComment}
+            title="Comments"
+          />
+          <IconButton icon={<Share2 size={19} />} onClick={() => setShareOpen(true)} title="Share" />
+        </div>
+        <IconButton
+          icon={<Bookmark size={19} className={cx(saved && "fill-current")} />}
+          active={saved}
+          onClick={() => {
+            toggleSaved(post.id);
+            toast(saved ? "Removed from Saved" : "Saved to your profile 🔖", saved ? "default" : "success");
+          }}
+          title="Save"
+        />
+      </div>
+
+      {post.content ? (
+        <div className="px-4 pb-4">
+          <p className="text-sm text-zinc-200">
+            <span className="font-bold text-zinc-50">@{post.author?.username ?? "unknown"}</span>{" "}
+            <HashtagText text={post.content} />
+          </p>
           <button
             type="button"
-            onClick={() => togglePhotoLike(photo.id)}
-            className={cx(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-bold transition active:scale-90",
-              photo.liked ? "text-rose-400" : "text-zinc-300 hover:bg-zinc-800/70",
-            )}
+            onClick={onComment}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-500 transition hover:text-zinc-300"
           >
-            <Heart size={20} className={cx(photo.liked && "fill-current")} />
-            <span className="tabular-nums">{formatCount(photo.likes)}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => togglePhotoDislike(photo.id)}
-            className={cx(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-bold transition active:scale-90",
-              photo.disliked ? "text-orange-400" : "text-zinc-400 hover:bg-zinc-800/70",
-            )}
-          >
-            {photo.disliked ? <ThumbsDown size={19} className="fill-current" /> : <ThumbsUp size={19} />}
-            <span className="tabular-nums">{hideDislikes ? "—" : formatCount(photo.dislikes)}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setCommentsOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-bold text-zinc-300 transition hover:bg-zinc-800/70 active:scale-90"
-          >
-            <MessageCircle size={19} />
-            <span className="tabular-nums">{formatCount(photo.comments.length)}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShareOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-bold text-zinc-300 transition hover:bg-zinc-800/70 active:scale-90"
-          >
-            <Share2 size={19} />
+            <MessageCircle size={13} /> View all {post.commentCount} comments
           </button>
         </div>
+      ) : null}
+
+      <ShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={`@${post.author?.username ?? "unknown"}'s photo`}
+      />
+    </article>
+  );
+}
+
+export function CommentModal({
+  post,
+  onClose,
+  draft,
+  setDraft,
+}: {
+  post: Post | null;
+  onClose: () => void;
+  draft: string;
+  setDraft: (value: string) => void;
+}) {
+  const { user } = useCliq();
+  const { comments, loading, add } = useComments(post?.id ?? "", Boolean(post));
+
+  return (
+    <Modal
+      open={Boolean(post)}
+      onClose={onClose}
+      title="Comments"
+      subtitle={post ? `On @${post.author?.username ?? "unknown"}'s post` : undefined}
+    >
+      <CommentThread
+        comments={comments}
+        loading={loading}
+        onReply={(parentId, text) => add(text, parentId)}
+        canInteract={Boolean(user)}
+        toxicFilter
+      />
+      <div className="sticky bottom-0 mt-4 flex items-center gap-2 border-t border-zinc-800/80 bg-zinc-900/95 pt-3">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && draft.trim()) {
+              void add(draft);
+              setDraft("");
+            }
+          }}
+          placeholder="Add a comment on Cliq..."
+          className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/70 px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+        />
         <button
           type="button"
-          aria-label="Save post"
-          onClick={() => togglePhotoSave(photo.id)}
-          className={cx(
-            "rounded-full p-2 transition active:scale-90",
-            photo.saved ? "text-[var(--accent-2)]" : "text-zinc-300 hover:bg-zinc-800/70",
-          )}
+          aria-label="Post comment"
+          onClick={() => {
+            if (draft.trim()) {
+              void add(draft);
+              setDraft("");
+            }
+          }}
+          className="grid h-9 w-9 place-items-center rounded-full bg-[var(--accent-grad)] text-white"
         >
-          <Bookmark size={19} className={cx(photo.saved && "fill-current")} />
+          <Send size={15} />
         </button>
       </div>
-
-      <div className="px-4 pb-3">
-        <p className="text-sm text-zinc-200">
-          <span className="font-bold text-zinc-50">@{author.handle}</span>{" "}
-          <HashtagText text={photo.caption} />
-        </p>
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {photo.hashtags.map((h) => (
-            <span key={h} className="text-[11px] font-semibold text-[var(--accent-2)]">
-              #{h}
-            </span>
-          ))}
-        </div>
-
-        {commentsOpen ? (
-          <div className="mt-3 rounded-2xl border border-zinc-800/70 bg-zinc-950/50 p-3">
-            <CommentThread
-              comments={photo.comments}
-              userMap={userMap}
-              onLike={(cid) => toggleCommentLike("photo", photo.id, cid)}
-              onReply={(cid, text) => addComment("photo", photo.id, text, cid)}
-              compact
-            />
-            <div className="mt-3 flex items-center gap-2">
-              <Avatar user={me} size={30} showOnline={false} />
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    addComment("photo", photo.id, draft);
-                    setDraft("");
-                  }
-                }}
-                placeholder="Add a comment on Cliq..."
-                className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-900/70 px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-[var(--accent)]"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  addComment("photo", photo.id, draft);
-                  setDraft("");
-                }}
-                className="rounded-full bg-[var(--accent-grad)] px-3 py-1.5 text-[11px] font-bold text-white"
-              >
-                Post
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCommentsOpen(true)}
-            className="mt-2 text-xs font-semibold text-zinc-500 transition hover:text-zinc-300"
-          >
-            View all {photo.comments.length} comments
-          </button>
-        )}
-      </div>
-
-      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} title={`@${author.handle}'s photo`} />
-    </article>
+    </Modal>
   );
 }

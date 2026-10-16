@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   BadgeCheck,
-  Bookmark,
   Bell,
-  Check,
-  Eye,
+  Bookmark,
+  Database,
   Film,
   Image as ImageIcon,
-  Lock,
+  LogOut,
   MessageSquare,
   Palette,
   Pencil,
@@ -20,28 +20,61 @@ import {
   X,
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { Avatar, EmptyState, GradientArt, Modal, SectionCard, Toggle } from "@/components/ui/Primitives";
+import { api } from "@/lib/api-client";
+import { Avatar, EmptyState, Modal, SectionCard, Toggle } from "@/components/ui/Primitives";
 import { ACCENT_LIST } from "@/lib/theme";
-import type { AccentKey, MessageScope, PhotoPost, VideoPost, ChatPost } from "@/types/cliq";
-import { cx, formatCount, timeAgo } from "@/lib/utils";
+import { INTEREST_OPTIONS, MESSAGE_SCOPES } from "@/lib/constants";
+import { PostCardMini } from "@/components/tabs/PostCardMini";
+import { useFeed } from "@/components/tabs/useFeed";
+import type { AccentKey, SessionUser } from "@/types/cliq";
+import { cx } from "@/lib/utils";
 
 export function ProfileTab() {
-  const { me, profileTab, setProfileTab } = useCliq();
+  const { user, apiError, fallbackMode, savedIds } = useCliq();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState<"posts" | "videos" | "photos" | "saved">("posts");
 
-  if (settingsOpen) return <SettingsPanel onBack={() => setSettingsOpen(false)} />;
+  const { posts: videoPosts } = useFeed("video");
+  const { posts: photoPosts } = useFeed("photo");
+  const { posts: chatPosts } = useFeed("chat");
+
+  if (!user) return null;
+
+  if (settingsOpen) {
+    return <SettingsPanel user={user} onBack={() => setSettingsOpen(false)} fallbackMode={fallbackMode} />;
+  }
+
+  const mineVideos = videoPosts.filter((p) => p.userId === user.id);
+  const minePhotos = photoPosts.filter((p) => p.userId === user.id);
+  const mineChats = chatPosts.filter((p) => p.userId === user.id);
+  const allPosts = [...mineVideos, ...minePhotos, ...mineChats];
+  const saved = [...videoPosts, ...photoPosts, ...chatPosts].filter((p) => savedIds.includes(p.id));
+
+  const cliqScore = allPosts.reduce(
+    (sum, p) => sum + p.likesCount + p.upgradesCount - p.dislikesCount - p.downgradesCount,
+    0,
+  );
+
+  const shown =
+    profileTab === "videos" ? mineVideos : profileTab === "photos" ? minePhotos : profileTab === "posts" ? mineChats : saved;
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-3 py-4 sm:px-4">
-      <ProfileHeader onEdit={() => setEditOpen(true)} onSettings={() => setSettingsOpen(true)} />
+      <ProfileHeader
+        user={user}
+        postCount={allPosts.length}
+        cliqScore={cliqScore}
+        onEdit={() => setEditOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
+      />
 
       <div className="grid grid-cols-4 gap-1 rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-1 backdrop-blur-md">
         {(
           [
             { key: "videos", label: "Videos", icon: Film },
             { key: "photos", label: "Photos", icon: ImageIcon },
-            { key: "chatposts", label: "Posts", icon: MessageSquare },
+            { key: "posts", label: "Posts", icon: MessageSquare },
             { key: "saved", label: "Saved", icon: Bookmark },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
@@ -59,10 +92,33 @@ export function ProfileTab() {
         ))}
       </div>
 
-      <ProfileContent />
+      {shown.length === 0 ? (
+        <EmptyState
+          icon={<Sparkles size={24} />}
+          title={
+            profileTab === "saved"
+              ? "Nothing saved yet"
+              : `No ${profileTab === "posts" ? "chat posts" : profileTab} yet`
+          }
+          hint={
+            profileTab === "saved"
+              ? "Tap the bookmark icon on any post to save it here."
+              : "Anything you post on Cliq shows up here."
+          }
+        />
+      ) : (
+        <div className={cx("grid gap-3", profileTab !== "posts" && "sm:grid-cols-2")}>
+          {shown.map((post) => (
+            <PostCardMini key={post.id} post={post} viewerId={user.id} />
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center justify-between rounded-2xl border border-zinc-800/80 bg-zinc-900/50 px-4 py-3">
-        <span className="text-[11px] text-zinc-500">Logged in as @{me.handle} · teen verified 13–19</span>
+        <span className="text-[11px] text-zinc-500">
+          Signed in as @{user.username}
+          {user.age ? ` · ${user.age}` : ""}
+        </span>
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
@@ -72,27 +128,45 @@ export function ProfileTab() {
         </button>
       </div>
 
-      <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} />
+      <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} user={user} onError={apiError} />
     </div>
   );
 }
 
-function ProfileHeader({ onEdit, onSettings }: { onEdit: () => void; onSettings: () => void }) {
-  const { me, friendIds, followingIds } = useCliq();
+function ProfileHeader({
+  user,
+  postCount,
+  cliqScore,
+  onEdit,
+  onSettings,
+}: {
+  user: SessionUser;
+  postCount: number;
+  cliqScore: number;
+  onEdit: () => void;
+  onSettings: () => void;
+}) {
+  const [bannerBroken, setBannerBroken] = useState(false);
+  const banner = user.bannerUrl && !bannerBroken ? user.bannerUrl : null;
+
   return (
     <div className="overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/80 backdrop-blur-md">
-      <GradientArt art={me.coverArt} className="h-32 w-full sm:h-40" showEmoji={false}>
-        <div className="cliq-drift absolute inset-0" />
-        <span className="absolute right-4 top-4 text-3xl">{me.coverArt.emoji}</span>
-        <span className="absolute bottom-3 left-4 rounded-full bg-zinc-950/50 px-2.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
-          {me.coverArt.label}
-        </span>
-      </GradientArt>
+      <div className="relative h-32 w-full sm:h-40">
+        {banner ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={banner} alt="" className="h-full w-full object-cover" onError={() => setBannerBroken(true)} />
+        ) : (
+          <div className="h-full w-full bg-[var(--accent-grad)]">
+            <div className="cliq-drift h-full w-full opacity-70" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 to-transparent" />
+      </div>
 
       <div className="relative px-4 pb-4">
         <div className="-mt-9 flex items-end justify-between">
           <div className="cliq-pulse-ring rounded-full">
-            <Avatar user={me} size={78} ring />
+            <Avatar user={user} size={78} ring />
           </div>
           <div className="flex gap-2">
             <button
@@ -114,34 +188,34 @@ function ProfileHeader({ onEdit, onSettings }: { onEdit: () => void; onSettings:
 
         <div className="mt-3">
           <div className="flex items-center gap-1.5">
-            <h1 className="text-lg font-black text-zinc-50">{me.name}</h1>
+            <h1 className="text-lg font-black text-zinc-50">{user.displayName}</h1>
             <BadgeCheck size={17} className="text-[var(--accent-2)]" />
           </div>
           <p className="text-xs text-zinc-500">
-            @{me.handle} · {me.age} · {me.vibe}
+            @{user.username}
+            {user.age ? ` · ${user.age}` : ""}
           </p>
-          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-zinc-700/70 px-2.5 py-0.5 text-[10px] font-semibold text-zinc-300">
-            <Sparkles size={11} className="text-[var(--accent-2)]" /> {me.pronouns} · Find your Cliq
-          </span>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-300">{me.bio}</p>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {me.interests.map((i) => (
-              <span
-                key={i}
-                className="rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent-2)]"
-              >
-                #{i}
-              </span>
-            ))}
-          </div>
+          {user.bio ? <p className="mt-2 text-sm leading-relaxed text-zinc-300">{user.bio}</p> : null}
+          {(user.interests ?? []).length > 0 ? (
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {(user.interests ?? []).map((interest) => (
+                <span
+                  key={interest}
+                  className="rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent-2)]"
+                >
+                  #{interest}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-4 grid grid-cols-4 gap-2">
           {[
-            { label: "Posts", value: "126" },
-            { label: "Cliq Friends", value: `${me.friends + (friendIds.length - 6)}` },
-            { label: "Following", value: `${me.following + followingIds.length}` },
-            { label: "Cliq Score", value: formatCount(me.cliqScore) },
+            { label: "Posts", value: `${postCount}` },
+            { label: "Cliq Score", value: `${cliqScore}` },
+            { label: "Friends", value: "—" },
+            { label: "Following", value: "—" },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-2xl border border-zinc-800/70 bg-zinc-950/50 px-2 py-2.5 text-center">
               <p className="text-base font-black text-zinc-50">{value}</p>
@@ -154,220 +228,172 @@ function ProfileHeader({ onEdit, onSettings }: { onEdit: () => void; onSettings:
   );
 }
 
-function ProfileContent() {
-  const { videos, photos, chatPosts, userMap, me, profileTab, setTab } = useCliq();
+function EditProfileModal({
+  open,
+  onClose,
+  user,
+  onError,
+}: {
+  open: boolean;
+  onClose: () => void;
+  user: SessionUser;
+  onError: (error: unknown) => void;
+}) {
+  const { refreshUser, toast } = useCliq();
+  const [displayName, setDisplayName] = useState(user.displayName);
+  const [bio, setBio] = useState(user.bio);
+  const [age, setAge] = useState(user.age ? `${user.age}` : "");
+  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "");
+  const [interests, setInterests] = useState<string[]>(user.interests ?? []);
+  const [busy, setBusy] = useState(false);
 
-  if (profileTab === "saved") {
-    const savedVideos = videos.filter((v) => v.saved);
-    const savedPhotos = photos.filter((p) => p.saved);
-    const savedPosts = chatPosts.filter((p) => p.saved);
-    if (savedVideos.length + savedPhotos.length + savedPosts.length === 0) {
-      return <EmptyState emoji="🔖" title="Nothing saved yet" hint="Tap the bookmark icon on any post to save it here." />;
+  useEffect(() => {
+    if (!open) return;
+    setDisplayName(user.displayName);
+    setBio(user.bio);
+    setAge(user.age ? `${user.age}` : "");
+    setAvatarUrl(user.avatarUrl ?? "");
+    setInterests(user.interests);
+  }, [open, user]);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api.updateProfile({
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+        age: age.trim() ? Number(age) : null,
+        avatarUrl: avatarUrl.trim() || null,
+        interests,
+      });
+      await refreshUser();
+      toast("Profile updated ✨", "success");
+      onClose();
+    } catch (error) {
+      onError(error);
+    } finally {
+      setBusy(false);
     }
-    return (
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Edit Profile" subtitle="Keep it real — your vibe, your rules.">
       <div className="space-y-3">
-        {savedVideos.map((v) => (
-          <MiniVideo key={v.id} video={v} authorName={userMap[v.authorId]?.handle ?? "cliq"} />
-        ))}
-        {savedPhotos.map((p) => (
-          <MiniPhoto key={p.id} photo={p} authorName={userMap[p.authorId]?.handle ?? "cliq"} />
-        ))}
-        {savedPosts.map((p) => (
-          <MiniPost key={p.id} post={p} authorName={userMap[p.authorId]?.handle ?? "cliq"} />
-        ))}
-      </div>
-    );
-  }
+        <div className="flex items-center gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-3">
+          <Avatar
+            user={{ id: user.id, username: user.username, displayName: displayName || user.displayName, avatarUrl: avatarUrl || null }}
+            size={52}
+            ring
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-zinc-100">{displayName || user.displayName}</p>
+            <p className="truncate text-[11px] text-zinc-500">@{user.username}</p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100">
+            <ImageIcon size={13} /> Upload
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => setAvatarUrl(typeof reader.result === "string" ? reader.result : "");
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+        </div>
 
-  const mine = (id: string, authorId: string) => authorId === id;
-
-  if (profileTab === "videos") {
-    const list = videos.filter((v) => mine(me.id, v.authorId));
-    if (list.length === 0)
-      return (
-        <EmptyState emoji="🎬" title="No videos yet" hint="Tap Create and publish your first Cliq video." />
-      );
-    return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        {list.map((v) => (
-          <MiniVideo key={v.id} video={v} authorName={me.handle} />
-        ))}
-      </div>
-    );
-  }
-
-  if (profileTab === "photos") {
-    const list = photos.filter((p) => mine(me.id, p.authorId));
-    if (list.length === 0) return <EmptyState emoji="📸" title="No photos yet" hint="Share a photo to see it here." />;
-    return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        {list.map((p) => (
-          <MiniPhoto key={p.id} photo={p} authorName={me.handle} />
-        ))}
-      </div>
-    );
-  }
-
-  const list = chatPosts.filter((p) => mine(me.id, p.authorId));
-  if (list.length === 0)
-    return <EmptyState emoji="💬" title="No chat posts yet" hint="Drop a thought on Cliq to fill this tab." />;
-  return (
-    <div className="space-y-3">
-      {list.map((p) => (
-        <MiniPost key={p.id} post={p} authorName={me.handle} />
-      ))}
-      <button
-        type="button"
-        onClick={() => setTab("chatposts")}
-        className="w-full rounded-2xl border border-dashed border-zinc-700 py-2.5 text-xs font-semibold text-zinc-400 transition hover:border-[var(--accent)] hover:text-zinc-100"
-      >
-        Write a new chat post
-      </button>
-    </div>
-  );
-}
-
-function MiniVideo({ video, authorName }: { video: VideoPost; authorName: string }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/70">
-      <GradientArt art={video.art} className="h-36 w-full" />
-      <div className="p-3">
-        <p className="line-clamp-2 text-xs text-zinc-300">@{authorName} · {video.caption}</p>
-        <p className="mt-1 text-[11px] text-zinc-500">
-          ❤️ {formatCount(video.likes)} · 💬 {video.comments.length} · {timeAgo(video.createdAt)}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function MiniPhoto({ photo, authorName }: { photo: PhotoPost; authorName: string }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/70">
-      <GradientArt art={photo.images[0]} className="h-36 w-full" />
-      <div className="p-3">
-        <p className="line-clamp-2 text-xs text-zinc-300">@{authorName} · {photo.caption}</p>
-        <p className="mt-1 text-[11px] text-zinc-500">
-          ❤️ {formatCount(photo.likes)} · 💬 {photo.comments.length} · {timeAgo(photo.createdAt)}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function MiniPost({ post, authorName }: { post: ChatPost; authorName: string }) {
-  return (
-    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-3">
-      <span
-        className="rounded-full border px-2 py-0.5 text-[10px] font-bold"
-        style={{ borderColor: `${post.flairColor}66`, color: post.flairColor, backgroundColor: `${post.flairColor}18` }}
-      >
-        {post.flair}
-      </span>
-      <p className="mt-2 line-clamp-3 text-xs text-zinc-300">@{authorName}: {post.text}</p>
-      <p className="mt-1 text-[11px] text-zinc-500">
-        ⚡ {formatCount(post.upgrades - post.downgrades)} · 💬 {post.comments.length} · {timeAgo(post.createdAt)}
-      </p>
-    </div>
-  );
-}
-
-function EditProfileModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { me, updateProfile } = useCliq();
-  const [name, setName] = useState(me.name);
-  const [handle, setHandle] = useState(me.handle);
-  const [bio, setBio] = useState(me.bio);
-  const [pronouns, setPronouns] = useState(me.pronouns);
-  const [interests, setInterests] = useState<string[]>(me.interests);
-
-  const INTEREST_OPTIONS = ["Gaming", "Music", "Anime", "Coding", "Fitness", "Art", "Movies", "Memes"];
-
-  return (
-    <Modal open={open} onClose={onClose} title="Edit Profile" subtitle="Keep it real. Your vibe, your rules.">
-      <div className="space-y-3">
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-zinc-400">Display name</span>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={60}
             className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
           />
         </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-zinc-400">@username</span>
-          <input
-            value={handle}
-            onChange={(e) => setHandle(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-zinc-400">Pronouns</span>
-          <input
-            value={pronouns}
-            onChange={(e) => setPronouns(e.target.value)}
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-          />
-        </label>
+
+        <div className="grid gap-3 sm:grid-cols-[7rem_1fr]">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-zinc-400">Age</span>
+            <input
+              value={age}
+              onChange={(e) => setAge(e.target.value.replace(/\D/g, "").slice(0, 3))}
+              inputMode="numeric"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-zinc-400">Avatar image URL</span>
+            <input
+              value={avatarUrl.startsWith("data:") ? "" : avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+            />
+          </label>
+        </div>
+
         <label className="block">
           <span className="mb-1 block text-xs font-semibold text-zinc-400">Bio</span>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             rows={3}
-            maxLength={160}
+            maxLength={300}
             className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
           />
         </label>
+
         <div>
           <span className="mb-1.5 block text-xs font-semibold text-zinc-400">Interests</span>
           <div className="flex flex-wrap gap-1.5">
-            {INTEREST_OPTIONS.map((i) => {
-              const active = interests.includes(i);
+            {INTEREST_OPTIONS.map((interest) => {
+              const active = interests.includes(interest);
               return (
                 <button
-                  key={i}
+                  key={interest}
                   type="button"
-                  onClick={() =>
-                    setInterests((prev) => (active ? prev.filter((x) => x !== i) : [...prev, i]))
-                  }
+                  onClick={() => setInterests((prev) => (active ? prev.filter((i) => i !== interest) : [...prev, interest]))}
                   className={cx(
                     "rounded-full border px-3 py-1 text-xs font-semibold transition",
-                    active
-                      ? "border-transparent bg-[var(--accent-grad)] text-white"
-                      : "border-zinc-800 text-zinc-400 hover:text-zinc-200",
+                    active ? "border-transparent bg-[var(--accent-grad)] text-white" : "border-zinc-800 text-zinc-400 hover:text-zinc-200",
                   )}
                 >
                   {active ? "✓ " : ""}
-                  {i}
+                  {interest}
                 </button>
               );
             })}
           </div>
         </div>
+
         <button
           type="button"
-          onClick={() => {
-            updateProfile({ name, handle, bio, pronouns, interests });
-            onClose();
-          }}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-[var(--accent-grad)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-110"
+          onClick={() => void save()}
+          disabled={busy}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-[var(--accent-grad)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
         >
-          <Check size={16} /> Save changes
+          {busy ? "Saving..." : "Save changes"}
         </button>
       </div>
     </Modal>
   );
 }
 
-function SettingsPanel({ onBack }: { onBack: () => void }) {
-  const { settings, updateSettings, me, toast, resetData } = useCliq();
-
-  const scopes: { key: MessageScope; label: string }[] = [
-    { key: "everyone", label: "Everyone" },
-    { key: "shared", label: "Shared Interests Only" },
-    { key: "friends", label: "Cliq Friends Only" },
-  ];
+function SettingsPanel({
+  user,
+  onBack,
+  fallbackMode,
+}: {
+  user: SessionUser;
+  onBack: () => void;
+  fallbackMode: boolean;
+}) {
+  const { settings, updateSettings, logOut, toast } = useCliq();
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-3 py-4 sm:px-4">
@@ -382,11 +408,33 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
         <h2 className="text-sm font-bold text-zinc-100">Settings</h2>
       </div>
 
+      {fallbackMode ? (
+        <div className="flex items-start gap-3 rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
+          <div className="text-xs leading-relaxed text-amber-100">
+            <p className="font-bold">Storage is running in fallback mode</p>
+            <p className="mt-1 text-amber-200/80">
+              Cloudflare D1 is not configured, so Cliq is using a temporary in-memory store. Data may
+              disappear when the server restarts. An admin can connect the database by setting{" "}
+              <code className="rounded bg-zinc-950/60 px-1">CLOUDFLARE_ACCOUNT_ID</code>,{" "}
+              <code className="rounded bg-zinc-950/60 px-1">CLOUDFLARE_DATABASE_ID</code>,{" "}
+              <code className="rounded bg-zinc-950/60 px-1">CLOUDFLARE_API_TOKEN</code> and{" "}
+              <code className="rounded bg-zinc-950/60 px-1">CLIQ_SESSION_SECRET</code> in Vercel.
+              Tables are created automatically on the next request.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-200">
+          <Database size={14} /> Connected to Cloudflare D1 — your data is persisted.
+        </div>
+      )}
+
       <SectionCard>
         <SectionTitle icon={<User size={15} />} title="Account & Profile" />
         <div className="mt-3 space-y-2 text-sm">
-          <Row label="Username" value={`@${me.handle}`} />
-          <Row label="Email" value={me.email} />
+          <Row label="Username" value={`@${user.username}`} />
+          <Row label="Email" value={user.email || "Not set"} />
           <Row label="Age tier" value="Teen Verified 13–19" badge />
           <Row label="Account status" value="Active · In good standing" />
         </div>
@@ -398,7 +446,7 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
           <Toggle
             checked={settings.privateProfile}
             onChange={(v) => {
-              updateSettings({ privateProfile: v });
+              void updateSettings({ privateProfile: v });
               toast(v ? "Profile is now private 🔒" : "Profile is public again", v ? "success" : "default");
             }}
             label="Private Cliq Profile"
@@ -408,36 +456,36 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
             <p className="text-sm font-semibold text-zinc-100">Who Can Message Me</p>
             <p className="mb-2 mt-0.5 text-xs text-zinc-500">Control who can start a direct chat with you</p>
             <div className="flex flex-wrap gap-1.5">
-              {scopes.map((s) => (
+              {MESSAGE_SCOPES.map((scope) => (
                 <button
-                  key={s.key}
+                  key={scope.key}
                   type="button"
                   onClick={() => {
-                    updateSettings({ whoCanMessage: s.key });
-                    toast(`Messages: ${s.label}`, "success");
+                    void updateSettings({ whoCanMessage: scope.key });
+                    toast(`Messages: ${scope.label}`, "success");
                   }}
                   className={cx(
                     "rounded-full border px-3 py-1 text-xs font-semibold transition",
-                    settings.whoCanMessage === s.key
+                    settings.whoCanMessage === scope.key
                       ? "border-transparent bg-[var(--accent-grad)] text-white"
                       : "border-zinc-800 text-zinc-400 hover:text-zinc-200",
                   )}
                 >
-                  {s.label}
+                  {scope.label}
                 </button>
               ))}
             </div>
           </div>
           <Toggle
             checked={settings.showOnline}
-            onChange={(v) => updateSettings({ showOnline: v })}
+            onChange={(v) => void updateSettings({ showOnline: v })}
             label="Show Online Activity Status"
             hint="Let friends see when you're active"
           />
           <Toggle
             checked={settings.hideDislikes}
             onChange={(v) => {
-              updateSettings({ hideDislikes: v });
+              void updateSettings({ hideDislikes: v });
               toast(v ? "Dislike counts hidden on your posts" : "Dislike counts visible", "success");
             }}
             label="Hide Dislike & Downgrade Counts on My Posts"
@@ -445,9 +493,9 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
           />
           <Toggle
             checked={settings.toxicFilter}
-            onChange={(v) => updateSettings({ toxicFilter: v })}
+            onChange={(v) => void updateSettings({ toxicFilter: v })}
             label="Safe-Chat Toxic Word Filter"
-            hint="Blurs unkind words in your comments and messages"
+            hint="Softens unkind words in content you view"
           />
         </div>
       </SectionCard>
@@ -459,34 +507,29 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
             <p className="text-sm font-semibold text-zinc-100">Accent color</p>
             <p className="mb-2 mt-0.5 text-xs text-zinc-500">Changes highlights across the whole app</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {ACCENT_LIST.map((a) => (
+              {ACCENT_LIST.map((accent) => (
                 <button
-                  key={a.key}
+                  key={accent.key}
                   type="button"
                   onClick={() => {
-                    updateSettings({ accent: a.key as AccentKey });
-                    toast(`${a.label} applied 🎨`, "success");
+                    void updateSettings({ accent: accent.key as AccentKey });
+                    toast(`${accent.label} applied 🎨`, "success");
                   }}
                   className={cx(
                     "relative overflow-hidden rounded-2xl border px-3 py-2.5 text-left transition",
-                    settings.accent === a.key ? "border-zinc-100" : "border-zinc-800 hover:border-zinc-600",
+                    settings.accent === accent.key ? "border-zinc-100" : "border-zinc-800 hover:border-zinc-600",
                   )}
-                  style={{ background: a.soft }}
+                  style={{ background: accent.soft }}
                 >
-                  <span className="block h-2 w-full rounded-full" style={{ background: a.gradient }} />
-                  <span className="mt-1.5 block text-[11px] font-bold text-zinc-100">{a.label}</span>
-                  {settings.accent === a.key ? (
-                    <span className="absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full bg-white text-zinc-900">
-                      <Check size={11} />
-                    </span>
-                  ) : null}
+                  <span className="block h-2 w-full rounded-full" style={{ background: accent.gradient }} />
+                  <span className="mt-1.5 block text-[11px] font-bold text-zinc-100">{accent.label}</span>
                 </button>
               ))}
             </div>
           </div>
           <Toggle
             checked={settings.autoplay}
-            onChange={(v) => updateSettings({ autoplay: v })}
+            onChange={(v) => void updateSettings({ autoplay: v })}
             label="Auto-Play Videos"
             hint="Videos start playing as you scroll the feed"
           />
@@ -496,40 +539,23 @@ function SettingsPanel({ onBack }: { onBack: () => void }) {
       <SectionCard>
         <SectionTitle icon={<Bell size={15} />} title="Notifications" />
         <div className="mt-3 space-y-2">
-          <Toggle
-            checked={settings.notifCliqUp}
-            onChange={(v) => updateSettings({ notifCliqUp: v })}
-            label='"Cliq Up" Friend Requests'
-          />
-          <Toggle
-            checked={settings.notifMessages}
-            onChange={(v) => updateSettings({ notifMessages: v })}
-            label="Direct Messages"
-          />
-          <Toggle
-            checked={settings.notifVotes}
-            onChange={(v) => updateSettings({ notifVotes: v })}
-            label="Post Upgrades & Likes"
-          />
-          <Toggle
-            checked={settings.notifComments}
-            onChange={(v) => updateSettings({ notifComments: v })}
-            label="Comments"
-          />
+          <Toggle checked={settings.notifCliqUp} onChange={(v) => void updateSettings({ notifCliqUp: v })} label='"Cliq Up" Friend Requests' />
+          <Toggle checked={settings.notifMessages} onChange={(v) => void updateSettings({ notifMessages: v })} label="Direct Messages" />
+          <Toggle checked={settings.notifVotes} onChange={(v) => void updateSettings({ notifVotes: v })} label="Post Upgrades & Likes" />
+          <Toggle checked={settings.notifComments} onChange={(v) => void updateSettings({ notifComments: v })} label="Comments" />
         </div>
       </SectionCard>
 
       <SectionCard className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <Lock size={13} /> Your data stays in this demo session.
-          <Eye size={13} /> Nothing is uploaded.
+          <Shield size={13} /> Passwords are hashed. Session cookies are httpOnly.
         </div>
         <button
           type="button"
-          onClick={resetData}
-          className="rounded-full border border-zinc-800 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-rose-500/60 hover:text-rose-300"
+          onClick={() => void logOut()}
+          className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/50 px-3.5 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10"
         >
-          Reset all demo data
+          <LogOut size={13} /> Log Out
         </button>
       </SectionCard>
     </div>
@@ -562,3 +588,4 @@ function Row({ label, value, badge }: { label: string; value: string; badge?: bo
     </div>
   );
 }
+
