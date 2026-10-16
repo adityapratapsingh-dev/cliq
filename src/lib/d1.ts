@@ -1,5 +1,3 @@
-import { SCHEMA_STATEMENTS } from "@/lib/schema";
-
 /**
  * Minimal Cloudflare D1 client over the HTTP REST API.
  *
@@ -9,13 +7,10 @@ import { SCHEMA_STATEMENTS } from "@/lib/schema";
  *
  * When they are missing the helper reports `configured: false` instead of
  * throwing, so the app can transparently fall back to the in-memory store.
+ *
+ * This module deliberately has no imports so it stays trivially testable; the
+ * schema bootstrap lives in `d1-schema.ts`.
  */
-
-export interface D1QueryResult<T = Record<string, unknown>> {
-  results: T[];
-  success: boolean;
-  meta?: Record<string, unknown>;
-}
 
 export interface D1Config {
   accountId: string;
@@ -42,13 +37,27 @@ function endpoint(config: D1Config): string {
 interface CloudflareResponse<T> {
   success: boolean;
   errors?: { code: number; message: string }[];
-  result?: { results?: T[]; success?: boolean; meta?: Record<string, unknown> }[];
+  result?: { results?: T[]; success?: boolean; meta?: Record<string, unknown> }[] | null;
 }
 
 /**
- * Run one or more SQL statements. Accepts either a single statement or an array
- * (Cloudflare executes arrays in an implicit transaction).
+ * Build the request body for the D1 /query endpoint.
+ *
+ * Cloudflare accepts either a single `{ sql, params }` object or a batch wrapped
+ * as `{ batch: [ { sql, params }, ... ] }`. Sending a bare array fails with
+ * error 7400 ("Invalid input: Expected object, received array"), so keep this
+ * in one place and cover it with a test.
  */
+export function buildRequestBody(
+  statements: { sql: string; params?: unknown[] }[],
+): { sql: string; params: unknown[] } | { batch: { sql: string; params: unknown[] }[] } {
+  if (statements.length === 1) {
+    return { sql: statements[0].sql, params: statements[0].params ?? [] };
+  }
+  return { batch: statements.map((s) => ({ sql: s.sql, params: s.params ?? [] })) };
+}
+
+/** Run one SQL statement and return its rows. */
 export async function d1Query<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
@@ -57,6 +66,10 @@ export async function d1Query<T = Record<string, unknown>>(
   return rows[0] ?? [];
 }
 
+/**
+ * Run one or more SQL statements. Accepts either a single statement or an array
+ * (Cloudflare executes arrays in an implicit transaction).
+ */
 export async function d1Batch<T = Record<string, unknown>>(
   statements: { sql: string; params?: unknown[] }[],
 ): Promise<T[][]> {
@@ -65,21 +78,13 @@ export async function d1Batch<T = Record<string, unknown>>(
     throw new Error("D1 is not configured (missing CLOUDFLARE_* environment variables).");
   }
 
-  // Cloudflare accepts either a single { sql, params } object or a batch
-  // wrapped as { batch: [...] }. A bare array is rejected with error 7400
-  // ("Expected object, received array"), so always send one of those two shapes.
-  const body =
-    statements.length === 1
-      ? { sql: statements[0].sql, params: statements[0].params ?? [] }
-      : { batch: statements.map((s) => ({ sql: s.sql, params: s.params ?? [] })) };
-
   const response = await fetch(endpoint(config), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.apiToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(buildRequestBody(statements)),
     cache: "no-store",
   });
 
@@ -103,24 +108,4 @@ export async function d1Batch<T = Record<string, unknown>>(
   // A single-statement request returns one result object; a batch returns many.
   const list = Array.isArray(results) ? results : [results];
   return list.map((r) => (Array.isArray(r?.results) ? (r.results as T[]) : []));
-}
-
-let tablesReady: Promise<void> | null = null;
-
-/**
- * Create every table/index if missing. Idempotent and memoised per process, so
- * it costs one round-trip on cold start and nothing afterwards.
- */
-export function ensureTablesExist(): Promise<void> {
-  if (!tablesReady) {
-    tablesReady = (async () => {
-      if (!isD1Configured()) return;
-      await d1Batch(SCHEMA_STATEMENTS.map((sql) => ({ sql })));
-    })().catch((error) => {
-      // Allow a later request to retry rather than caching the failure forever.
-      tablesReady = null;
-      throw error;
-    });
-  }
-  return tablesReady;
 }
