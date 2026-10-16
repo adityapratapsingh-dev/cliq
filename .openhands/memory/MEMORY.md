@@ -299,3 +299,13 @@ UI (static/index.html):
 
 ## Commands (updated)
 - Tests: `python -m tests.test_end_to_end` → **502 checks** now (was 474).
+
+## Cliq app (this repo, 2026-10-16)
+Standalone Next.js 15 App Router + TS + Tailwind v4 + lucide-react teen social app.
+`npm run build`/`npm run lint` are zero-error/zero-warning. All state lives in
+`src/components/CliqProvider.tsx`; tabs in `src/components/tabs/*`; mock data in
+`src/data/mockCliqData.ts`; types in `src/types/cliq.ts`; accent theming in
+`src/lib/theme.ts` + CSS vars in `globals.css`. Gotchas: the Google
+gtv-videos-bucket sample MP4s now 403 (use download.samplelib.com / media.w3.org);
+create-next-app refuses a non-empty dir (scaffold in /tmp, copy in). Details in
+`.openhands/memory/2026-10-16.md`.
