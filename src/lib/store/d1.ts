@@ -13,7 +13,8 @@ import type {
   ReactionType,
   Settings,
 } from "@/types/cliq";
-import { d1Batch, d1Query, ensureTablesExist } from "@/lib/d1";
+import { d1Batch, d1Query } from "@/lib/d1";
+import { ensureTablesExist } from "@/lib/d1-schema";
 import {
   toPublicUser,
   type CreateCommentInput,

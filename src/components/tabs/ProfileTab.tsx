@@ -30,7 +30,7 @@ import type { AccentKey, SessionUser } from "@/types/cliq";
 import { cx } from "@/lib/utils";
 
 export function ProfileTab() {
-  const { user, apiError, fallbackMode, savedIds } = useCliq();
+  const { user, apiError, fallbackMode, dbError, savedIds } = useCliq();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<"posts" | "videos" | "photos" | "saved">("posts");
@@ -42,7 +42,14 @@ export function ProfileTab() {
   if (!user) return null;
 
   if (settingsOpen) {
-    return <SettingsPanel user={user} onBack={() => setSettingsOpen(false)} fallbackMode={fallbackMode} />;
+    return (
+      <SettingsPanel
+        user={user}
+        onBack={() => setSettingsOpen(false)}
+        fallbackMode={fallbackMode}
+        dbError={dbError}
+      />
+    );
   }
 
   const mineVideos = videoPosts.filter((p) => p.userId === user.id);
@@ -388,10 +395,12 @@ function SettingsPanel({
   user,
   onBack,
   fallbackMode,
+  dbError,
 }: {
   user: SessionUser;
   onBack: () => void;
   fallbackMode: boolean;
+  dbError: string | null;
 }) {
   const { settings, updateSettings, logOut, toast } = useCliq();
 
@@ -414,14 +423,20 @@ function SettingsPanel({
           <div className="text-xs leading-relaxed text-amber-100">
             <p className="font-bold">Storage is running in fallback mode</p>
             <p className="mt-1 text-amber-200/80">
-              Cloudflare D1 is not configured, so Cliq is using a temporary in-memory store. Data may
-              disappear when the server restarts. An admin can connect the database by setting{" "}
+              Cliq is using a temporary in-memory store, so data may disappear when the server
+              restarts. If you have already set the Cloudflare variables in Vercel, check that the
+              values are correct and then redeploy; otherwise add{" "}
               <code className="rounded bg-zinc-950/60 px-1">CLOUDFLARE_ACCOUNT_ID</code>,{" "}
               <code className="rounded bg-zinc-950/60 px-1">CLOUDFLARE_DATABASE_ID</code>,{" "}
               <code className="rounded bg-zinc-950/60 px-1">CLOUDFLARE_API_TOKEN</code> and{" "}
-              <code className="rounded bg-zinc-950/60 px-1">CLIQ_SESSION_SECRET</code> in Vercel.
-              Tables are created automatically on the next request.
+              <code className="rounded bg-zinc-950/60 px-1">CLIQ_SESSION_SECRET</code>. Tables are
+              created automatically on the next request.
             </p>
+            {dbError ? (
+              <p className="mt-2 break-words rounded-xl bg-zinc-950/50 px-2.5 py-2 font-mono text-[11px] text-amber-200/90">
+                {dbError}
+              </p>
+            ) : null}
           </div>
         </div>
       ) : (
