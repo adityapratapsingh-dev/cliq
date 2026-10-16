@@ -318,3 +318,12 @@ Vercel refuses to deploy commits whose git author is not a Vercel project member
 previews fail. Fix used: `git filter-branch --env-filter` re-author (runs under
 sh — inline the logic, no `source`). Full recipe + gotchas in
 `2026-10-17-vercel-git-author.md`.
+
+## Step 2 (PR #3, 2026-10-16): real users + D1
+Cliq now has real auth, real DMs and Cloudflare D1 (HTTP REST) with an
+in-memory fallback so it never 500s without DB env vars. `Store` interface in
+`src/lib/store/` (memory + d1 impls); sessions are stateless HMAC cookies;
+passwords are PBKDF2 via Web Crypto. Details + gotchas in
+`.openhands/memory/2026-10-16-step2.md`.
+**Any branch based on `main` MUST also apply the deps fix** (next 15.5.28 etc.)
+and be committed as the repo owner, or Vercel will not build it.
