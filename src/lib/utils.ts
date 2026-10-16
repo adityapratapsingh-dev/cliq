@@ -2,12 +2,6 @@ export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
-let counter = 0;
-export function makeId(prefix: string): string {
-  counter += 1;
-  return `${prefix}_${Date.now().toString(36)}_${counter}`;
-}
-
 export function formatCount(n: number): string {
   if (Math.abs(n) < 1000) return `${n}`;
   if (Math.abs(n) < 1_000_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
@@ -37,32 +31,6 @@ export function clockTime(iso: string): string {
   return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
-export function minutesAgo(n: number): string {
-  return new Date(Date.now() - n * 60_000).toISOString();
-}
-
-export function hoursAgo(n: number): string {
-  return new Date(Date.now() - n * 3_600_000).toISOString();
-}
-
-export function daysAgo(n: number): string {
-  return new Date(Date.now() - n * 86_400_000).toISOString();
-}
-
-export function avatarGradient(stops: [string, string]): string {
-  return `linear-gradient(135deg, ${stops[0]}, ${stops[1]})`;
-}
-
-/** Public CC0 sample MP4s — no API key required. Verified reachable (HTTP 200/206). */
-export const SAMPLE_VIDEOS = [
-  "https://download.samplelib.com/mp4/sample-5s.mp4",
-  "https://media.w3.org/2010/05/video/movie_300.mp4",
-  "https://download.samplelib.com/mp4/sample-10s.mp4",
-  "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
-  "https://download.samplelib.com/mp4/sample-15s.mp4",
-  "https://media.w3.org/2010/05/sintel/trailer.mp4",
-];
-
 export function extractHashtags(text: string): string[] {
   const found = text.match(/#[\p{L}\p{N}_]+/gu);
   return found ? Array.from(new Set(found.map((t) => t.slice(1)))) : [];
@@ -70,6 +38,7 @@ export function extractHashtags(text: string): string[] {
 
 const TOXIC_WORDS = ["stupid", "idiot", "loser", "hate you", "dumb", "ugly"];
 
+/** Soft-censor unkind words when the Safe-Chat filter is enabled. */
 export function censor(text: string, enabled: boolean): string {
   if (!enabled) return text;
   let out = text;
@@ -78,4 +47,32 @@ export function censor(text: string, enabled: boolean): string {
     out = out.replace(re, (m) => "•".repeat(Math.max(3, m.length)));
   }
   return out;
+}
+
+/** Deterministic gradient for a user without an avatar image. */
+export function avatarGradient(seed: string): [string, string] {
+  const palettes: [string, string][] = [
+    ["#7c3aed", "#22d3ee"],
+    ["#e11d48", "#f472b6"],
+    ["#0891b2", "#a855f7"],
+    ["#f59e0b", "#fb7185"],
+    ["#059669", "#a3e635"],
+    ["#6366f1", "#22d3ee"],
+    ["#d946ef", "#38bdf8"],
+    ["#14b8a6", "#6366f1"],
+  ];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return palettes[hash % palettes.length];
+}
+
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+export function ageBadge(age: number | null): string {
+  return age ? `${age}` : "Teen";
 }

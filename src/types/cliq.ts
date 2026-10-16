@@ -4,138 +4,11 @@ export type AccentKey = "violet" | "cyan" | "rose" | "emerald";
 
 export type MessageScope = "everyone" | "shared" | "friends";
 
-export interface CliqUser {
-  id: string;
-  name: string;
-  handle: string;
-  age: number;
-  vibe: string;
-  bio: string;
-  interests: string[];
-  online: boolean;
-  verified?: boolean;
-  /** two hex stops used to build the avatar gradient */
-  avatar: [string, string];
-}
+export type PostType = "video" | "photo" | "chat";
 
-export interface UserProfile extends CliqUser {
-  email: string;
-  pronouns: string;
-  coverArt: ArtSeed;
-  friends: number;
-  following: number;
-  cliqScore: number;
-}
+export type ReactionType = "like" | "dislike" | "upgrade" | "downgrade";
 
-export interface ArtSeed {
-  from: string;
-  to: string;
-  tint: string;
-  emoji: string;
-  label: string;
-}
-
-export interface Comment {
-  id: string;
-  authorId: string;
-  text: string;
-  createdAt: string;
-  likes: number;
-  liked: boolean;
-  replies: Comment[];
-}
-
-export interface VideoPost {
-  id: string;
-  authorId: string;
-  src: string;
-  art: ArtSeed;
-  caption: string;
-  hashtags: string[];
-  audio: string;
-  likes: number;
-  liked: boolean;
-  shares: number;
-  reposted: boolean;
-  saved: boolean;
-  following: boolean;
-  comments: Comment[];
-  createdAt: string;
-}
-
-export interface PhotoPost {
-  id: string;
-  authorId: string;
-  images: ArtSeed[];
-  caption: string;
-  hashtags: string[];
-  likes: number;
-  liked: boolean;
-  dislikes: number;
-  disliked: boolean;
-  saved: boolean;
-  following: boolean;
-  hidden: boolean;
-  comments: Comment[];
-  createdAt: string;
-}
-
-export interface PollOption {
-  id: string;
-  text: string;
-  votes: number;
-}
-
-export interface ChatPost {
-  id: string;
-  authorId: string;
-  text: string;
-  flair: string;
-  flairColor: string;
-  upgrades: number;
-  downgrades: number;
-  vote: "up" | "down" | null;
-  reposts: number;
-  reposted: boolean;
-  saved: boolean;
-  comments: Comment[];
-  poll?: {
-    options: PollOption[];
-    votedId: string | null;
-  };
-  createdAt: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  fromMe: boolean;
-  text?: string;
-  media?: ArtSeed;
-  createdAt: string;
-  reactions: { emoji: string; count: number }[];
-  myReaction: string | null;
-}
-
-export interface Conversation {
-  id: string;
-  personId: string;
-  messages: ChatMessage[];
-  unread: number;
-  typing: boolean;
-  pinned: boolean;
-}
-
-export type NotificationKind = "like" | "upgrade" | "comment" | "cliqup" | "message";
-
-export interface CliqNotification {
-  id: string;
-  kind: NotificationKind;
-  actorId: string;
-  text: string;
-  createdAt: string;
-  read: boolean;
-  requestState: "pending" | "accepted" | "declined";
-}
+export type FriendshipStatus = "pending" | "accepted";
 
 export interface Settings {
   privateProfile: boolean;
@@ -151,10 +24,137 @@ export interface Settings {
   notifComments: boolean;
 }
 
+export const DEFAULT_SETTINGS: Settings = {
+  privateProfile: false,
+  whoCanMessage: "shared",
+  showOnline: true,
+  hideDislikes: false,
+  toxicFilter: true,
+  autoplay: true,
+  accent: "violet",
+  notifCliqUp: true,
+  notifMessages: true,
+  notifVotes: true,
+  notifComments: false,
+};
+
+/** A user as returned to other users (never includes the password hash). */
+export interface PublicUser {
+  id: string;
+  username: string;
+  displayName: string;
+  age: number | null;
+  bio: string;
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  interests: string[];
+  createdAt: string;
+}
+
+/** The signed-in user's own record (adds private fields). */
+export interface SessionUser extends PublicUser {
+  email: string;
+  settings: Settings;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+}
+
+export interface Poll {
+  options: PollOption[];
+  votedOptionId: string | null;
+}
+
+export interface Post {
+  id: string;
+  userId: string;
+  author: PublicUser | null;
+  type: PostType;
+  content: string;
+  mediaUrl: string | null;
+  flair: string | null;
+  flairColor: string | null;
+  poll: Poll | null;
+  likesCount: number;
+  dislikesCount: number;
+  upgradesCount: number;
+  downgradesCount: number;
+  commentCount: number;
+  /** the signed-in user's reaction on this post, if any */
+  myReaction: ReactionType | null;
+  createdAt: string;
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  userId: string;
+  author: PublicUser | null;
+  parentCommentId: string | null;
+  content: string;
+  createdAt: string;
+  replies: Comment[];
+}
+
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  mediaUrl: string | null;
+  replyToId: string | null;
+  replyTo: { id: string; content: string; senderId: string } | null;
+  reactions: MessageReaction[];
+  isRead: boolean;
+  createdAt: string;
+  /** true when the signed-in user sent this message (derived client-side) */
+  fromMe: boolean;
+}
+
+export interface ConversationSummary {
+  partner: PublicUser;
+  lastMessage: Message | null;
+  unreadCount: number;
+}
+
+export interface Friendship {
+  id: string;
+  requesterId: string;
+  receiverId: string;
+  status: FriendshipStatus;
+  createdAt: string;
+}
+
+export interface FriendGraph {
+  friends: PublicUser[];
+  incoming: { id: string; user: PublicUser; createdAt: string }[];
+  outgoing: { id: string; user: PublicUser; createdAt: string }[];
+  suggested: PublicUser[];
+}
+
 export interface Toast {
   id: string;
   text: string;
   tone: "default" | "success" | "danger";
 }
 
-export type CommentTarget = "video" | "photo" | "chatpost";
+export type CommentTarget = PostType;
+
+/** Error carrying an HTTP status so route handlers can respond consistently. */
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = "ApiError";
+  }
+}
