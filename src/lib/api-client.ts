@@ -13,9 +13,11 @@ import type {
 
 export class ApiClientError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  detail?: string;
+  constructor(status: number, message: string, detail?: string) {
     super(message);
     this.status = status;
+    this.detail = detail;
     this.name = "ApiClientError";
   }
 }
@@ -41,9 +43,12 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const message =
-      (payload as { error?: string } | null)?.error ?? `Request failed (${response.status}).`;
-    throw new ApiClientError(response.status, message);
+    const body = payload as { error?: string; detail?: string } | null;
+    const message = body?.error ?? `Request failed (${response.status}).`;
+    // Keep the underlying cause (e.g. a D1 error) alongside the user-facing text
+    // so failures are diagnosable instead of just "Database unavailable."
+    const detail = body?.detail && body.detail !== message ? body.detail : undefined;
+    throw new ApiClientError(response.status, message, detail);
   }
   return (payload ?? {}) as T;
 }

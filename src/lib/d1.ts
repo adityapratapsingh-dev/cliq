@@ -65,10 +65,13 @@ export async function d1Batch<T = Record<string, unknown>>(
     throw new Error("D1 is not configured (missing CLOUDFLARE_* environment variables).");
   }
 
-  const payload =
+  // Cloudflare accepts either a single { sql, params } object or a batch
+  // wrapped as { batch: [...] }. A bare array is rejected with error 7400
+  // ("Expected object, received array"), so always send one of those two shapes.
+  const body =
     statements.length === 1
       ? { sql: statements[0].sql, params: statements[0].params ?? [] }
-      : statements.map((s) => ({ sql: s.sql, params: s.params ?? [] }));
+      : { batch: statements.map((s) => ({ sql: s.sql, params: s.params ?? [] })) };
 
   const response = await fetch(endpoint(config), {
     method: "POST",
@@ -76,7 +79,7 @@ export async function d1Batch<T = Record<string, unknown>>(
       Authorization: `Bearer ${config.apiToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
     cache: "no-store",
   });
 

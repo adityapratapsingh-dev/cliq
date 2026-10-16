@@ -18,6 +18,8 @@ interface CliqContextValue {
   user: SessionUser | null;
   loading: boolean;
   fallbackMode: boolean;
+  /** underlying database error text, when one has occurred */
+  dbError: string | null;
   tab: TabKey;
   setTab: (tab: TabKey) => void;
   createOpen: boolean;
@@ -50,6 +52,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [fallbackMode, setFallbackMode] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("videos");
   const [createOpen, setCreateOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -71,7 +74,11 @@ export function CliqProvider({ children }: { children: ReactNode }) {
   const apiError = useCallback(
     (error: unknown) => {
       if (error instanceof ApiClientError) {
-        if (error.status === 503) setFallbackMode(true);
+        if (error.status === 503) {
+          setFallbackMode(true);
+          // Keep the underlying cause so Settings can show something actionable.
+          setDbError(error.detail ?? error.message);
+        }
         toast(error.message, "danger");
       } else {
         toast("Something went wrong. Please try again.", "danger");
@@ -164,6 +171,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       fallbackMode,
+      dbError,
       tab,
       setTab,
       createOpen,
@@ -185,6 +193,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       fallbackMode,
+      dbError,
       tab,
       createOpen,
       toasts,
