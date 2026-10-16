@@ -309,3 +309,12 @@ Standalone Next.js 15 App Router + TS + Tailwind v4 + lucide-react teen social a
 gtv-videos-bucket sample MP4s now 403 (use download.samplelib.com / media.w3.org);
 create-next-app refuses a non-empty dir (scaffold in /tmp, copy in). Details in
 `.openhands/memory/2026-10-16.md`.
+
+## Vercel git-author deployment gate
+Vercel refuses to deploy commits whose git author is not a Vercel project member
+("Git author openhands-agent must have access..."). This repos owner is
+`adityapratapsingh-dev <pratapsinghaditya202@gmail.com>`; the agent default is
+`openhands <openhands@all-hands.dev>`. **Commit as the owner here** or Vercel
+previews fail. Fix used: `git filter-branch --env-filter` re-author (runs under
+sh — inline the logic, no `source`). Full recipe + gotchas in
+`2026-10-17-vercel-git-author.md`.
