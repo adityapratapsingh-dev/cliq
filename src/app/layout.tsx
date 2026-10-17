@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CliqProvider } from "@/components/CliqProvider";
+import { Providers } from "@/components/Providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,7 +37,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-zinc-950 antialiased`}>
-        <CliqProvider>{children}</CliqProvider>
+        <Providers>
+          <CliqProvider>{children}</CliqProvider>
+        </Providers>
       </body>
     </html>
   );

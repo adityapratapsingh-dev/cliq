@@ -1,4 +1,5 @@
 import type {
+  CliqNotification,
   Comment,
   ConversationSummary,
   FriendGraph,
@@ -6,6 +7,7 @@ import type {
   Post,
   PostType,
   PublicUser,
+  ProfileStats,
   ReactionType,
   SessionUser,
   Settings,
@@ -72,6 +74,24 @@ function decorateConversations(list: ConversationSummary[]): ConversationSummary
   }));
 }
 
+/**
+ * SWR fetcher. `key` is a path like "/api/posts?type=video", or an array whose
+ * first element is the path and second is a query object.
+ */
+export async function swrFetcher<T>(key: string | [string, Record<string, unknown>?]): Promise<T> {
+  let url = typeof key === "string" ? key : key[0];
+  const params = typeof key === "string" ? undefined : key[1];
+  if (params) {
+    const search = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && v !== "") search.set(k, String(v));
+    }
+    const qs = search.toString();
+    if (qs) url += (url.includes("?") ? "&" : "?") + qs;
+  }
+  return request<T>(url);
+}
+
 export const api = {
   // ---------------------------------------------------------------- auth
   async me(): Promise<SessionUser | null> {
@@ -116,6 +136,23 @@ export const api = {
     const suffix = params.toString();
     const { users } = await request<{ users: PublicUser[] }>(`/api/users${suffix ? `?${suffix}` : ""}`);
     return users;
+  },
+
+  async listNotifications(): Promise<{ notifications: CliqNotification[]; unread: number }> {
+    return request<{ notifications: CliqNotification[]; unread: number }>("/api/notifications");
+  },
+
+  markNotificationsRead(): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>("/api/notifications", { method: "PATCH" });
+  },
+
+  getStats(): Promise<ProfileStats> {
+    return request<ProfileStats>("/api/stats");
+  },
+
+  async getProfile(userId: string): Promise<PublicUser | null> {
+    const { user } = await request<{ user: PublicUser | null }>(`/api/users/${encodeURIComponent(userId)}`);
+    return user;
   },
 
   updateProfile(patch: {

@@ -16,8 +16,11 @@ import {
   toPublicUser,
   type CreateCommentInput,
   type CreateMessageInput,
+  type CreateNotificationInput,
   type CreatePostInput,
   type CreateUserInput,
+  type NotificationItem,
+  type ProfileStats,
   type Store,
   type StoredUser,
   type UpdateUserPatch,
@@ -66,6 +69,17 @@ interface StoredMessage {
   createdAt: string;
 }
 
+interface StoredNotification {
+  id: string;
+  userId: string;
+  actorId: string | null;
+  kind: string;
+  postId: string | null;
+  text: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 interface MemoryState {
   users: Map<string, StoredUser>;
   posts: Map<string, StoredPost>;
@@ -73,6 +87,7 @@ interface MemoryState {
   comments: StoredComment[];
   friendships: Friendship[];
   messages: StoredMessage[];
+  notifications: StoredNotification[];
 }
 
 /**
@@ -468,6 +483,60 @@ export class MemoryStore implements Store {
       if (m.receiverId === userId && m.senderId === partnerId) m.isRead = true;
     }
   }
+
+  // ------------------------------------------------------------ profile stats
+
+  async getStats(userId: string): Promise<ProfileStats> {
+    let friends = 0;
+    let following = 0;
+    for (const f of this.state.friendships) {
+      if (f.status === "accepted" && (f.requesterId === userId || f.receiverId === userId)) friends += 1;
+      if (f.requesterId === userId) following += 1;
+    }
+    return {
+      friends,
+      following,
+      posts: [...this.state.posts.values()].filter((p) => p.userId === userId).length,
+    };
+  }
+
+  // ---------------------------------------------------------- notifications
+
+  async listNotifications(userId: string): Promise<NotificationItem[]> {
+    return this.state.notifications
+      .filter((n) => n.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((n) => ({
+        id: n.id,
+        userId: n.userId,
+        actor: n.actorId ? this.publicUserById(n.actorId) : null,
+        kind: n.kind,
+        postId: n.postId,
+        text: n.text,
+        isRead: n.isRead,
+        createdAt: n.createdAt,
+      }));
+  }
+
+  async createNotification(input: CreateNotificationInput): Promise<NotificationItem> {
+    this.state.notifications.push({ ...input, isRead: false });
+    return {
+      id: input.id,
+      userId: input.userId,
+      actor: input.actorId ? this.publicUserById(input.actorId) : null,
+      kind: input.kind,
+      postId: input.postId,
+      text: input.text,
+      isRead: false,
+      createdAt: input.createdAt,
+    };
+  }
+
+  async markNotificationsRead(userId: string): Promise<void> {
+    for (const n of this.state.notifications) {
+      if (n.userId === userId) n.isRead = true;
+    }
+  }
 }
 
 const globalForMemory = globalThis as unknown as { __cliqMemoryState?: MemoryState };
@@ -480,6 +549,7 @@ function freshState(): MemoryState {
     comments: [],
     friendships: [],
     messages: [],
+    notifications: [],
   };
 }
 

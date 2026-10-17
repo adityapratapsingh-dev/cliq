@@ -3,15 +3,15 @@
 import { useState } from "react";
 import { Bookmark, Film, Heart, MessageCircle, Play, Send, Share2 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { api } from "@/lib/api-client";
 import { Avatar, EmptyState, IconButton, Modal, SkeletonCard } from "@/components/ui/Primitives";
 import { CommentThread, HashtagText } from "@/components/ui/FeedBits";
 import { matchesSearch, useComments, useFeed } from "@/components/tabs/useFeed";
-import { ShareSheet } from "@/components/CreateModal";
+import { usePostActions } from "@/components/tabs/usePostActions";
+import { ShareSheet } from "@/components/ShareSheet";
 import type { Post } from "@/types/cliq";
-import { cx, timeAgo } from "@/lib/utils";
+import { cx, formatCount, timeAgo } from "@/lib/utils";
 
-export function VideosTab({ search }: { search: string }) {
+export function VideosTab({ search, onOpenProfile }: { search: string; onOpenProfile: (id: string) => void }) {
   const { posts, loading } = useFeed("video");
   const { setCreateOpen } = useCliq();
 
@@ -35,7 +35,7 @@ export function VideosTab({ search }: { search: string }) {
           hint={
             search
               ? "Try a different vibe or clear the search bar."
-              : "Be the first to post a Video! Paste an .mp4 link or upload a clip."
+              : "Be the first to post a Video! Upload a clip or paste a link."
           }
           actionLabel={search ? undefined : "Post a Video"}
           onAction={search ? undefined : () => setCreateOpen(true)}
@@ -47,16 +47,15 @@ export function VideosTab({ search }: { search: string }) {
   return (
     <div className="mx-auto w-full max-w-md space-y-5 px-3 py-4 sm:px-4">
       {visible.map((post) => (
-        <VideoCard key={post.id} post={post} />
+        <VideoCard key={post.id} post={post} onOpenProfile={onOpenProfile} />
       ))}
     </div>
   );
 }
 
-function VideoCard({ post }: { post: Post }) {
-  const { user, toast, apiError, savedIds, toggleSaved } = useCliq();
-  const [liked, setLiked] = useState(post.myReaction === "like");
-  const [likes, setLikes] = useState(post.likesCount);
+function VideoCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: string) => void }) {
+  const { user, toast, savedIds, toggleSaved } = useCliq();
+  const { react } = usePostActions();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -64,27 +63,39 @@ function VideoCard({ post }: { post: Post }) {
 
   const { comments, loading, add } = useComments(post.id, commentsOpen);
 
+  const liked = post.myReaction === "like";
   const saved = savedIds.includes(post.id);
-
-  async function toggleLike() {
-    try {
-      const { post: updated } = await api.react(post.id, "like");
-      setLiked(updated.myReaction === "like");
-      setLikes(updated.likesCount);
-    } catch (error) {
-      apiError(error);
-    }
-  }
 
   return (
     <article className="cliq-rise overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/80 backdrop-blur-md">
       <header className="flex items-center gap-3 px-4 py-3">
-        {post.author ? <Avatar user={post.author} size={40} ring /> : <span className="h-10 w-10 rounded-full bg-zinc-800" />}
+        <button
+          type="button"
+          onClick={() => post.author && onOpenProfile(post.author.id)}
+          className="shrink-0 rounded-full transition hover:brightness-110"
+          aria-label="Open profile"
+        >
+          {post.author ? (
+            <Avatar user={post.author} size={40} ring />
+          ) : (
+            <span className="h-10 w-10 rounded-full bg-zinc-800" />
+          )}
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-zinc-100">{post.author?.displayName ?? "Cliq User"}</p>
-          <p className="truncate text-[11px] text-zinc-500">
+          <button
+            type="button"
+            onClick={() => post.author && onOpenProfile(post.author.id)}
+            className="block max-w-full truncate text-left text-sm font-bold text-zinc-100 transition hover:text-[var(--accent-2)]"
+          >
+            {post.author?.displayName ?? "Cliq User"}
+          </button>
+          <button
+            type="button"
+            onClick={() => post.author && onOpenProfile(post.author.id)}
+            className="block max-w-full truncate text-left text-[11px] text-zinc-500 transition hover:text-[var(--accent-2)]"
+          >
             @{post.author?.username ?? "unknown"} · {timeAgo(post.createdAt)}
-          </p>
+          </button>
         </div>
       </header>
 
@@ -123,10 +134,10 @@ function VideoCard({ post }: { post: Post }) {
         <div className="flex items-center gap-0.5">
           <IconButton
             icon={<Heart size={20} className={cx(liked && "fill-current")} />}
-            count={likes}
+            count={formatCount(post.likesCount)}
             active={liked}
             activeColor="#fb7185"
-            onClick={toggleLike}
+            onClick={() => void react(post.id, "like", post)}
             title="Like"
           />
           <IconButton
@@ -148,7 +159,12 @@ function VideoCard({ post }: { post: Post }) {
         />
       </div>
 
-      <Modal open={commentsOpen} onClose={() => setCommentsOpen(false)} title="Comments" subtitle={`On @${post.author?.username ?? "unknown"}'s video`}>
+      <Modal
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        title="Comments"
+        subtitle={`On @${post.author?.username ?? "unknown"}'s video`}
+      >
         <CommentThread
           comments={comments}
           loading={loading}

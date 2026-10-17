@@ -19,8 +19,11 @@ import {
   toPublicUser,
   type CreateCommentInput,
   type CreateMessageInput,
+  type CreateNotificationInput,
   type CreatePostInput,
   type CreateUserInput,
+  type NotificationItem,
+  type ProfileStats,
   type Store,
   type StoredUser,
   type UpdateUserPatch,
@@ -706,5 +709,85 @@ export class D1Store implements Store {
   async markConversationRead(userId: string, partnerId: string): Promise<void> {
     await this.ready();
     await d1Query("UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ?", [userId, partnerId]);
+  }
+
+  // ------------------------------------------------------------ profile stats
+
+  async getStats(userId: string): Promise<ProfileStats> {
+    await this.ready();
+    const rows = await d1Query<{ friends: number; following: number; posts: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM friendships
+           WHERE status = 'accepted' AND (requester_id = ? OR receiver_id = ?)) AS friends,
+         (SELECT COUNT(*) FROM friendships WHERE requester_id = ?) AS following,
+         (SELECT COUNT(*) FROM posts WHERE user_id = ?) AS posts`,
+      [userId, userId, userId, userId],
+    );
+    const row = rows[0];
+    return {
+      friends: Number(row?.friends ?? 0),
+      following: Number(row?.following ?? 0),
+      posts: Number(row?.posts ?? 0),
+    };
+  }
+
+  // ---------------------------------------------------------- notifications
+
+  async listNotifications(userId: string): Promise<NotificationItem[]> {
+    await this.ready();
+    const rows = await d1Query<{
+      id: string;
+      user_id: string;
+      actor_id: string | null;
+      kind: string;
+      post_id: string | null;
+      text: string;
+      is_read: number;
+      created_at: string;
+    }>(
+      "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
+      [userId],
+    );
+    const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((v): v is string => Boolean(v)))];
+    const actors = await this.usersByIds(actorIds);
+
+    return rows.map((r) => {
+      const actor = r.actor_id ? actors.get(r.actor_id) : undefined;
+      return {
+        id: r.id,
+        userId: r.user_id,
+        actor: actor ? toPublicUser(actor) : null,
+        kind: r.kind,
+        postId: r.post_id,
+        text: r.text,
+        isRead: Number(r.is_read) === 1,
+        createdAt: r.created_at,
+      };
+    });
+  }
+
+  async createNotification(input: CreateNotificationInput): Promise<NotificationItem> {
+    await this.ready();
+    await d1Query(
+      `INSERT INTO notifications (id, user_id, actor_id, kind, post_id, text, is_read, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+      [input.id, input.userId, input.actorId, input.kind, input.postId, input.text, input.createdAt],
+    );
+    const actor = input.actorId ? await this.getUserById(input.actorId) : null;
+    return {
+      id: input.id,
+      userId: input.userId,
+      actor: actor ? toPublicUser(actor) : null,
+      kind: input.kind,
+      postId: input.postId,
+      text: input.text,
+      isRead: false,
+      createdAt: input.createdAt,
+    };
+  }
+
+  async markNotificationsRead(userId: string): Promise<void> {
+    await this.ready();
+    await d1Query("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0", [userId]);
   }
 }

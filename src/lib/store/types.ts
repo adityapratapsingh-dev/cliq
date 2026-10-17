@@ -83,8 +83,35 @@ export interface CreateMessageInput {
   createdAt: string;
 }
 
+export interface CreateNotificationInput {
+  id: string;
+  userId: string;
+  actorId: string | null;
+  kind: string;
+  postId: string | null;
+  text: string;
+  createdAt: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  actor: PublicUser | null;
+  kind: string;
+  postId: string | null;
+  text: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ProfileStats {
+  friends: number;
+  following: number;
+  posts: number;
+}
+
 export interface Store {
-  readonly kind: "d1" | "memory";
+  readonly kind: "neon" | "d1" | "memory";
 
   // users
   createUser(input: CreateUserInput): Promise<StoredUser>;
@@ -117,6 +144,14 @@ export interface Store {
   deleteMessage(id: string, userId: string): Promise<boolean>;
   setMessageReaction(messageId: string, userId: string, emoji: string): Promise<Message>;
   markConversationRead(userId: string, partnerId: string): Promise<void>;
+
+  // profile stats (real counters for the profile header)
+  getStats(userId: string): Promise<ProfileStats>;
+
+  // notifications
+  listNotifications(userId: string): Promise<NotificationItem[]>;
+  createNotification(input: CreateNotificationInput): Promise<NotificationItem>;
+  markNotificationsRead(userId: string): Promise<void>;
 }
 
 export function toPublicUser(user: StoredUser): PublicUser {

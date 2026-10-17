@@ -45,6 +45,21 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     });
 
+    // Let the post's author know (skip when commenting on your own post).
+    if (post.userId !== me.id) {
+      await store
+        .createNotification({
+          id: newId("n"),
+          userId: post.userId,
+          actorId: me.id,
+          kind: "comment",
+          postId: post.id,
+          text: "commented on your post",
+          createdAt: new Date().toISOString(),
+        })
+        .catch(() => undefined);
+    }
+
     return ok({ comment }, { status: 201 });
   } catch (error) {
     return fail(error);

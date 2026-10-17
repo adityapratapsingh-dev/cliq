@@ -1,4 +1,5 @@
 import { ApiError } from "@/types/cliq";
+import { newId } from "@/lib/auth";
 import { fail, ok, readJson, requireString } from "@/lib/api";
 import { requireSessionUser } from "@/lib/server-auth";
 import { getStore } from "@/lib/store";
@@ -35,6 +36,19 @@ export async function POST(request: Request) {
       const target = await store.getUserById(userId);
       if (!target) throw new ApiError(404, "That user does not exist.");
       const friendship = await store.sendFriendRequest(me.id, userId);
+      if (friendship.status === "pending") {
+        await store
+          .createNotification({
+            id: newId("n"),
+            userId,
+            actorId: me.id,
+            kind: "cliqup",
+            postId: null,
+            text: "sent you a Cliq Up request",
+            createdAt: new Date().toISOString(),
+          })
+          .catch(() => undefined);
+      }
       const graph = await store.listFriends(me.id);
       return ok({ friendship, ...graph }, { status: 201 });
     }

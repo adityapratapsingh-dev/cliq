@@ -16,6 +16,7 @@ import {
   Settings as SettingsIcon,
   Shield,
   Sparkles,
+  UploadCloud,
   User,
   X,
 } from "lucide-react";
@@ -25,7 +26,7 @@ import { Avatar, EmptyState, Modal, SectionCard, Toggle } from "@/components/ui/
 import { ACCENT_LIST } from "@/lib/theme";
 import { INTEREST_OPTIONS, MESSAGE_SCOPES } from "@/lib/constants";
 import { PostCardMini } from "@/components/tabs/PostCardMini";
-import { useFeed } from "@/components/tabs/useFeed";
+import { useFeed, useStats } from "@/components/tabs/useFeed";
 import type { AccentKey, SessionUser } from "@/types/cliq";
 import { cx } from "@/lib/utils";
 
@@ -38,6 +39,8 @@ export function ProfileTab() {
   const { posts: videoPosts } = useFeed("video");
   const { posts: photoPosts } = useFeed("photo");
   const { posts: chatPosts } = useFeed("chat");
+  // Real counters from the friendships / posts tables.
+  const { data: stats } = useStats();
 
   if (!user) return null;
 
@@ -70,8 +73,10 @@ export function ProfileTab() {
     <div className="mx-auto w-full max-w-3xl space-y-4 px-3 py-4 sm:px-4">
       <ProfileHeader
         user={user}
-        postCount={allPosts.length}
+        postCount={stats?.posts ?? allPosts.length}
         cliqScore={cliqScore}
+        friends={stats?.friends ?? 0}
+        following={stats?.following ?? 0}
         onEdit={() => setEditOpen(true)}
         onSettings={() => setSettingsOpen(true)}
       />
@@ -144,12 +149,16 @@ function ProfileHeader({
   user,
   postCount,
   cliqScore,
+  friends,
+  following,
   onEdit,
   onSettings,
 }: {
   user: SessionUser;
   postCount: number;
   cliqScore: number;
+  friends: number;
+  following: number;
   onEdit: () => void;
   onSettings: () => void;
 }) {
@@ -221,8 +230,8 @@ function ProfileHeader({
           {[
             { label: "Posts", value: `${postCount}` },
             { label: "Cliq Score", value: `${cliqScore}` },
-            { label: "Friends", value: "—" },
-            { label: "Following", value: "—" },
+            { label: "Friends", value: `${friends}` },
+            { label: "Following", value: `${following}` },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-2xl border border-zinc-800/70 bg-zinc-950/50 px-2 py-2.5 text-center">
               <p className="text-base font-black text-zinc-50">{value}</p>
@@ -402,7 +411,7 @@ function SettingsPanel({
   fallbackMode: boolean;
   dbError: string | null;
 }) {
-  const { settings, updateSettings, logOut, toast } = useCliq();
+  const { settings, updateSettings, logOut, toast, mediaUnconfigured } = useCliq();
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-3 py-4 sm:px-4">
@@ -442,6 +451,24 @@ function SettingsPanel({
       ) : (
         <div className="flex items-center gap-2 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-200">
           <Database size={14} /> Connected to Cloudflare D1 — your data is persisted.
+        </div>
+      )}
+
+      {mediaUnconfigured ? (
+        <div className="flex items-start gap-3 rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
+          <div className="text-xs leading-relaxed text-amber-100">
+            <p className="font-bold">Direct media uploads are off</p>
+            <p className="mt-1 text-amber-200/80">
+              Set <code className="rounded bg-zinc-950/60 px-1">NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME</code> and{" "}
+              <code className="rounded bg-zinc-950/60 px-1">NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET</code> (an
+              unsigned preset) in Vercel, then redeploy. Until then you can still paste image and video URLs.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-200">
+          <UploadCloud size={14} /> Cloudinary direct uploads are enabled — media never touches Vercel.
         </div>
       )}
 

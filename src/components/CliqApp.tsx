@@ -7,6 +7,7 @@ import { BottomNav, Header, Sidebar } from "@/components/Shell";
 import { CreateModal } from "@/components/CreateModal";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationDrawer } from "@/components/NotificationDrawer";
+import { ProfileModal } from "@/components/ProfileModal";
 import { VideosTab } from "@/components/tabs/VideosTab";
 import { PhotosTab } from "@/components/tabs/PhotosTab";
 import { ChatPostsTab } from "@/components/tabs/ChatPostsTab";
@@ -19,6 +20,9 @@ export function CliqApp() {
   const { user, loading, settings, tab, setTab, refreshUser, bump } = useCliq();
   const [search, setSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
+  // Which user's public profile is open, if any.
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const openProfile = (id: string) => setProfileUserId(id);
 
   useEffect(() => {
     if (tab !== "friends") setBellOpen(false);
@@ -77,13 +81,13 @@ export function CliqApp() {
           <Sidebar />
           <main className="cliq-scroll min-w-0 flex-1 pb-24 lg:pb-8">
             {tab === "videos" ? (
-              <VideosTab search={search} />
+              <VideosTab search={search} onOpenProfile={openProfile} />
             ) : tab === "photos" ? (
-              <PhotosTab search={search} />
+              <PhotosTab search={search} onOpenProfile={openProfile} />
             ) : tab === "chatposts" ? (
-              <ChatPostsTab search={search} />
+              <ChatPostsTab search={search} onOpenProfile={openProfile} />
             ) : tab === "friends" ? (
-              <FriendsTab search={search} onDataChanged={bump} />
+              <FriendsTab search={search} onDataChanged={bump} onOpenProfile={openProfile} />
             ) : (
               <ProfileTab />
             )}
@@ -93,6 +97,11 @@ export function CliqApp() {
 
       <BottomNav />
       <CreateModal />
+      <ProfileModal
+        userId={profileUserId}
+        onClose={() => setProfileUserId(null)}
+        onMessage={() => setTab("friends")}
+      />
       <ToastHost />
     </div>
   );

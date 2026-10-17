@@ -80,6 +80,18 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     });
 
+    await store
+      .createNotification({
+        id: newId("n"),
+        userId: receiverId,
+        actorId: me.id,
+        kind: "message",
+        postId: null,
+        text: "sent you a message",
+        createdAt: new Date().toISOString(),
+      })
+      .catch(() => undefined);
+
     return ok({ message }, { status: 201 });
   } catch (error) {
     return fail(error);

@@ -2,16 +2,23 @@
 
 > **Find your Cliq. Share your vibe.**
 
-Cliq is a social app where teens share videos, photos and thoughts, upgrade the
-best takes, Cliq Up new friends, and chat in real time. **Step 2** replaced all
-demo content with real user accounts, real messaging, and a real database.
+A social app where teens share videos, photos and thoughts, upgrade the best
+takes, Cliq Up new friends, and chat in real time.
+
+**Step 3 architecture:** Neon PostgreSQL for data, Cloudinary for media (uploaded
+directly from the browser so Vercel's payload limit is never involved), SWR for
+instant feeds, and optimistic UI so every interaction feels immediate.
 
 ## Stack
 
-- **Next.js 15** (App Router) + **TypeScript** — zero-error `npm run build`
-- **Tailwind CSS v4** with CSS-variable accent theming
-- **lucide-react** icons
-- **Cloudflare D1** (HTTP REST API) with a zero-crash in-memory fallback
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 15 (App Router) + TypeScript — zero-error `npm run build` |
+| Styling | Tailwind CSS v4 with CSS-variable accent theming |
+| Icons | lucide-react |
+| Database | **Neon PostgreSQL** via `pg` (pooled, serverless-friendly) |
+| Media | **Cloudinary** direct upload (unsigned preset) + canvas WebP compression |
+| Data fetching | **SWR** (stale-while-revalidate) + optimistic mutations |
 
 ## Getting started
 
@@ -20,85 +27,112 @@ npm install
 npm run dev      # http://localhost:3000
 npm run build    # production build
 npm run start    # serve the production build
+npm run test:d1  # D1 client regression test (legacy fallback)
 ```
 
-Open the app and you land on the **Welcome & Auth** screen. Sign Up with a
-display name, `@username`, password, age, bio, interests and an optional avatar —
-or Log In. Sessions use a signed, httpOnly cookie.
+Sign up on the Welcome & Auth screen, then post, react, comment and chat.
 
-### Connecting the database (optional)
+### Environment variables
 
-The app boots and works with **zero configuration** by falling back to an
-in-memory store. For persistent data, set these in Vercel → Settings →
-Environment Variables (or a local `.env.local`):
+Copy `.env.example` to `.env.local` and fill it in, or set these in
+**Vercel → Settings → Environment Variables**.
 
 | Variable | Purpose |
 | --- | --- |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account id |
-| `CLOUDFLARE_DATABASE_ID` | D1 database id |
-| `CLOUDFLARE_API_TOKEN` | API token with D1 edit permission |
-| `CLIQ_SESSION_SECRET` | Signs session cookies (`openssl rand -base64 48`) |
+| `DATABASE_URL` | Neon **pooled** connection string (`...-pooler...`). Required for persistence. |
+| `CLIQ_SESSION_SECRET` | Signs the httpOnly session cookie. `openssl rand -base64 48` |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name (browser-side) |
+| `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` | Cloudinary **unsigned** upload preset |
 
-`ensureTablesExist()` runs `CREATE TABLE IF NOT EXISTS` for every table on the
-first request, so no manual migration step is needed. See `schema.sql` for the
-canonical schema. When D1 is not configured, Settings shows an amber
-"fallback mode" notice instead of failing.
+Optional: `PG_POOL_MAX` (default 5), `DATABASE_SSL=no-verify` (only if a TLS proxy
+breaks certificate validation).
 
-## What Step 2 changed
+**Zero-config fallback:** with no `DATABASE_URL` the app transparently uses an
+in-memory store, so local dev and a fresh deploy both work immediately. Settings
+shows an amber notice with the exact missing variables rather than failing.
 
-**Part 1 — real content & auth**
-- Deleted every demo video, photo, chat post, fake profile, notification and
-  pre-filled DM. Removed the simulated 1.5s bot auto-reply.
-- Added the Welcome & Auth screen (Sign Up / Log In / Log Out in Settings).
-- Added glassmorphic empty states with CTAs on all five tabs.
+The schema is created automatically on the first request
+(`ensureTablesExist()`), so there is no migration step. `schema.postgres.sql` is
+the canonical schema; `src/lib/neon-schema.ts` is the runtime copy — keep them in
+sync. To apply it by hand:
 
-**Part 2 — Chats & Friends overhaul**
-- Mobile shows the conversation list first and slides into a full-screen chat
-  with a back (`←`) button; desktop keeps the split view.
-- Reply-to-message with a quoted banner, emoji reactions, copy text, and unsend
-  for your own messages. Images can be attached or pasted as URLs.
-- `Sent ✓` / `Seen ✓✓` delivery indicators with real timestamps.
-- `/api/messages` is polled every 3s so two real users see new messages live.
+```bash
+psql "$DATABASE_URL" -f schema.postgres.sql
+```
 
-**Part 3 — Cloudflare D1 + API routes**
-- `src/lib/d1.ts` (HTTP REST helper + `ensureTablesExist`), `schema.sql`,
-  `src/lib/schema.ts`.
-- Routes: `/api/auth`, `/api/users`, `/api/posts`, `/api/posts/react`,
-  `/api/comments`, `/api/friends`, `/api/messages`.
-- All five tabs read and write through these routes.
+## Architecture notes
+
+### Database (`src/lib/neon.ts`)
+A single `pg.Pool` is memoised on `globalThis` so serverless instances reuse
+connections across invocations instead of opening one per request. Every query
+uses parameter placeholders (`$1`, `$2`, …); multi-write operations
+(reaction toggling) run inside a transaction.
+
+`src/lib/store/` defines a `Store` interface with three implementations —
+`neon.ts` (production), `d1.ts` (legacy Cloudflare D1) and `memory.ts`
+(no-config fallback). `getStore()` picks one at startup.
+
+### Media (`src/lib/cloudinary.ts`)
+Uploads go **browser → Cloudinary** via `XMLHttpRequest` (the only API that
+reports upload progress), so file bytes never pass through Vercel. Images are
+downscaled and re-encoded to WebP at 0.8 quality on a `<canvas>` before upload;
+if compression fails or does not help, the original file is sent. Only the
+resulting `secure_url` is stored in Postgres.
+
+### Performance
+- **SWR** caches every feed; navigation renders cached posts instantly while
+  revalidating in the background (`keepPreviousData`).
+- **Optimistic UI** for likes, dislikes, upgrades, downgrades, poll votes,
+  comments and DMs — state updates at 0ms, then reconciles with the server and
+  rolls back on failure.
+
+## API routes
+
+| Route | Methods |
+| --- | --- |
+| `/api/auth` | `GET` session · `POST` sign up / log in · `DELETE` log out |
+| `/api/users` | `GET` list/search · `PATCH` update profile & settings |
+| `/api/users/[id]` | `GET` public profile + stats |
+| `/api/stats` | `GET` real friends / following / posts counters |
+| `/api/posts` | `GET` by type · `POST` create · `DELETE` own post |
+| `/api/posts/react` | `POST` like/dislike/upgrade/downgrade + poll votes |
+| `/api/comments` | `GET` · `POST` |
+| `/api/friends` | `GET` graph · `POST` request/accept/decline |
+| `/api/messages` | `GET` conversations/thread · `POST` send · `PATCH` react · `DELETE` unsend |
+| `/api/notifications` | `GET` · `PATCH` mark read |
 
 ## Project structure
 
 ```
-schema.sql                     canonical D1 schema
-src/app/api/                   auth · users · posts · posts/react · comments · friends · messages
-src/app/                       layout.tsx (metadata) · page.tsx · globals.css
+schema.postgres.sql            canonical Neon schema
+src/app/api/                   route handlers
 src/components/
   CliqApp.tsx                  auth gate + tab router
   CliqProvider.tsx             session/state context
+  Providers.tsx                SWR configuration
   AuthScreen.tsx               welcome & auth
   Shell.tsx                    header · sidebar · bottom nav
-  NotificationDrawer.tsx       friend requests + unread messages
-  CreateModal.tsx              create post · share sheet
-  tabs/                        Videos · Photos · ChatPosts · Friends · Profile (+ useFeed, PostCardMini)
-  ui/                          Primitives · FeedBits
+  CreateModal.tsx              create post + Cloudinary upload + preview
+  ProfileModal.tsx             public profile for any user
+  NotificationDrawer.tsx       real notifications + friend requests
+  ShareSheet.tsx               share actions
+  tabs/                        Videos · Photos · ChatPosts · Friends · Profile
+                               (+ useFeed, usePostActions, PostCardMini)
+  ui/                          Primitives · FeedBits · UserLink
 src/lib/
-  d1.ts · schema.ts            database access
-  store/                       Store interface + memory + D1 implementations
+  neon.ts · neon-schema*.ts    Neon pool + schema bootstrap
+  cloudinary.ts                direct upload + canvas compression
+  store/                       Store interface + neon / d1 / memory backends
   auth.ts · session.ts         PBKDF2 hashing · signed session tokens
-  api-client.ts · api.ts       client + server helpers
-  constants.ts · theme.ts · utils.ts
+  api-client.ts · api.ts       client fetchers + server helpers
 src/types/cliq.ts              domain types
 ```
 
-## Security notes
+## Security
 
-- Passwords are hashed with PBKDF2-SHA256 (120k iterations) before storage.
-- Session cookies are httpOnly, SameSite=Lax, and Secure in production.
-- Every mutating route re-checks ownership (posts, comments, messages).
-- Emoji reactions on messages are stored as JSON on the message row.
-
-## Deploying to Vercel
-
-Push the branch and import the project. Set the environment variables above —
-without them the site still deploys and runs on the fallback store.
+- Passwords hashed with PBKDF2-SHA256 (120k iterations) via Web Crypto.
+- Sessions are stateless HMAC-signed tokens in an httpOnly, SameSite=Lax cookie
+  (Secure in production).
+- Ownership is re-checked server-side for deleting posts, unsending messages and
+  answering friend requests.
+- All SQL uses bound parameters — no string interpolation of user input.

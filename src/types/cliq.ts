@@ -141,6 +141,25 @@ export interface FriendGraph {
   suggested: PublicUser[];
 }
 
+export type NotificationKind = "like" | "upgrade" | "comment" | "cliqup" | "message";
+
+export interface CliqNotification {
+  id: string;
+  userId: string;
+  actor: PublicUser | null;
+  kind: NotificationKind;
+  postId: string | null;
+  text: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ProfileStats {
+  friends: number;
+  following: number;
+  posts: number;
+}
+
 export interface Toast {
   id: string;
   text: string;
