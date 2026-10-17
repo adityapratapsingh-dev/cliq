@@ -327,3 +327,12 @@ passwords are PBKDF2 via Web Crypto. Details + gotchas in
 `.openhands/memory/2026-10-16-step2.md`.
 **Any branch based on `main` MUST also apply the deps fix** (next 15.5.28 etc.)
 and be committed as the repo owner, or Vercel will not build it.
+
+## Step 3 (PR #5): Neon Postgres + Cloudinary + SWR
+Cliq now runs on **Neon PostgreSQL** (`pg` pool, `serverExternalPackages: ["pg"]`),
+uploads media **browser -> Cloudinary** via XHR + canvas WebP compression, and uses
+**SWR + optimistic UI** for instant feeds/interactions. `Store` has a third impl
+`store/neon.ts`; `getStore()` prefers neon -> d1 -> memory. New routes: `/api/stats`,
+`/api/notifications`, `/api/users/[id]`. Env: DATABASE_URL (pooled),
+CLIQ_SESSION_SECRET, NEXT_PUBLIC_CLOUDINARY_*. Details + gotchas in
+`.openhands/memory/2026-10-16-step3.md`.
