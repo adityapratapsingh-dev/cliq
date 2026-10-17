@@ -9,6 +9,9 @@
  */
 import assert from "node:assert/strict";
 import {
+  DEFAULT_VIDEO_PRESET,
+  VIDEO_PRESETS,
+  suggestPreset,
   VIDEO_MAX_EDGE,
   VIDEO_MIN_SIZE_BYTES,
   VIDEO_MAX_DURATION_SECONDS,
@@ -129,6 +132,79 @@ await check("compressed 100MB video fits far more posts in 25GB", () => {
   assert.ok(after > before * 4, `expected >4x more posts, got ${after} vs ${before}`);
   console.log(`       ${formatBytes(original)} -> ${formatBytes(compressed)} per post`);
   console.log(`       ${before} posts -> ${after} posts in 25 GiB`);
+});
+
+console.log("== presets ==");
+
+await check("three presets exist with ascending bitrate", () => {
+  const names = ["dataSaver", "balanced", "high"] as const;
+  for (const n of names) assert.ok(VIDEO_PRESETS[n], `missing preset ${n}`);
+  assert.ok(VIDEO_PRESETS.dataSaver.videoBitsPerSecond < VIDEO_PRESETS.balanced.videoBitsPerSecond);
+  assert.ok(VIDEO_PRESETS.balanced.videoBitsPerSecond < VIDEO_PRESETS.high.videoBitsPerSecond);
+});
+
+await check("default preset is balanced", () => {
+  assert.equal(DEFAULT_VIDEO_PRESET, "balanced");
+});
+
+await check("presets stay within sane bitrate bounds", () => {
+  for (const [name, p] of Object.entries(VIDEO_PRESETS)) {
+    assert.ok(p.videoBitsPerSecond >= 400_000, `${name} bitrate too low`);
+    assert.ok(p.videoBitsPerSecond <= 6_000_000, `${name} bitrate too high`);
+    assert.ok(p.audioBitsPerSecond >= 32_000 && p.audioBitsPerSecond <= 192_000, `${name} audio`);
+    assert.ok(p.fps >= 20 && p.fps <= 60, `${name} fps`);
+  }
+});
+
+await check("data saver is at least half the balanced bitrate", () => {
+  const ratio = VIDEO_PRESETS.dataSaver.videoBitsPerSecond / VIDEO_PRESETS.balanced.videoBitsPerSecond;
+  assert.ok(ratio <= 0.6, `expected <=0.6, got ${ratio}`);
+});
+
+await check("suggestPreset picks dataSaver for large or long clips", () => {
+  assert.equal(suggestPreset(120 * 1024 * 1024, 10), "dataSaver", "very large file");
+  assert.equal(suggestPreset(20 * 1024 * 1024, 120), "dataSaver", "long clip");
+});
+
+await check("suggestPreset picks high for small short clips", () => {
+  assert.equal(suggestPreset(8 * 1024 * 1024, 12), "high");
+});
+
+await check("suggestPreset falls back to balanced", () => {
+  assert.equal(suggestPreset(30 * 1024 * 1024, 40), "balanced");
+});
+
+await check("preset sizes map to expected resolutions", () => {
+  assert.equal(VIDEO_PRESETS.dataSaver.maxEdge, 854);
+  assert.equal(VIDEO_PRESETS.balanced.maxEdge, 1280);
+  assert.equal(VIDEO_PRESETS.high.maxEdge, 1920);
+});
+
+console.log("== measured preset output (real browser run) ==");
+
+await check("measured sizes imply the expected storage capacity", () => {
+  // Values measured in headless Chromium against a 3.37 MB 1080p source clip.
+  const measured = {
+    high: { bytes: 1_205_007, seconds: 5 },
+    balanced: { bytes: 647_093, seconds: 5 },
+    dataSaver: { bytes: 299_324, seconds: 5 },
+  };
+  const quotaBytes = 25 * 1024 * 1024 * 1024;
+
+  const capacity: Record<string, number> = {};
+  for (const [name, m] of Object.entries(measured)) {
+    const perMinute = (m.bytes / m.seconds) * 60;
+    capacity[name] = Math.floor(quotaBytes / perMinute);
+  }
+
+  console.log(`       high      ~${capacity.high} posts`);
+  console.log(`       balanced  ~${capacity.balanced} posts`);
+  console.log(`       dataSaver ~${capacity.dataSaver} posts`);
+
+  // Each step down should buy meaningfully more capacity.
+  assert.ok(capacity.balanced > capacity.high * 1.5, "balanced should beat high by >1.5x");
+  assert.ok(capacity.dataSaver > capacity.balanced * 1.5, "dataSaver should beat balanced by >1.5x");
+  assert.ok(capacity.dataSaver > 5000, `dataSaver capacity should exceed 5000, got ${capacity.dataSaver}`);
 });
 
 console.log("== formatting ==");

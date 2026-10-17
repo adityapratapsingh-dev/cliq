@@ -20,7 +20,13 @@ import {
   FileTooLargeError,
   uploadMedia,
 } from "@/lib/cloudinary";
-import { formatBytes } from "@/lib/video-compress";
+import {
+  DEFAULT_VIDEO_PRESET,
+  VIDEO_PRESETS,
+  formatBytes,
+  suggestPreset,
+  type VideoPresetName,
+} from "@/lib/video-compress";
 import { prependPost } from "@/components/tabs/useFeed";
 import type { PostType } from "@/types/cliq";
 import { cx } from "@/lib/utils";
@@ -48,6 +54,7 @@ export function CreateModal() {
   const [pollMode, setPollMode] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [busy, setBusy] = useState(false);
+  const [preset, setPreset] = useState<VideoPresetName>(DEFAULT_VIDEO_PRESET);
   const fileRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -76,6 +83,8 @@ export function CreateModal() {
     }
 
     const isVideo = file.type.startsWith("video/");
+    // Recommend a preset from the file size; the user can override below.
+    if (isVideo) setPreset(suggestPreset(file.size, 0));
     const localUrl = URL.createObjectURL(file);
     setUpload({
       progress: 0,
@@ -92,6 +101,7 @@ export function CreateModal() {
 
     try {
       const result = await uploadMedia(file, {
+        preset,
         signal: controller.signal,
         onPrepare: ({ percent, detail }) =>
           setUpload((prev) =>
@@ -283,6 +293,38 @@ export function CreateModal() {
                 className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
               />
             </div>
+
+            {upload?.kind === "video" && !uploading ? (
+              <div className="mt-2">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+                  Quality · smaller file vs. sharper video
+                </p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(Object.keys(VIDEO_PRESETS) as VideoPresetName[]).map((key) => {
+                    const option = VIDEO_PRESETS[key];
+                    const active = preset === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setPreset(key)}
+                        className={cx(
+                          "rounded-xl border px-2 py-1.5 text-left transition",
+                          active
+                            ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                            : "border-zinc-800 hover:border-zinc-700",
+                        )}
+                      >
+                        <span className="block text-[11px] font-bold text-zinc-100">{option.label}</span>
+                        <span className="block text-[10px] text-zinc-500">
+                          {option.maxEdge}p · {(option.videoBitsPerSecond / 1_000_000).toFixed(1)} Mbps
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {mediaUnconfigured ? (
               <p className="mt-2 text-[10px] leading-relaxed text-amber-300/80">
