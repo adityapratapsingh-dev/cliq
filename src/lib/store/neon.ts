@@ -24,6 +24,7 @@ import {
   type CreateUserInput,
   type NotificationItem,
   type Store,
+  type UnreadCounts,
   type StoredUser,
   type UpdateUserPatch,
 } from "@/lib/store/types";
@@ -754,6 +755,8 @@ export class NeonStore implements Store {
 
   async listNotifications(userId: string): Promise<NotificationItem[]> {
     await this.ready();
+    // One query joins the actor (for the avatar) and the target post (for the
+    // thumbnail), so the Activity Center renders without any follow-up requests.
     const rows = await query<{
       id: string;
       userId: string;
@@ -766,16 +769,21 @@ export class NeonStore implements Store {
       actor_username: string | null;
       actor_display_name: string | null;
       actor_avatar_url: string | null;
+      post_type: string | null;
+      post_media_url: string | null;
+      post_content: string | null;
     }>(
       `SELECT n.id, n.user_id AS "userId", n.kind, n.post_id AS "postId", n.text,
               n.is_read AS "isRead", n.created_at AS "createdAt",
               a.id AS actor_id, a.username AS actor_username, a.display_name AS actor_display_name,
-              a.avatar_url AS actor_avatar_url
+              a.avatar_url AS actor_avatar_url,
+              p.type AS post_type, p.media_url AS post_media_url, p.content AS post_content
        FROM notifications n
        LEFT JOIN users a ON a.id = n.actor_id
+       LEFT JOIN posts p ON p.id = n.post_id
        WHERE n.user_id = $1
        ORDER BY n.created_at DESC
-       LIMIT 50`,
+       LIMIT 60`,
       [userId],
     );
 
@@ -798,6 +806,15 @@ export class NeonStore implements Store {
           : null,
       kind: r.kind,
       postId: r.postId,
+      post:
+        r.postId && r.post_type
+          ? {
+              id: r.postId,
+              type: r.post_type as PostType,
+              mediaUrl: r.post_media_url,
+              content: r.post_content ?? "",
+            }
+          : null,
       text: r.text,
       isRead: Boolean(r.isRead),
       createdAt: iso(r.createdAt),
@@ -817,6 +834,7 @@ export class NeonStore implements Store {
       actor: null,
       kind: input.kind,
       postId: input.postId,
+      post: null,
       text: input.text,
       isRead: false,
       createdAt: input.createdAt,
@@ -826,5 +844,33 @@ export class NeonStore implements Store {
   async markNotificationsRead(userId: string): Promise<void> {
     await this.ready();
     await query("UPDATE notifications SET is_read = true WHERE user_id = $1 AND is_read = false", [userId]);
+  }
+
+  async markNotificationRead(id: string, userId: string): Promise<void> {
+    await this.ready();
+    // Scope by user_id so one account cannot mark another's row.
+    await query("UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2", [id, userId]);
+  }
+
+  /**
+   * All three counters in a single round-trip.
+   *
+   * Subqueries are used rather than separate calls because this runs on a 4s
+   * poll — three sequential queries would triple the latency for no benefit.
+   */
+  async unreadCounts(userId: string): Promise<UnreadCounts> {
+    await this.ready();
+    const row = await queryOne<{ notifications: string; messages: string; pending: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = false) AS notifications,
+         (SELECT COUNT(*) FROM messages WHERE receiver_id = $1 AND is_read = false) AS messages,
+         (SELECT COUNT(*) FROM friendships WHERE receiver_id = $1 AND status = 'pending') AS pending`,
+      [userId],
+    );
+    return {
+      notifications: Number(row?.notifications ?? 0),
+      messages: Number(row?.messages ?? 0),
+      pendingRequests: Number(row?.pending ?? 0),
+    };
   }
 }

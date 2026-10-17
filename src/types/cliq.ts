@@ -141,7 +141,26 @@ export interface FriendGraph {
   suggested: PublicUser[];
 }
 
-export type NotificationKind = "like" | "upgrade" | "comment" | "cliqup" | "message";
+export type NotificationKind =
+  | "like"
+  | "dislike"
+  | "upgrade"
+  | "downgrade"
+  | "comment"
+  | "reply"
+  | "poll_vote"
+  | "friend_request"
+  | "friend_accept"
+  | "cliqup"
+  | "message";
+
+/** Post context attached to a notification so the Center can render a thumbnail. */
+export interface NotificationPost {
+  id: string;
+  type: PostType;
+  mediaUrl: string | null;
+  content: string;
+}
 
 export interface CliqNotification {
   id: string;
@@ -149,9 +168,28 @@ export interface CliqNotification {
   actor: PublicUser | null;
   kind: NotificationKind;
   postId: string | null;
+  /** Post context for the right-hand thumbnail / quote box. */
+  post: NotificationPost | null;
   text: string;
   isRead: boolean;
   createdAt: string;
+}
+
+/**
+ * Live counters that drive every red dot in the UI. One request keeps the bell,
+ * the Chats tab, and the sub-tabs in sync.
+ */
+export interface UnreadCounts {
+  notifications: number;
+  messages: number;
+  pendingRequests: number;
+}
+
+export interface NotificationsResponse {
+  notifications: CliqNotification[];
+  counts: UnreadCounts;
+  /** Breakdown by kind, for the floating activity pill. */
+  breakdown: { like: number; comment: number; upgrade: number; cliqp: number };
 }
 
 export interface ProfileStats {

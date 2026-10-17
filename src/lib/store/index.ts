@@ -24,9 +24,9 @@ function pickBackend(): Backend {
 export function getStore(): Store {
   const kind = pickBackend();
   if (!cached || cached.kind !== kind) {
-    if (kind === "neon") cached = { store: new NeonStore(), kind };
-    else if (kind === "d1") cached = { store: new D1Store(), kind };
-    else cached = { store: getMemoryStore(), kind };
+    const store: Store =
+      kind === "neon" ? new NeonStore() : kind === "d1" ? new D1Store() : getMemoryStore();
+    cached = { store, kind };
   }
   return cached.store;
 }

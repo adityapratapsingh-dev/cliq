@@ -6,7 +6,8 @@ import { AuthScreen } from "@/components/AuthScreen";
 import { BottomNav, Header, Sidebar } from "@/components/Shell";
 import { CreateModal } from "@/components/CreateModal";
 import { ToastHost } from "@/components/ToastHost";
-import { NotificationDrawer } from "@/components/NotificationDrawer";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import { NotificationBanner } from "@/components/notifications/NotificationBanner";
 import { ProfileModal } from "@/components/ProfileModal";
 import { VideosTab } from "@/components/tabs/VideosTab";
 import { PhotosTab } from "@/components/tabs/PhotosTab";
@@ -17,7 +18,7 @@ import { accentVars } from "@/lib/theme";
 import { Spinner } from "@/components/ui/Primitives";
 
 export function CliqApp() {
-  const { user, loading, settings, tab, setTab, refreshUser, bump } = useCliq();
+  const { user, loading, settings, tab, setTab, refreshUser, bump, markTabSeen } = useCliq();
   const [search, setSearch] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
   // Which user's public profile is open, if any.
@@ -26,7 +27,9 @@ export function CliqApp() {
 
   useEffect(() => {
     if (tab !== "friends") setBellOpen(false);
-  }, [tab]);
+    // Opening a tab clears its "new posts" red dot.
+    markTabSeen(tab);
+  }, [tab, markTabSeen]);
 
   if (loading) {
     return (
@@ -70,12 +73,11 @@ export function CliqApp() {
         <Header
           search={search}
           onSearch={setSearch}
-          bellCount={0}
           onBell={() => setBellOpen((v) => !v)}
           onProfile={() => setTab("profile")}
         />
         {bellOpen ? (
-          <NotificationDrawer onClose={() => setBellOpen(false)} onOpenChats={() => setTab("friends")} />
+          <NotificationCenter onClose={() => setBellOpen(false)} onNavigate={(next) => setTab(next)} />
         ) : null}
         <div className="mx-auto flex max-w-7xl">
           <Sidebar />
@@ -96,6 +98,7 @@ export function CliqApp() {
       </div>
 
       <BottomNav />
+      <NotificationBanner onOpenCenter={() => setBellOpen(true)} />
       <CreateModal />
       <ProfileModal
         userId={profileUserId}

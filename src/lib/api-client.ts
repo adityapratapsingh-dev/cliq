@@ -1,5 +1,4 @@
 import type {
-  CliqNotification,
   Comment,
   ConversationSummary,
   FriendGraph,
@@ -7,10 +6,12 @@ import type {
   Post,
   PostType,
   PublicUser,
+  NotificationsResponse,
   ProfileStats,
   ReactionType,
   SessionUser,
   Settings,
+  UnreadCounts,
 } from "@/types/cliq";
 
 export class ApiClientError extends Error {
@@ -138,12 +139,16 @@ export const api = {
     return users;
   },
 
-  async listNotifications(): Promise<{ notifications: CliqNotification[]; unread: number }> {
-    return request<{ notifications: CliqNotification[]; unread: number }>("/api/notifications");
+  listNotifications(): Promise<NotificationsResponse> {
+    return request<NotificationsResponse>("/api/notifications");
   },
 
-  markNotificationsRead(): Promise<{ ok: boolean }> {
-    return request<{ ok: boolean }>("/api/notifications", { method: "PATCH" });
+  /** Omit `id` to mark everything read. */
+  markNotificationsRead(id?: string): Promise<{ ok: boolean; counts: UnreadCounts }> {
+    return request<{ ok: boolean; counts: UnreadCounts }>("/api/notifications", {
+      method: "PATCH",
+      body: JSON.stringify(id ? { id } : {}),
+    });
   },
 
   getStats(): Promise<ProfileStats> {
@@ -230,6 +235,14 @@ export const api = {
   async listConversations(): Promise<ConversationSummary[]> {
     const { conversations } = await request<{ conversations: ConversationSummary[] }>("/api/messages");
     return decorateConversations(conversations);
+  },
+
+  /** Explicitly mark a conversation read (used when opening a thread). */
+  markConversationRead(partnerId: string): Promise<{ ok: boolean; counts: UnreadCounts }> {
+    return request<{ ok: boolean; counts: UnreadCounts }>("/api/messages", {
+      method: "PATCH",
+      body: JSON.stringify({ action: "markRead", partnerId }),
+    });
   },
 
   async listMessages(partnerId: string, markRead = true): Promise<Message[]> {

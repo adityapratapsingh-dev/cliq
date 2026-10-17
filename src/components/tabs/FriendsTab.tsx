@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { api } from "@/lib/api-client";
+import { refreshNotifications } from "@/components/notifications/useNotificationCenter";
 import { Avatar, EmptyState, Skeleton, Spinner, TypingDots } from "@/components/ui/Primitives";
 import { EMOJI_QUICKBAR, INTEREST_FILTERS, MESSAGE_REACTIONS } from "@/lib/constants";
 import type { ConversationSummary, FriendGraph, Message, PublicUser } from "@/types/cliq";
@@ -44,6 +45,7 @@ export function FriendsTab({
 }) {
   const [mode, setMode] = useState<Mode>("discover");
   const [openPartner, setOpenPartner] = useState<PublicUser | null>(null);
+  const { counts } = useCliq();
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-3 py-4 sm:px-4">
@@ -56,10 +58,10 @@ export function FriendsTab({
       >
         {(
           [
-            { key: "discover", label: "Find Your Cliq", icon: Sparkles },
-            { key: "chats", label: "Direct Chats", icon: MessageSquarePlus },
+            { key: "discover", label: "Find Your Cliq", icon: Sparkles, badge: counts.pendingRequests },
+            { key: "chats", label: "Direct Chats", icon: MessageSquarePlus, badge: counts.messages },
           ] as const
-        ).map(({ key, label, icon: Icon }) => (
+        ).map(({ key, label, icon: Icon, badge }) => (
           <button
             key={key}
             type="button"
@@ -68,11 +70,16 @@ export function FriendsTab({
               setOpenPartner(null);
             }}
             className={cx(
-              "inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition",
+              "relative inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition",
               mode === key ? "bg-[var(--accent-grad)] text-white" : "text-zinc-400 hover:text-zinc-100",
             )}
           >
             <Icon size={14} /> {label}
+            {badge > 0 ? (
+              <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-lg shadow-rose-500/40">
+                {badge > 9 ? "9+" : badge}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -461,12 +468,27 @@ function Chats({
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-xs font-bold text-zinc-100">{c.partner.displayName}</span>
+                      <span
+                        className={cx(
+                          "truncate text-xs",
+                          c.unreadCount > 0 ? "font-bold text-white" : "font-semibold text-zinc-300",
+                        )}
+                      >
+                        {c.partner.displayName}
+                      </span>
                       {c.lastMessage ? (
-                        <span className="shrink-0 text-[10px] text-zinc-500">{timeAgo(c.lastMessage.createdAt)}</span>
+                        <span className="flex shrink-0 items-center gap-1 text-[10px] text-zinc-500">
+                          {c.unreadCount > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> : null}
+                          {timeAgo(c.lastMessage.createdAt)}
+                        </span>
                       ) : null}
                     </div>
-                    <p className="truncate text-[11px] text-zinc-500">
+                    <p
+                      className={cx(
+                        "truncate text-[11px]",
+                        c.unreadCount > 0 ? "font-medium text-zinc-200" : "text-zinc-500",
+                      )}
+                    >
                       {c.lastMessage
                         ? `${c.lastMessage.senderId === c.partner.id ? "" : "You: "}${
                             c.lastMessage.content || "📷 Photo"
@@ -475,8 +497,8 @@ function Chats({
                     </p>
                   </div>
                   {c.unreadCount > 0 ? (
-                    <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-[var(--accent-grad)] px-1 text-[10px] font-bold text-white">
-                      {c.unreadCount}
+                    <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-lg shadow-rose-500/40">
+                      {c.unreadCount > 9 ? "9+" : c.unreadCount}
                     </span>
                   ) : null}
                 </button>
@@ -688,6 +710,27 @@ function ChatWindow({
   useEffect(() => {
     scrollToBottom(true);
   }, [messages.length, scrollToBottom]);
+
+  /**
+   * Mark this conversation read as soon as it opens.
+   *
+   * This is what clears the red badge on the conversation row, the Direct Chats
+   * sub-tab and the Chats nav item — all from one optimistic write.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await api.markConversationRead(partner.id);
+        if (!cancelled) void refreshNotifications();
+      } catch {
+        // Non-fatal: the thread still renders.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [partner.id]);
 
   async function send() {
     const content = draft.trim();

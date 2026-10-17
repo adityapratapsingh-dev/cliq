@@ -99,9 +99,18 @@ export interface NotificationItem {
   actor: PublicUser | null;
   kind: string;
   postId: string | null;
+  /** Post context for the thumbnail / quote box in the Activity Center. */
+  post: { id: string; type: PostType; mediaUrl: string | null; content: string } | null;
   text: string;
   isRead: boolean;
   createdAt: string;
+}
+
+/** Live counters driving every red dot in the UI. */
+export interface UnreadCounts {
+  notifications: number;
+  messages: number;
+  pendingRequests: number;
 }
 
 export interface ProfileStats {
@@ -152,6 +161,9 @@ export interface Store {
   listNotifications(userId: string): Promise<NotificationItem[]>;
   createNotification(input: CreateNotificationInput): Promise<NotificationItem>;
   markNotificationsRead(userId: string): Promise<void>;
+  markNotificationRead(id: string, userId: string): Promise<void>;
+  /** One round-trip for all three counters. */
+  unreadCounts(userId: string): Promise<UnreadCounts>;
 }
 
 export function toPublicUser(user: StoredUser): PublicUser {

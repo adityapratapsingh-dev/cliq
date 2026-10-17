@@ -25,6 +25,7 @@ import {
   type NotificationItem,
   type ProfileStats,
   type Store,
+  type UnreadCounts,
   type StoredUser,
   type UpdateUserPatch,
 } from "@/lib/store/types";
@@ -744,8 +745,14 @@ export class D1Store implements Store {
       text: string;
       is_read: number;
       created_at: string;
+      post_type: string | null;
+      post_media_url: string | null;
+      post_content: string | null;
     }>(
-      "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
+      `SELECT n.*, p.type AS post_type, p.media_url AS post_media_url, p.content AS post_content
+       FROM notifications n
+       LEFT JOIN posts p ON p.id = n.post_id
+       WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT 60`,
       [userId],
     );
     const actorIds = [...new Set(rows.map((r) => r.actor_id).filter((v): v is string => Boolean(v)))];
@@ -759,6 +766,15 @@ export class D1Store implements Store {
         actor: actor ? toPublicUser(actor) : null,
         kind: r.kind,
         postId: r.post_id,
+        post:
+          r.post_id && r.post_type
+            ? {
+                id: r.post_id,
+                type: r.post_type as PostType,
+                mediaUrl: r.post_media_url,
+                content: r.post_content ?? "",
+              }
+            : null,
         text: r.text,
         isRead: Number(r.is_read) === 1,
         createdAt: r.created_at,
@@ -774,12 +790,28 @@ export class D1Store implements Store {
       [input.id, input.userId, input.actorId, input.kind, input.postId, input.text, input.createdAt],
     );
     const actor = input.actorId ? await this.getUserById(input.actorId) : null;
+    let post: NotificationItem["post"] = null;
+    if (input.postId) {
+      const postRow = await d1Query<{ type: string; media_url: string | null; content: string | null }>(
+        "SELECT type, media_url, content FROM posts WHERE id = ?",
+        [input.postId],
+      );
+      if (postRow[0]) {
+        post = {
+          id: input.postId,
+          type: postRow[0].type as PostType,
+          mediaUrl: postRow[0].media_url,
+          content: postRow[0].content ?? "",
+        };
+      }
+    }
     return {
       id: input.id,
       userId: input.userId,
       actor: actor ? toPublicUser(actor) : null,
       kind: input.kind,
       postId: input.postId,
+      post,
       text: input.text,
       isRead: false,
       createdAt: input.createdAt,
@@ -789,5 +821,26 @@ export class D1Store implements Store {
   async markNotificationsRead(userId: string): Promise<void> {
     await this.ready();
     await d1Query("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0", [userId]);
+  }
+
+  async markNotificationRead(id: string, userId: string): Promise<void> {
+    await this.ready();
+    await d1Query("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?", [id, userId]);
+  }
+
+  async unreadCounts(userId: string): Promise<UnreadCounts> {
+    await this.ready();
+    const row = await d1Query<{ notifications: number; messages: number; pending: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0) AS notifications,
+         (SELECT COUNT(*) FROM messages WHERE receiver_id = ? AND is_read = 0) AS messages,
+         (SELECT COUNT(*) FROM friendships WHERE receiver_id = ? AND status = 'pending') AS pending`,
+      [userId, userId, userId],
+    );
+    return {
+      notifications: Number(row[0]?.notifications ?? 0),
+      messages: Number(row[0]?.messages ?? 0),
+      pendingRequests: Number(row[0]?.pending ?? 0),
+    };
   }
 }

@@ -1,8 +1,9 @@
 import { ApiError } from "@/types/cliq";
-import { newId } from "@/lib/auth";
 import { fail, ok, optionalString, readJson, requireString } from "@/lib/api";
+import { newId } from "@/lib/auth";
 import { requireSessionUser } from "@/lib/server-auth";
 import { getStore } from "@/lib/store";
+import { notify, snippet } from "@/lib/notify";
 
 /**
  * GET /api/messages
@@ -80,17 +81,12 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     });
 
-    await store
-      .createNotification({
-        id: newId("n"),
-        userId: receiverId,
-        actorId: me.id,
-        kind: "message",
-        postId: null,
-        text: "sent you a message",
-        createdAt: new Date().toISOString(),
-      })
-      .catch(() => undefined);
+    await notify({
+      userId: receiverId,
+      actorId: me.id,
+      kind: "message",
+      text: content ? `sent you a message: "${snippet(content, 40)}"` : "sent you a message",
+    });
 
     return ok({ message }, { status: 201 });
   } catch (error) {
@@ -101,16 +97,33 @@ export async function POST(request: Request) {
 interface PatchBody {
   messageId?: string;
   emoji?: string;
+  /** When set, marks the whole conversation with this user as read. */
+  action?: "markRead";
+  partnerId?: string;
 }
 
-/** PATCH /api/messages — toggle an emoji reaction on a message. */
+/**
+ * PATCH /api/messages
+ *
+ * Either toggles an emoji reaction (`messageId` + `emoji`) or marks a whole
+ * conversation read (`action: "markRead"` + `partnerId`). The latter is called
+ * the moment a conversation is opened so the unread badge clears instantly.
+ */
 export async function PATCH(request: Request) {
   try {
     const me = await requireSessionUser();
     const body = await readJson<PatchBody>(request);
+    const store = getStore();
+
+    if (body.action === "markRead") {
+      const partnerId = requireString(body.partnerId, "Conversation partner", { max: 200 });
+      await store.markConversationRead(me.id, partnerId);
+      const counts = await store.unreadCounts(me.id);
+      return ok({ ok: true, counts });
+    }
+
     const messageId = requireString(body.messageId, "Message id", { max: 200 });
     const emoji = requireString(body.emoji, "Emoji", { max: 12 });
-    const store = getStore();
     const message = await store.setMessageReaction(messageId, me.id, emoji);
     return ok({ message });
   } catch (error) {
