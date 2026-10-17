@@ -10,8 +10,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ApiClientError, api } from "@/lib/api-client";
-import { DEFAULT_SETTINGS, type SessionUser, type Settings, type TabKey, type Toast } from "@/types/cliq";
+import useSWR from "swr";
+import { ApiClientError, api, swrFetcher } from "@/lib/api-client";
+import { feedKey } from "@/components/tabs/useFeed";
+import {
+  DEFAULT_SETTINGS,
+  type SessionUser,
+  type Post,
+  type Settings,
+  type TabKey,
+  type Toast,
+  type UnreadCounts,
+} from "@/types/cliq";
 
 interface CliqContextValue {
   /** null while the session is being resolved; false-ish once loaded = logged out */
@@ -45,6 +55,14 @@ interface CliqContextValue {
   toggleFollow: (userId: string) => void;
   /** Re-read the follow graph after it changes elsewhere. */
   refreshFollowing: () => Promise<void>;
+  /** Live unread counters (bell + Chats badge). */
+  counts: UnreadCounts;
+  /** Newest post timestamp per feed, for the "new posts" red dots. */
+  feedLatest: { video?: string; photo?: string; chat?: string };
+  /** Last time the user opened each feed tab. */
+  lastSeen: { video?: string; photo?: string; chat?: string; chatposts?: string };
+  /** Record that a tab has been viewed, clearing its dot. */
+  markTabSeen: (tab: TabKey) => void;
   apiError: (error: unknown) => void;
 }
 
@@ -68,6 +86,8 @@ export function CliqProvider({ children }: { children: ReactNode }) {
   const [revision, setRevision] = useState(0);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [counts, setCounts] = useState<UnreadCounts>({ notifications: 0, messages: 0, pendingRequests: 0 });
+  const [lastSeen, setLastSeen] = useState<{ video?: string; photo?: string; chat?: string; chatposts?: string }>({});
   const counter = useRef(0);
 
   const toast = useCallback((text: string, tone: Toast["tone"] = "default") => {
@@ -229,6 +249,73 @@ export function CliqProvider({ children }: { children: ReactNode }) {
     window.localStorage.removeItem("cliq:saved");
   }, []);
 
+  /**
+   * Newest post per feed.
+   *
+   * These `useSWR` calls reuse the *same* cache keys as the tabs, so SWR serves
+   * them from cache — this adds no network traffic, it just observes data the
+   * app has already fetched.
+   */
+  const { data: videoFeed } = useSWR<{ posts: Post[] }>(user ? feedKey("video") : null, swrFetcher);
+  const { data: photoFeed } = useSWR<{ posts: Post[] }>(user ? feedKey("photo") : null, swrFetcher);
+  const { data: chatFeed } = useSWR<{ posts: Post[] }>(user ? feedKey("chat") : null, swrFetcher);
+
+  const feedLatest = useMemo(() => {
+    const newest = (posts?: Post[]) =>
+      posts && posts.length > 0 ? posts.reduce((max, p) => (p.createdAt > max ? p.createdAt : max), "") : undefined;
+    return {
+      video: newest(videoFeed?.posts),
+      photo: newest(photoFeed?.posts),
+      chat: newest(chatFeed?.posts),
+    };
+  }, [videoFeed, photoFeed, chatFeed]);
+
+  // Restore what the user had already seen.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("cliq:lastSeen");
+      if (raw) setLastSeen(JSON.parse(raw) as typeof lastSeen);
+    } catch {
+      /* ignore malformed */
+    }
+  }, []);
+
+  /** Opening a tab clears its red dot immediately. */
+  const markTabSeen = useCallback((next: TabKey) => {
+    const key = next === "chatposts" ? "chatposts" : next === "videos" ? "video" : next === "photos" ? "photo" : null;
+    if (!key) return;
+    setLastSeen((prev) => {
+      const updated = { ...prev, [key]: new Date().toISOString() };
+      try {
+        window.localStorage.setItem("cliq:lastSeen", JSON.stringify(updated));
+      } catch {
+        /* ignore */
+      }
+      return updated;
+    });
+  }, []);
+
+  // Poll the lightweight counters so the Chats badge stays live even when the
+  // Notification Center is closed.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await api.listNotifications();
+        if (!cancelled) setCounts(response.counts);
+      } catch {
+        /* keep the last known counts */
+      }
+    };
+    void load();
+    const timer = setInterval(load, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [user]);
+
   const settings = user?.settings ?? DEFAULT_SETTINGS;
 
   const value = useMemo<CliqContextValue>(
@@ -256,6 +343,10 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       followingIds,
       toggleFollow,
       refreshFollowing,
+      counts,
+      feedLatest,
+      lastSeen,
+      markTabSeen,
       apiError,
     }),
     [
@@ -280,6 +371,10 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       followingIds,
       toggleFollow,
       refreshFollowing,
+      counts,
+      feedLatest,
+      lastSeen,
+      markTabSeen,
       apiError,
     ],
   );

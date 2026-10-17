@@ -22,6 +22,7 @@ import {
   type NotificationItem,
   type ProfileStats,
   type Store,
+  type UnreadCounts,
   type StoredUser,
   type UpdateUserPatch,
 } from "@/lib/store/types";
@@ -506,26 +507,34 @@ export class MemoryStore implements Store {
     return this.state.notifications
       .filter((n) => n.userId === userId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map((n) => ({
-        id: n.id,
-        userId: n.userId,
-        actor: n.actorId ? this.publicUserById(n.actorId) : null,
-        kind: n.kind,
-        postId: n.postId,
-        text: n.text,
-        isRead: n.isRead,
-        createdAt: n.createdAt,
-      }));
+      .map((n) => {
+        const post = n.postId ? this.state.posts.get(n.postId) : undefined;
+        return {
+          id: n.id,
+          userId: n.userId,
+          actor: n.actorId ? this.publicUserById(n.actorId) : null,
+          kind: n.kind,
+          postId: n.postId,
+          post: post
+            ? { id: post.id, type: post.type, mediaUrl: post.mediaUrl, content: post.content }
+            : null,
+          text: n.text,
+          isRead: n.isRead,
+          createdAt: n.createdAt,
+        };
+      });
   }
 
   async createNotification(input: CreateNotificationInput): Promise<NotificationItem> {
     this.state.notifications.push({ ...input, isRead: false });
+    const created = input.postId ? this.state.posts.get(input.postId) : undefined;
     return {
       id: input.id,
       userId: input.userId,
       actor: input.actorId ? this.publicUserById(input.actorId) : null,
       kind: input.kind,
       postId: input.postId,
+      post: created ? { id: created.id, type: created.type, mediaUrl: created.mediaUrl, content: created.content } : null,
       text: input.text,
       isRead: false,
       createdAt: input.createdAt,
@@ -536,6 +545,19 @@ export class MemoryStore implements Store {
     for (const n of this.state.notifications) {
       if (n.userId === userId) n.isRead = true;
     }
+  }
+
+  async markNotificationRead(id: string, userId: string): Promise<void> {
+    const target = this.state.notifications.find((n) => n.id === id && n.userId === userId);
+    if (target) target.isRead = true;
+  }
+
+  async unreadCounts(userId: string): Promise<UnreadCounts> {
+    return {
+      notifications: this.state.notifications.filter((n) => n.userId === userId && !n.isRead).length,
+      messages: this.state.messages.filter((m) => m.receiverId === userId && !m.isRead).length,
+      pendingRequests: this.state.friendships.filter((f) => f.receiverId === userId && f.status === "pending").length,
+    };
   }
 }
 

@@ -1,8 +1,8 @@
 import { ApiError } from "@/types/cliq";
-import { newId } from "@/lib/auth";
 import { fail, ok, readJson, requireString } from "@/lib/api";
 import { requireSessionUser } from "@/lib/server-auth";
 import { getStore } from "@/lib/store";
+import { notify } from "@/lib/notify";
 
 /** GET /api/friends — friends, incoming/outgoing requests and suggestions. */
 export async function GET() {
@@ -37,17 +37,20 @@ export async function POST(request: Request) {
       if (!target) throw new ApiError(404, "That user does not exist.");
       const friendship = await store.sendFriendRequest(me.id, userId);
       if (friendship.status === "pending") {
-        await store
-          .createNotification({
-            id: newId("n"),
-            userId,
-            actorId: me.id,
-            kind: "cliqup",
-            postId: null,
-            text: "sent you a Cliq Up request",
-            createdAt: new Date().toISOString(),
-          })
-          .catch(() => undefined);
+        await notify({
+          userId,
+          actorId: me.id,
+          kind: "friend_request",
+          text: "sent you a Cliq Up request",
+        });
+      } else if (friendship.status === "accepted") {
+        // They had already asked us, so this call auto-accepted.
+        await notify({
+          userId,
+          actorId: me.id,
+          kind: "friend_accept",
+          text: "accepted your Cliq Up",
+        });
       }
       const graph = await store.listFriends(me.id);
       return ok({ friendship, ...graph }, { status: 201 });
@@ -55,6 +58,14 @@ export async function POST(request: Request) {
 
     const friendshipId = requireString(body.friendshipId, "Friendship id", { max: 200 });
     const friendship = await store.respondFriendRequest(friendshipId, me.id, action === "accept");
+    if (action === "accept" && friendship.requesterId !== me.id) {
+      await notify({
+        userId: friendship.requesterId,
+        actorId: me.id,
+        kind: "friend_accept",
+        text: "accepted your Cliq Up",
+      });
+    }
     const graph = await store.listFriends(me.id);
     return ok({ friendship, ...graph });
   } catch (error) {

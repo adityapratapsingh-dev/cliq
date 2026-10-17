@@ -1,8 +1,9 @@
 import { ApiError } from "@/types/cliq";
-import { newId } from "@/lib/auth";
 import { fail, ok, readJson, requireString } from "@/lib/api";
+import { newId } from "@/lib/auth";
 import { requireSessionUser } from "@/lib/server-auth";
 import { getStore } from "@/lib/store";
+import { notify, postNoun, snippet } from "@/lib/notify";
 
 /** GET /api/comments?postId=... — nested comment tree for a post. */
 export async function GET(request: Request) {
@@ -45,19 +46,30 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
     });
 
-    // Let the post's author know (skip when commenting on your own post).
-    if (post.userId !== me.id) {
-      await store
-        .createNotification({
-          id: newId("n"),
-          userId: post.userId,
+    const quote = snippet(content);
+
+    if (body.parentCommentId) {
+      // Reply: notify the person being replied to, not the post author.
+      const parent = (await store.listComments(postId))
+        .flatMap((c) => [c, ...c.replies])
+        .find((c) => c.id === body.parentCommentId);
+      if (parent) {
+        await notify({
+          userId: parent.userId,
           actorId: me.id,
-          kind: "comment",
+          kind: "reply",
           postId: post.id,
-          text: "commented on your post",
-          createdAt: new Date().toISOString(),
-        })
-        .catch(() => undefined);
+          text: `replied to your comment: "${quote}"`,
+        });
+      }
+    } else {
+      await notify({
+        userId: post.userId,
+        actorId: me.id,
+        kind: "comment",
+        postId: post.id,
+        text: `commented on your ${postNoun(post.type)}: "${quote}"`,
+      });
     }
 
     return ok({ comment }, { status: 201 });

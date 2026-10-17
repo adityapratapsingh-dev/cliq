@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { api } from "@/lib/api-client";
+import {
+  browserNotificationsEnabled,
+  disableBrowserNotifications,
+  enableBrowserNotifications,
+} from "@/lib/browser-notify";
 import { Avatar, EmptyState, Modal, SectionCard, Toggle } from "@/components/ui/Primitives";
 import { ACCENT_LIST } from "@/lib/theme";
 import { INTEREST_OPTIONS, MESSAGE_SCOPES } from "@/lib/constants";
@@ -412,6 +417,11 @@ function SettingsPanel({
   dbError: string | null;
 }) {
   const { settings, updateSettings, logOut, toast, mediaUnconfigured } = useCliq();
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  useEffect(() => {
+    setPushEnabled(browserNotificationsEnabled());
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-3 py-4 sm:px-4">
@@ -585,6 +595,26 @@ function SettingsPanel({
           <Toggle checked={settings.notifMessages} onChange={(v) => void updateSettings({ notifMessages: v })} label="Direct Messages" />
           <Toggle checked={settings.notifVotes} onChange={(v) => void updateSettings({ notifVotes: v })} label="Post Upgrades & Likes" />
           <Toggle checked={settings.notifComments} onChange={(v) => void updateSettings({ notifComments: v })} label="Comments" />
+          <Toggle
+            checked={pushEnabled}
+            onChange={(v) => {
+              if (!v) {
+                disableBrowserNotifications();
+                setPushEnabled(false);
+                toast("Browser notifications turned off", "default");
+                return;
+              }
+              void enableBrowserNotifications().then((granted) => {
+                setPushEnabled(granted);
+                toast(
+                  granted ? "Browser notifications enabled 🔔" : "Your browser blocked notifications",
+                  granted ? "success" : "danger",
+                );
+              });
+            }}
+            label="Browser Notifications"
+            hint="Get native device alerts for new messages and activity"
+          />
         </div>
       </SectionCard>
 

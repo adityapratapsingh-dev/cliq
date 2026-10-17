@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { type ReactNode } from "react";
 import { useCliq } from "@/components/CliqProvider";
+import { useNotificationCenter } from "@/components/notifications/useNotificationCenter";
+import { ActivityPill } from "@/components/notifications/ActivityPill";
 import { Avatar } from "@/components/ui/Primitives";
 import type { TabKey } from "@/types/cliq";
 import { cx } from "@/lib/utils";
@@ -49,17 +51,16 @@ export function CliqLogo({ compact }: { compact?: boolean }) {
 export function Header({
   search,
   onSearch,
-  bellCount,
   onBell,
   onProfile,
 }: {
   search: string;
   onSearch: (value: string) => void;
-  bellCount: number;
   onBell: () => void;
   onProfile: () => void;
 }) {
   const { user, setCreateOpen } = useCliq();
+  const { unreadCount } = useNotificationCenter();
 
   return (
     <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl">
@@ -99,19 +100,27 @@ export function Header({
           <Plus size={16} strokeWidth={3} /> Create
         </button>
 
-        <button
-          type="button"
-          aria-label="Notifications"
-          onClick={onBell}
-          className="relative grid h-10 w-10 place-items-center rounded-full border border-zinc-800/80 bg-zinc-900/70 text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
-        >
-          <Bell size={18} />
-          {bellCount > 0 ? (
-            <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-[var(--accent-grad)] px-1 text-[10px] font-bold text-white">
-              {bellCount}
-            </span>
-          ) : null}
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="Notifications"
+            data-testid="notification-bell"
+            onClick={onBell}
+            className="relative grid h-10 w-10 place-items-center rounded-full border border-zinc-800/80 bg-zinc-900/70 text-zinc-300 transition hover:border-zinc-700 hover:text-zinc-100"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 ? (
+              <span
+                data-testid="bell-badge"
+                className="absolute -right-0.5 -top-0.5 grid h-[18px] min-w-[18px] animate-pulse place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white shadow-lg shadow-rose-500/40"
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            ) : null}
+          </button>
+          {/* Floating Instagram-style activity bubble */}
+          <ActivityPill onOpen={onBell} />
+        </div>
 
         <button
           type="button"
@@ -134,12 +143,14 @@ export function Header({
 
 export function Sidebar({ children }: { children?: ReactNode }) {
   const { tab, setTab, user } = useCliq();
+  const badges = useNavBadges();
 
   return (
     <aside className="cliq-scroll sticky top-16 hidden h-[calc(100dvh-4rem)] w-64 shrink-0 flex-col gap-1 overflow-y-auto border-r border-zinc-800/80 px-3 py-5 lg:flex">
       <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">Explore Cliq</p>
       {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
         const active = tab === key;
+        const badge = badges[key];
         return (
           <button
             key={key}
@@ -152,14 +163,23 @@ export function Sidebar({ children }: { children?: ReactNode }) {
           >
             <span
               className={cx(
-                "grid h-8 w-8 place-items-center rounded-xl transition",
+                "relative grid h-8 w-8 place-items-center rounded-xl transition",
                 active ? "bg-[var(--accent-grad)] text-white" : "bg-zinc-900 text-zinc-400 group-hover:text-zinc-100",
               )}
             >
               <Icon size={16} />
+              {badge?.dot ? (
+                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-rose-500 shadow-lg shadow-rose-500/40" />
+              ) : null}
             </span>
             <span className="flex-1 text-left">{label}</span>
-            {active ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" /> : null}
+            {badge?.count ? (
+              <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white shadow-lg shadow-rose-500/40">
+                {badge.count > 9 ? "9+" : badge.count}
+              </span>
+            ) : active ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+            ) : null}
           </button>
         );
       })}
@@ -181,12 +201,20 @@ export function Sidebar({ children }: { children?: ReactNode }) {
 
 export function BottomNav() {
   const { tab, setTab, setCreateOpen, user } = useCliq();
+  const badges = useNavBadges();
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-xl lg:hidden">
       <div className="mx-auto flex max-w-lg items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] pt-1.5">
         {NAV_ITEMS.slice(0, 2).map(({ key, label, icon: Icon }) => (
-          <NavButton key={key} active={tab === key} label={label} Icon={Icon} onClick={() => setTab(key)} />
+          <NavButton
+            key={key}
+            active={tab === key}
+            label={label}
+            Icon={Icon}
+            onClick={() => setTab(key)}
+            badge={badges[key]}
+          />
         ))}
         <button
           type="button"
@@ -204,6 +232,7 @@ export function BottomNav() {
             Icon={Icon}
             onClick={() => setTab(key)}
             avatar={key === "profile" && user ? <Avatar user={user} size={22} /> : undefined}
+            badge={badges[key]}
           />
         ))}
       </div>
@@ -217,12 +246,14 @@ function NavButton({
   Icon,
   onClick,
   avatar,
+  badge,
 }: {
   active: boolean;
   label: string;
   Icon: typeof Home;
   onClick: () => void;
   avatar?: ReactNode;
+  badge?: { count: number; dot: boolean };
 }) {
   return (
     <button
@@ -233,12 +264,51 @@ function NavButton({
         active ? "text-[var(--accent-2)]" : "text-zinc-500",
       )}
     >
-      {avatar ? (
-        <span className={cx("rounded-full", active && "ring-2 ring-[var(--accent)]")}>{avatar}</span>
-      ) : (
-        <Icon size={20} className={cx(active && "drop-shadow-[0_0_6px_var(--accent)]")} />
-      )}
+      <span className="relative">
+        {avatar ? (
+          <span className={cx("block rounded-full", active && "ring-2 ring-[var(--accent)]")}>{avatar}</span>
+        ) : (
+          <Icon size={20} className={cx(active && "drop-shadow-[0_0_6px_var(--accent)]")} />
+        )}
+        {badge?.dot ? (
+          <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-rose-500 shadow-lg shadow-rose-500/40" />
+        ) : null}
+        {badge?.count ? (
+          <span className="absolute -right-2 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white shadow-lg shadow-rose-500/40">
+            {badge.count > 9 ? "9+" : badge.count}
+          </span>
+        ) : null}
+      </span>
       <span>{label}</span>
     </button>
   );
+}
+
+/**
+ * Red-dot state for every nav item.
+ *
+ * Chats shows a numeric badge (unread DMs + pending Cliq requests). The feed
+ * tabs show a plain dot when a post newer than the last time you opened that tab
+ * exists, and it clears as soon as you switch to the tab.
+ */
+export function useNavBadges(): Partial<Record<TabKey, { count: number; dot: boolean }>> {
+  const { tab, counts, lastSeen, feedLatest } = useCliq();
+
+  const chatCount = counts.messages + counts.pendingRequests;
+
+  return {
+    friends: { count: chatCount, dot: chatCount > 0 },
+    videos: {
+      count: 0,
+      dot: (feedLatest.video ?? "") > (lastSeen.video ?? "") && tab !== "videos",
+    },
+    photos: {
+      count: 0,
+      dot: (feedLatest.photo ?? "") > (lastSeen.photo ?? "") && tab !== "photos",
+    },
+    chatposts: {
+      count: 0,
+      dot: (feedLatest.chat ?? "") > (lastSeen.chatposts ?? "") && tab !== "chatposts",
+    },
+  };
 }

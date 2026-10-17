@@ -1,8 +1,8 @@
 import { ApiError, type ReactionType } from "@/types/cliq";
-import { newId } from "@/lib/auth";
 import { fail, ok, readJson, requireString } from "@/lib/api";
 import { requireSessionUser } from "@/lib/server-auth";
 import { getStore } from "@/lib/store";
+import { notify, postNoun } from "@/lib/notify";
 
 const REACTIONS: ReactionType[] = ["like", "dislike", "upgrade", "downgrade"];
 
@@ -29,6 +29,13 @@ export async function POST(request: Request) {
     if (body.optionId) {
       const optionId = requireString(body.optionId, "Poll option", { max: 200 });
       const post = await store.votePoll(postId, me.id, optionId);
+      await notify({
+        userId: post.userId,
+        actorId: me.id,
+        kind: "poll_vote",
+        postId: post.id,
+        text: `voted on your poll`,
+      });
       return ok({ post });
     }
 
@@ -51,27 +58,24 @@ export async function POST(request: Request) {
 
     const post = await store.setPostReaction(postId, me.id, reaction);
 
-    // Notify the post's author (never the person reacting to their own post).
-    if (post.userId !== me.id) {
+    // Only notify on an *add*, not when the same reaction is toggled off.
+    if (post.myReaction === reaction) {
+      const noun = postNoun(post.type);
       const label =
         reaction === "like"
-          ? "liked your post"
+          ? `liked your ${noun}`
           : reaction === "dislike"
-            ? "disliked your post"
+            ? `disliked your ${noun}`
             : reaction === "upgrade"
               ? "upgraded your post"
               : "downgraded your post";
-      await store
-        .createNotification({
-          id: newId("n"),
-          userId: post.userId,
-          actorId: me.id,
-          kind: reaction === "upgrade" || reaction === "downgrade" ? "upgrade" : "like",
-          postId: post.id,
-          text: label,
-          createdAt: new Date().toISOString(),
-        })
-        .catch(() => undefined);
+      await notify({
+        userId: post.userId,
+        actorId: me.id,
+        kind: reaction,
+        postId: post.id,
+        text: label,
+      });
     }
 
     return ok({ post });
