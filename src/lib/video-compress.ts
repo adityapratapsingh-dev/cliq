@@ -18,12 +18,78 @@
  * the reason a user cannot post.
  */
 
-/** Long edge cap. 1280 ≈ 720p, which looks fine on a phone. */
-export const VIDEO_MAX_EDGE = 1280;
-export const VIDEO_FPS = 30;
+/**
+ * Quality presets.
+ *
+ * `balanced` is the default and matches the original settings. The other two
+ * exist so the size/quality trade-off is explicit rather than guessed at:
+ *
+ *   dataSaver — roughly half the bitrate of balanced, for slow connections or
+ *               when storage is the binding constraint.
+ *   high      — closer to the source; still far smaller than an unprocessed
+ *               phone clip, which is typically 10-20 Mbps.
+ *
+ * Lowering `videoBitsPerSecond` is by far the most effective lever: MediaRecorder
+ * targets a bitrate, so file size scales almost linearly with it. Reducing
+ * resolution helps too, but less than people expect — the encoder spends its
+ * budget on whatever detail remains.
+ */
+export interface VideoPreset {
+  label: string;
+  maxEdge: number;
+  fps: number;
+  videoBitsPerSecond: number;
+  audioBitsPerSecond: number;
+}
+
+export const VIDEO_PRESETS: Record<"dataSaver" | "balanced" | "high", VideoPreset> = {
+  dataSaver: {
+    label: "Data saver",
+    maxEdge: 854, // 480p
+    fps: 24,
+    videoBitsPerSecond: 900_000,
+    audioBitsPerSecond: 64_000,
+  },
+  balanced: {
+    label: "Balanced",
+    maxEdge: 1280, // 720p
+    fps: 30,
+    videoBitsPerSecond: 1_800_000,
+    audioBitsPerSecond: 96_000,
+  },
+  high: {
+    label: "High quality",
+    maxEdge: 1920, // 1080p
+    fps: 30,
+    videoBitsPerSecond: 3_500_000,
+    audioBitsPerSecond: 128_000,
+  },
+};
+
+export type VideoPresetName = keyof typeof VIDEO_PRESETS;
+
+export const DEFAULT_VIDEO_PRESET: VideoPresetName = "balanced";
+
+/**
+ * Suggest a preset from the clip's size.
+ *
+ * The goal is to keep uploads under ~15 MB, which is a reasonable ceiling on
+ * mobile data while still looking good on a phone screen.
+ */
+export function suggestPreset(bytes: number, durationSeconds: number): VideoPresetName {
+  const megabytes = bytes / (1024 * 1024);
+  // Long clips benefit most from the smaller preset, since size scales with time.
+  if (megabytes > 60 || durationSeconds > 90) return "dataSaver";
+  if (megabytes < 15 && durationSeconds < 30) return "high";
+  return "balanced";
+}
+
+/** Long edge cap for the default preset. 1280 ≈ 720p, fine on a phone. */
+export const VIDEO_MAX_EDGE = VIDEO_PRESETS.balanced.maxEdge;
+export const VIDEO_FPS = VIDEO_PRESETS.balanced.fps;
 /** ~1.8 Mbps video — a good size/quality balance for phone-shot clips. */
-export const VIDEO_BITRATE = 1_800_000;
-export const VIDEO_AUDIO_BITRATE = 96_000;
+export const VIDEO_BITRATE = VIDEO_PRESETS.balanced.videoBitsPerSecond;
+export const VIDEO_AUDIO_BITRATE = VIDEO_PRESETS.balanced.audioBitsPerSecond;
 /** Below this, the wait is not worth the saving. */
 export const VIDEO_MIN_SIZE_BYTES = 6 * 1024 * 1024;
 /** Real-time cost guard: skip compression for clips longer than this. */
@@ -32,6 +98,8 @@ export const VIDEO_MAX_DURATION_SECONDS = 120;
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 export interface VideoCompressionOptions {
+  /** Named preset. Individual options below override it. */
+  preset?: VideoPresetName;
   maxEdge?: number;
   fps?: number;
   videoBitsPerSecond?: number;
@@ -189,11 +257,12 @@ export async function compressVideo(
     bytes: originalBytes,
   });
 
+  const chosen = VIDEO_PRESETS[options.preset ?? DEFAULT_VIDEO_PRESET] ?? VIDEO_PRESETS.balanced;
   const {
-    maxEdge = VIDEO_MAX_EDGE,
-    fps = VIDEO_FPS,
-    videoBitsPerSecond = VIDEO_BITRATE,
-    audioBitsPerSecond = VIDEO_AUDIO_BITRATE,
+    maxEdge = chosen.maxEdge,
+    fps = chosen.fps,
+    videoBitsPerSecond = chosen.videoBitsPerSecond,
+    audioBitsPerSecond = chosen.audioBitsPerSecond,
     maxDurationSeconds = VIDEO_MAX_DURATION_SECONDS,
     minSizeBytes = VIDEO_MIN_SIZE_BYTES,
     onProgress,

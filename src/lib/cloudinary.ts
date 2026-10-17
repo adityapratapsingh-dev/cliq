@@ -11,7 +11,13 @@
  * Both are NEXT_PUBLIC_* because the browser performs the upload.
  */
 
-import { compressVideo, formatBytes, isCompressibleVideo, MAX_UPLOAD_BYTES } from "@/lib/video-compress";
+import {
+  compressVideo,
+  formatBytes,
+  isCompressibleVideo,
+  MAX_UPLOAD_BYTES,
+  type VideoPresetName,
+} from "@/lib/video-compress";
 
 export interface CloudinaryConfig {
   cloudName: string;
@@ -60,6 +66,8 @@ export interface UploadOptions {
   signal?: AbortSignal;
   /** Compress before upload (default true). Applies to images and videos. */
   compress?: boolean;
+  /** Quality preset for video compression. Ignored for images. */
+  preset?: VideoPresetName;
 }
 
 /** Thrown when a file is too large to upload at all. */
@@ -225,6 +233,7 @@ export async function uploadMedia(file: File, options: UploadOptions = {}): Prom
     prepared = await compressImage(file);
   } else if (shouldCompress && isCompressibleVideo(file)) {
     const result = await compressVideo(file, {
+      preset: options.preset,
       signal: options.signal,
       onProgress: (percent) =>
         options.onPrepare?.({
