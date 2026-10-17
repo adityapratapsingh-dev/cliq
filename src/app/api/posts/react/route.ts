@@ -1,4 +1,5 @@
 import { ApiError, type ReactionType } from "@/types/cliq";
+import { newId } from "@/lib/auth";
 import { fail, ok, readJson, requireString } from "@/lib/api";
 import { requireSessionUser } from "@/lib/server-auth";
 import { getStore } from "@/lib/store";
@@ -49,6 +50,30 @@ export async function POST(request: Request) {
     }
 
     const post = await store.setPostReaction(postId, me.id, reaction);
+
+    // Notify the post's author (never the person reacting to their own post).
+    if (post.userId !== me.id) {
+      const label =
+        reaction === "like"
+          ? "liked your post"
+          : reaction === "dislike"
+            ? "disliked your post"
+            : reaction === "upgrade"
+              ? "upgraded your post"
+              : "downgraded your post";
+      await store
+        .createNotification({
+          id: newId("n"),
+          userId: post.userId,
+          actorId: me.id,
+          kind: reaction === "upgrade" || reaction === "downgrade" ? "upgrade" : "like",
+          postId: post.id,
+          text: label,
+          createdAt: new Date().toISOString(),
+        })
+        .catch(() => undefined);
+    }
+
     return ok({ post });
   } catch (error) {
     return fail(error);

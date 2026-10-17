@@ -1,53 +1,129 @@
 "use client";
 
-import { useState } from "react";
-import { Film, Image as ImageIcon, Link2, MessageSquare, Sparkles, X } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  Check,
+  Film,
+  Image as ImageIcon,
+  Link2,
+  MessageSquare,
+  Sparkles,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { Modal } from "@/components/ui/Primitives";
 import { FLAIRS } from "@/lib/constants";
 import { api } from "@/lib/api-client";
+import {
+  CloudinaryNotConfiguredError,
+  isCompressibleImage,
+  uploadMedia,
+} from "@/lib/cloudinary";
+import { prependPost } from "@/components/tabs/useFeed";
 import type { PostType } from "@/types/cliq";
 import { cx } from "@/lib/utils";
 
+interface UploadState {
+  /** 0-100, or null when no upload is running */
+  progress: number | null;
+  name: string;
+  kind: "image" | "video";
+  localUrl: string;
+}
+
 export function CreateModal() {
-  const { createOpen, setCreateOpen, tab, bump, toast, apiError } = useCliq();
+  const { createOpen, setCreateOpen, tab, toast, apiError, user, mediaUnconfigured, bump } = useCliq();
   const [type, setType] = useState<PostType>("video");
   const [content, setContent] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
+  const [upload, setUpload] = useState<UploadState | null>(null);
   const [flair, setFlair] = useState(FLAIRS[0].label);
   const [pollMode, setPollMode] = useState(false);
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  function close() {
-    setCreateOpen(false);
+  function reset() {
     setContent("");
     setMediaUrl("");
     setPollMode(false);
     setPollOptions(["", ""]);
+    setUpload((prev) => {
+      if (prev) URL.revokeObjectURL(prev.localUrl);
+      return null;
+    });
   }
 
-  function openWith(defaultType: PostType) {
-    setType(defaultType);
+  function close() {
+    abortRef.current?.abort();
+    reset();
+    setCreateOpen(false);
+  }
+
+  /** Upload straight to Cloudinary so Vercel never sees the bytes. */
+  async function handleFile(file: File) {
+    if (mediaUnconfigured) {
+      toast("Media uploads need Cloudinary env vars set. You can paste a URL instead.", "danger");
+      return;
+    }
+
+    const isVideo = file.type.startsWith("video/");
+    const localUrl = URL.createObjectURL(file);
+    setUpload({ progress: 0, name: file.name, kind: isVideo ? "video" : "image", localUrl });
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const result = await uploadMedia(file, {
+        compress: !isVideo && isCompressibleImage(file),
+        signal: controller.signal,
+        onProgress: (percent) =>
+          setUpload((prev) => (prev ? { ...prev, progress: percent } : prev)),
+      });
+      setMediaUrl(result.secureUrl);
+      setUpload((prev) => (prev ? { ...prev, progress: 100 } : prev));
+      toast("Upload complete ✅", "success");
+    } catch (error) {
+      setUpload((prev) => {
+        if (prev) URL.revokeObjectURL(prev.localUrl);
+        return null;
+      });
+      if (error instanceof CloudinaryNotConfiguredError) {
+        toast("Media uploads are not configured — paste a URL instead.", "danger");
+      } else if (error instanceof Error && /cancel/i.test(error.message)) {
+        toast("Upload cancelled", "default");
+      } else {
+        apiError(error);
+      }
+    } finally {
+      abortRef.current = null;
+    }
   }
 
   const typeForTab: PostType | null =
     tab === "videos" ? "video" : tab === "photos" ? "photo" : tab === "chatposts" ? "chat" : null;
 
+  const uploading = upload?.progress !== null && upload?.progress !== undefined && upload.progress < 100;
   const canPublish =
-    type === "chat" ? content.trim().length > 0 : content.trim().length > 0 || mediaUrl.trim().length > 0;
+    (type === "chat" ? content.trim().length > 0 : content.trim().length > 0 || mediaUrl.trim().length > 0) &&
+    !uploading;
 
   async function publish() {
     if (!canPublish || busy) return;
     setBusy(true);
     try {
-      await api.createPost({
+      const { post } = await api.createPost({
         type,
         content: content.trim(),
         mediaUrl: mediaUrl.trim() || null,
         flair: type === "chat" ? flair : null,
         pollOptions: type === "chat" && pollMode ? pollOptions.filter((o) => o.trim()) : [],
       });
+      // Show it in the feed immediately, then let SWR reconcile.
+      await prependPost(type, post);
       bump();
       toast("Published to Cliq ⚡", "success");
       close();
@@ -69,7 +145,7 @@ export function CreateModal() {
       open={createOpen}
       onClose={close}
       title="Create on Cliq"
-      subtitle="Share a video, a photo, or a late-night thought ✨"
+      subtitle="Uploads go straight to Cloudinary — fast, even on mobile data ✨"
       maxWidth="max-w-xl"
     >
       <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-1">
@@ -77,7 +153,7 @@ export function CreateModal() {
           <button
             key={key}
             type="button"
-            onClick={() => openWith(key)}
+            onClick={() => setType(key)}
             className={cx(
               "inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition",
               type === key ? "bg-[var(--accent-grad)] text-white" : "text-zinc-400 hover:text-zinc-100",
@@ -97,38 +173,93 @@ export function CreateModal() {
 
       <div className="space-y-4">
         {type !== "chat" ? (
-          <label className="block">
-            <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-zinc-400">
-              {type === "video" ? <Film size={13} /> : <ImageIcon size={13} />}
-              {type === "video" ? "Video URL (.mp4)" : "Photo URL"}
-              <span className="text-zinc-600">— paste a link or upload a file</span>
-            </span>
-            <input
-              value={mediaUrl.startsWith("data:") ? "" : mediaUrl}
-              onChange={(e) => setMediaUrl(e.target.value)}
-              placeholder={type === "video" ? "https://.../clip.mp4" : "https://.../photo.jpg"}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-            />
-            <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100">
-              <Link2 size={13} /> Upload {type === "video" ? "video" : "image"}
+          <div>
+            {/* live preview */}
+            {upload || mediaUrl ? (
+              <div className="relative mb-2 overflow-hidden rounded-2xl border border-zinc-800 bg-black">
+                {upload?.kind === "video" && upload.localUrl ? (
+                  <video src={upload.localUrl} className="max-h-64 w-full object-contain" controls muted playsInline />
+                ) : mediaUrl || upload?.localUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={upload?.localUrl ?? mediaUrl}
+                    alt="Upload preview"
+                    className="max-h-64 w-full object-contain"
+                  />
+                ) : null}
+
+                {uploading ? (
+                  <div className="absolute inset-x-0 bottom-0 bg-zinc-950/80 px-3 py-2 backdrop-blur">
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-zinc-300">
+                      <span className="truncate">{upload?.name}</span>
+                      <span className="tabular-nums">{upload?.progress ?? 0}%</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                      <div
+                        className="h-full rounded-full bg-[var(--accent-grad)] transition-[width] duration-200"
+                        style={{ width: `${upload?.progress ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    abortRef.current?.abort();
+                    setMediaUrl("");
+                    setUpload((prev) => {
+                      if (prev) URL.revokeObjectURL(prev.localUrl);
+                      return null;
+                    });
+                  }}
+                  aria-label="Remove media"
+                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-zinc-950/70 text-zinc-200 backdrop-blur transition hover:text-white"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100"
+              >
+                <UploadCloud size={13} /> {type === "video" ? "Upload video" : "Upload photo"}
+              </button>
+              <span className="text-[11px] text-zinc-600">or paste a link</span>
               <input
+                ref={fileRef}
                 type="file"
                 accept={type === "video" ? "video/*" : "image/*"}
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (file.size > 4.5 * 1024 * 1024) {
-                    toast("Keep uploads under 4.5MB, or paste a URL instead.", "danger");
-                    return;
-                  }
-                  const reader = new FileReader();
-                  reader.onload = () => setMediaUrl(typeof reader.result === "string" ? reader.result : "");
-                  reader.readAsDataURL(file);
+                  if (file) void handleFile(file);
+                  e.target.value = "";
                 }}
               />
-            </label>
-          </label>
+            </div>
+
+            <div className="relative mt-2">
+              <Link2 size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                value={mediaUrl.startsWith("blob:") ? "" : mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder={type === "video" ? "https://.../clip.mp4" : "https://.../photo.jpg"}
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+              />
+            </div>
+
+            {mediaUnconfigured ? (
+              <p className="mt-2 text-[10px] leading-relaxed text-amber-300/80">
+                Direct uploads are off until NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME and
+                NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET are set. Pasting a URL still works.
+              </p>
+            ) : null}
+          </div>
         ) : null}
 
         {type === "chat" ? (
@@ -204,81 +335,28 @@ export function CreateModal() {
         />
         <div className="flex items-center justify-between text-[11px] text-zinc-500">
           <span>{content.length}/500 characters</span>
-          <span>Safe-chat filter keeps Cliq kind 🛡️</span>
+          <span>{user ? `Posting as @${user.username}` : "Safe-chat filter keeps Cliq kind 🛡️"}</span>
         </div>
 
         <button
           type="button"
-          onClick={publish}
+          onClick={() => void publish()}
           disabled={!canPublish || busy}
           className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-grad)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {busy ? "Publishing..." : "Publish to Cliq"}
+          {uploading ? (
+            <span>Uploading {upload?.progress ?? 0}%</span>
+          ) : busy ? (
+            <span>Publishing...</span>
+          ) : (
+            <>
+              <Check size={16} /> Publish to Cliq
+            </>
+          )}
         </button>
       </div>
     </Modal>
   );
 }
 
-export function ShareSheet({
-  open,
-  onClose,
-  title,
-  onShare,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  onShare?: (action: "copy" | "repost") => void;
-}) {
-  const { toast } = useCliq();
-  const [copied, setCopied] = useState(false);
-
-  const actions = [
-    {
-      key: "copy",
-      label: copied ? "Link copied ✓" : "Copy Link",
-      icon: Link2,
-      run: () => {
-        const url = typeof window !== "undefined" ? window.location.href : "https://oncliq.vercel.app";
-        navigator.clipboard?.writeText(url).catch(() => undefined);
-        setCopied(true);
-        onShare?.("copy");
-        toast("Link copied to clipboard 🔗", "success");
-      },
-    },
-    {
-      key: "repost",
-      label: "Repost to my Cliq",
-      icon: Sparkles,
-      run: () => {
-        onShare?.("repost");
-        toast("Reposted 🔁", "success");
-      },
-    },
-  ];
-
-  return (
-    <Modal open={open} onClose={onClose} title="Share" subtitle={title} maxWidth="max-w-md">
-      <div className="space-y-1.5">
-        {actions.map(({ key, label, icon: Icon, run }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={run}
-            className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/50 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-[var(--accent)] hover:bg-zinc-900"
-          >
-            <Icon size={16} /> {label}
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        onClick={onClose}
-        className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-xs font-semibold text-zinc-500 transition hover:text-zinc-200"
-      >
-        <X size={14} /> Cancel
-      </button>
-    </Modal>
-  );
-}
+export { ShareSheet } from "@/components/ShareSheet";

@@ -1,18 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Bookmark, MessageCircle, MessageSquare, Repeat, Send, Share2, Sparkles, TrendingUp, Vote } from "lucide-react";
+import { Bookmark, MessageCircle, MessageSquare, Send, Share2, Sparkles, TrendingUp, Vote } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { api } from "@/lib/api-client";
 import { Avatar, EmptyState, IconButton, SkeletonCard } from "@/components/ui/Primitives";
 import { CommentThread, HashtagText, VoteBar } from "@/components/ui/FeedBits";
-import { ShareSheet } from "@/components/CreateModal";
+import { ShareSheet } from "@/components/ShareSheet";
 import { matchesSearch, useComments, useFeed } from "@/components/tabs/useFeed";
+import { usePostActions } from "@/components/tabs/usePostActions";
+import { api } from "@/lib/api-client";
+import { prependPost } from "@/components/tabs/useFeed";
 import { FLAIRS, flairColor } from "@/lib/constants";
 import type { Post } from "@/types/cliq";
-import { censor, cx, formatCount, timeAgo } from "@/lib/utils";
+import { censor, cx, timeAgo } from "@/lib/utils";
 
-export function ChatPostsTab({ search }: { search: string }) {
+export function ChatPostsTab({ search, onOpenProfile }: { search: string; onOpenProfile: (id: string) => void }) {
   const { posts, loading } = useFeed("chat");
   const { setCreateOpen } = useCliq();
 
@@ -52,7 +54,7 @@ export function ChatPostsTab({ search }: { search: string }) {
           onAction={search ? undefined : () => setCreateOpen(true)}
         />
       ) : (
-        visible.map((post) => <ChatPostCard key={post.id} post={post} />)
+        visible.map((post) => <ChatPostCard key={post.id} post={post} onOpenProfile={onOpenProfile} />)
       )}
     </div>
   );
@@ -70,7 +72,7 @@ function Composer() {
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      await api.createPost({
+      const { post } = await api.createPost({
         type: "chat",
         content: text.trim(),
         flair: flair.label,
@@ -79,6 +81,7 @@ function Composer() {
       setText("");
       setPollMode(false);
       setOptions(["", ""]);
+      await prependPost("chat", post);
       bump();
       toast("Thought dropped on Cliq ⚡", "success");
     } catch (error) {
@@ -157,7 +160,10 @@ function Composer() {
 
           <div className="mt-3 flex items-center justify-between">
             <span className="text-[11px] text-zinc-500">
-              {text.length}/500 · <span className="font-semibold" style={{ color: flair.color }}>{flair.label}</span>
+              {text.length}/500 ·{" "}
+              <span className="font-semibold" style={{ color: flair.color }}>
+                {flair.label}
+              </span>
             </span>
             <button
               type="button"
@@ -177,54 +183,52 @@ function Composer() {
   );
 }
 
-function ChatPostCard({ post }: { post: Post }) {
-  const { user, toast, apiError, savedIds, toggleSaved, settings } = useCliq();
-  const [vote, setVote] = useState<"up" | "down" | null>(
-    post.myReaction === "upgrade" ? "up" : post.myReaction === "downgrade" ? "down" : null,
-  );
-  const [upgrades, setUpgrades] = useState(post.upgradesCount);
-  const [downgrades, setDowngrades] = useState(post.downgradesCount);
-  const [poll, setPoll] = useState(post.poll);
+function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: string) => void }) {
+  const { user, toast, savedIds, toggleSaved, settings } = useCliq();
+  const { react, votePoll } = usePostActions();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [draft, setDraft] = useState("");
 
   const { comments, loading, add } = useComments(post.id, commentsOpen);
+
   const saved = savedIds.includes(post.id);
   const mine = post.userId === user?.id;
   const hideCounts = settings.hideDislikes && mine;
-  const score = upgrades - downgrades;
-  const pollTotal = poll ? poll.options.reduce((sum, o) => sum + o.votes, 0) : 0;
-
-  async function applyVote(dir: "up" | "down") {
-    try {
-      const { post: updated } = await api.react(post.id, dir === "up" ? "upgrade" : "downgrade");
-      setVote(updated.myReaction === "upgrade" ? "up" : updated.myReaction === "downgrade" ? "down" : null);
-      setUpgrades(updated.upgradesCount);
-      setDowngrades(updated.downgradesCount);
-    } catch (error) {
-      apiError(error);
-    }
-  }
-
-  async function castPoll(optionId: string) {
-    try {
-      const { post: updated } = await api.votePoll(post.id, optionId);
-      setPoll(updated.poll);
-    } catch (error) {
-      apiError(error);
-    }
-  }
+  const vote = post.myReaction === "upgrade" ? "up" : post.myReaction === "downgrade" ? "down" : null;
+  const score = post.upgradesCount - post.downgradesCount;
+  const pollTotal = post.poll ? post.poll.options.reduce((sum, o) => sum + o.votes, 0) : 0;
 
   return (
     <article className="cliq-rise rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-4 backdrop-blur-md">
       <header className="flex items-center gap-3">
-        {post.author ? <Avatar user={post.author} size={40} ring /> : <span className="h-10 w-10 rounded-full bg-zinc-800" />}
+        <button
+          type="button"
+          onClick={() => post.author && onOpenProfile(post.author.id)}
+          className="shrink-0 rounded-full transition hover:brightness-110"
+          aria-label="Open profile"
+        >
+          {post.author ? (
+            <Avatar user={post.author} size={40} ring />
+          ) : (
+            <span className="h-10 w-10 rounded-full bg-zinc-800" />
+          )}
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-zinc-100">{post.author?.displayName ?? "Cliq User"}</p>
-          <p className="truncate text-[11px] text-zinc-500">
+          <button
+            type="button"
+            onClick={() => post.author && onOpenProfile(post.author.id)}
+            className="block max-w-full truncate text-left text-sm font-bold text-zinc-100 transition hover:text-[var(--accent-2)]"
+          >
+            {post.author?.displayName ?? "Cliq User"}
+          </button>
+          <button
+            type="button"
+            onClick={() => post.author && onOpenProfile(post.author.id)}
+            className="block max-w-full truncate text-left text-[11px] text-zinc-500 transition hover:text-[var(--accent-2)]"
+          >
             @{post.author?.username ?? "unknown"} · {timeAgo(post.createdAt)}
-          </p>
+          </button>
         </div>
         {post.flair ? (
           <span
@@ -244,16 +248,16 @@ function ChatPostCard({ post }: { post: Post }) {
         <HashtagText text={censor(post.content, settings.toxicFilter)} />
       </p>
 
-      {poll ? (
+      {post.poll ? (
         <div className="mt-3 space-y-2">
-          {poll.options.map((opt) => {
+          {post.poll.options.map((opt) => {
             const pct = pollTotal > 0 ? Math.round((opt.votes / pollTotal) * 100) : 0;
-            const voted = poll.votedOptionId === opt.id;
+            const voted = post.poll?.votedOptionId === opt.id;
             return (
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => void castPoll(opt.id)}
+                onClick={() => void votePoll(post.id, opt.id, post)}
                 className={cx(
                   "relative w-full overflow-hidden rounded-2xl border px-3 py-2.5 text-left transition",
                   voted ? "border-[var(--accent)]" : "border-zinc-800 hover:border-zinc-700",
@@ -273,7 +277,7 @@ function ChatPostCard({ post }: { post: Post }) {
             );
           })}
           <p className="text-[11px] text-zinc-500">
-            {pollTotal} vote{pollTotal === 1 ? "" : "s"} · {poll.votedOptionId ? "You voted" : "Tap to vote"}
+            {pollTotal} vote{pollTotal === 1 ? "" : "s"} · {post.poll.votedOptionId ? "You voted" : "Tap to vote"}
           </p>
         </div>
       ) : null}
@@ -282,8 +286,8 @@ function ChatPostCard({ post }: { post: Post }) {
         <VoteBar
           score={hideCounts ? 0 : score}
           vote={vote}
-          onUp={() => void applyVote("up")}
-          onDown={() => void applyVote("down")}
+          onUp={() => void react(post.id, "upgrade", post)}
+          onDown={() => void react(post.id, "downgrade", post)}
         />
         <IconButton
           icon={<MessageCircle size={17} />}
@@ -291,7 +295,6 @@ function ChatPostCard({ post }: { post: Post }) {
           onClick={() => setCommentsOpen((v) => !v)}
           title="Comments"
         />
-        <IconButton icon={<Repeat size={17} />} count={formatCount(0)} disabled title="Reposts (coming soon)" />
         <IconButton
           icon={<Bookmark size={17} className={cx(saved && "fill-current")} />}
           active={saved}
@@ -358,3 +361,4 @@ function ChatPostCard({ post }: { post: Post }) {
     </article>
   );
 }
+

@@ -69,6 +69,16 @@ export const SCHEMA_STATEMENTS: string[] = [
     is_read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    actor_id TEXT,
+    kind TEXT NOT NULL,
+    post_id TEXT,
+    text TEXT NOT NULL DEFAULT '',
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_posts_type_created ON posts (type, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_posts_user ON posts (user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_post_reactions_post ON post_reactions (post_id)`,
@@ -77,4 +87,5 @@ export const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_friendships_receiver ON friendships (receiver_id)`,
   `CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages (sender_id, receiver_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages (receiver_id, is_read)`,
+  `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, is_read, created_at DESC)`,
 ];

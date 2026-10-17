@@ -20,6 +20,8 @@ interface CliqContextValue {
   fallbackMode: boolean;
   /** underlying database error text, when one has occurred */
   dbError: string | null;
+  /** true when Cloudinary env vars are missing, so uploads are unavailable */
+  mediaUnconfigured: boolean;
   tab: TabKey;
   setTab: (tab: TabKey) => void;
   createOpen: boolean;
@@ -53,6 +55,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [fallbackMode, setFallbackMode] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [mediaUnconfigured, setMediaUnconfigured] = useState(false);
   const [tab, setTab] = useState<TabKey>("videos");
   const [createOpen, setCreateOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -115,6 +118,12 @@ export function CliqProvider({ children }: { children: ReactNode }) {
 
   // Local storage hint so we can surface the D1 setup notice before any request.
   useEffect(() => {
+    setMediaUnconfigured(
+      !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
+    );
+  }, []);
+
+  useEffect(() => {
     const stored = window.localStorage.getItem("cliq:saved");
     if (stored) {
       try {
@@ -172,6 +181,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       loading,
       fallbackMode,
       dbError,
+      mediaUnconfigured,
       tab,
       setTab,
       createOpen,
@@ -194,6 +204,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       loading,
       fallbackMode,
       dbError,
+      mediaUnconfigured,
       tab,
       createOpen,
       toasts,

@@ -3,16 +3,16 @@
 import { useState } from "react";
 import { Bookmark, EyeOff, Heart, Image as ImageIcon, MessageCircle, MoreHorizontal, Send, Share2 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { api } from "@/lib/api-client";
 import { Avatar, EmptyState, IconButton, Modal, SkeletonCard } from "@/components/ui/Primitives";
 import { CommentThread, HashtagText, LikePair } from "@/components/ui/FeedBits";
-import { ShareSheet } from "@/components/CreateModal";
+import { ShareSheet } from "@/components/ShareSheet";
 import { matchesSearch, useComments, useFeed } from "@/components/tabs/useFeed";
+import { usePostActions } from "@/components/tabs/usePostActions";
 import type { Post } from "@/types/cliq";
 import { cx, timeAgo } from "@/lib/utils";
 
-export function PhotosTab({ search }: { search: string }) {
-  const { posts, loading, removePost } = useFeed("photo");
+export function PhotosTab({ search, onOpenProfile }: { search: string; onOpenProfile: (id: string) => void }) {
+  const { posts, loading } = useFeed("photo");
   const { setCreateOpen, settings, user } = useCliq();
   const [draft, setDraft] = useState("");
   const [commentTarget, setCommentTarget] = useState<Post | null>(null);
@@ -38,7 +38,7 @@ export function PhotosTab({ search }: { search: string }) {
           hint={
             search
               ? "Try a different vibe or clear the search bar."
-              : "Be the first to post a Photo! Paste an image link or upload one."
+              : "Be the first to post a Photo! Upload one or paste a link."
           }
           actionLabel={search ? undefined : "Post a Photo"}
           onAction={search ? undefined : () => setCreateOpen(true)}
@@ -54,20 +54,13 @@ export function PhotosTab({ search }: { search: string }) {
           key={post.id}
           post={post}
           onComment={() => setCommentTarget(post)}
-          onHide={() => {
-            setHidden((prev) => [...prev, post.id]);
-            void removePost(post.id);
-          }}
+          onHide={() => setHidden((prev) => [...prev, post.id])}
+          onOpenProfile={onOpenProfile}
           hideDislikes={settings.hideDislikes && post.userId === user?.id}
         />
       ))}
 
-      <CommentModal
-        post={commentTarget}
-        onClose={() => setCommentTarget(null)}
-        draft={draft}
-        setDraft={setDraft}
-      />
+      <CommentModal post={commentTarget} onClose={() => setCommentTarget(null)} draft={draft} setDraft={setDraft} />
     </div>
   );
 }
@@ -76,45 +69,55 @@ export function PhotoCard({
   post,
   onComment,
   onHide,
+  onOpenProfile,
   hideDislikes,
 }: {
   post: Post;
   onComment: () => void;
   onHide: () => void;
+  onOpenProfile: (id: string) => void;
   hideDislikes: boolean;
 }) {
-  const { toast, apiError, savedIds, toggleSaved } = useCliq();
-  const [liked, setLiked] = useState(post.myReaction === "like");
-  const [likes, setLikes] = useState(post.likesCount);
-  const [disliked, setDisliked] = useState(post.myReaction === "dislike");
-  const [dislikes, setDislikes] = useState(post.dislikesCount);
+  const { toast, savedIds, toggleSaved } = useCliq();
+  const { react } = usePostActions();
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [broken, setBroken] = useState(false);
 
+  const liked = post.myReaction === "like";
+  const disliked = post.myReaction === "dislike";
   const saved = savedIds.includes(post.id);
-
-  async function react(kind: "like" | "dislike") {
-    try {
-      const { post: updated } = await api.react(post.id, kind);
-      setLiked(updated.myReaction === "like");
-      setLikes(updated.likesCount);
-      setDisliked(updated.myReaction === "dislike");
-      setDislikes(updated.dislikesCount);
-    } catch (error) {
-      apiError(error);
-    }
-  }
 
   return (
     <article className="cliq-rise overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/80 backdrop-blur-md">
       <header className="flex items-center gap-3 px-4 py-3">
-        {post.author ? <Avatar user={post.author} size={42} ring /> : <span className="h-10 w-10 rounded-full bg-zinc-800" />}
+        <button
+          type="button"
+          onClick={() => post.author && onOpenProfile(post.author.id)}
+          className="shrink-0 rounded-full transition hover:brightness-110"
+          aria-label="Open profile"
+        >
+          {post.author ? (
+            <Avatar user={post.author} size={42} ring />
+          ) : (
+            <span className="h-10 w-10 rounded-full bg-zinc-800" />
+          )}
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-zinc-100">{post.author?.displayName ?? "Cliq User"}</p>
-          <p className="truncate text-[11px] text-zinc-500">
+          <button
+            type="button"
+            onClick={() => post.author && onOpenProfile(post.author.id)}
+            className="block max-w-full truncate text-left text-sm font-bold text-zinc-100 transition hover:text-[var(--accent-2)]"
+          >
+            {post.author?.displayName ?? "Cliq User"}
+          </button>
+          <button
+            type="button"
+            onClick={() => post.author && onOpenProfile(post.author.id)}
+            className="block max-w-full truncate text-left text-[11px] text-zinc-500 transition hover:text-[var(--accent-2)]"
+          >
             @{post.author?.username ?? "unknown"} · {timeAgo(post.createdAt)}
-          </p>
+          </button>
         </div>
         <div className="relative">
           <button
@@ -184,20 +187,15 @@ export function PhotoCard({
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-0.5">
           <LikePair
-            likes={likes}
+            likes={post.likesCount}
             liked={liked}
-            dislikes={dislikes}
+            dislikes={post.dislikesCount}
             disliked={disliked}
             hideDislikes={hideDislikes}
-            onLike={() => void react("like")}
-            onDislike={() => void react("dislike")}
+            onLike={() => void react(post.id, "like", post)}
+            onDislike={() => void react(post.id, "dislike", post)}
           />
-          <IconButton
-            icon={<MessageCircle size={19} />}
-            count={post.commentCount}
-            onClick={onComment}
-            title="Comments"
-          />
+          <IconButton icon={<MessageCircle size={19} />} count={post.commentCount} onClick={onComment} title="Comments" />
           <IconButton icon={<Share2 size={19} />} onClick={() => setShareOpen(true)} title="Share" />
         </div>
         <IconButton
@@ -214,7 +212,13 @@ export function PhotoCard({
       {post.content ? (
         <div className="px-4 pb-4">
           <p className="text-sm text-zinc-200">
-            <span className="font-bold text-zinc-50">@{post.author?.username ?? "unknown"}</span>{" "}
+            <button
+              type="button"
+              onClick={() => post.author && onOpenProfile(post.author.id)}
+              className="font-bold text-zinc-50 transition hover:text-[var(--accent-2)]"
+            >
+              @{post.author?.username ?? "unknown"}
+            </button>{" "}
             <HashtagText text={post.content} />
           </p>
           <button

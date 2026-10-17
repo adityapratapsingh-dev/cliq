@@ -36,9 +36,11 @@ type Mode = "discover" | "chats";
 export function FriendsTab({
   search,
   onDataChanged,
+  onOpenProfile,
 }: {
   search: string;
   onDataChanged: () => void;
+  onOpenProfile: (id: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>("discover");
   const [openPartner, setOpenPartner] = useState<PublicUser | null>(null);
@@ -83,9 +85,15 @@ export function FriendsTab({
             setOpenPartner(user);
           }}
           onDataChanged={onDataChanged}
+          onOpenProfile={onOpenProfile}
         />
       ) : (
-        <Chats openPartner={openPartner} setOpenPartner={setOpenPartner} onDataChanged={onDataChanged} />
+        <Chats
+          openPartner={openPartner}
+          setOpenPartner={setOpenPartner}
+          onDataChanged={onDataChanged}
+          onOpenProfile={onOpenProfile}
+        />
       )}
     </div>
   );
@@ -97,10 +105,12 @@ function Discover({
   search,
   onMessage,
   onDataChanged,
+  onOpenProfile,
 }: {
   search: string;
   onMessage: (user: PublicUser) => void;
   onDataChanged: () => void;
+  onOpenProfile: (id: string) => void;
 }) {
   const { user, toast, apiError } = useCliq();
   const [filter, setFilter] = useState("All Vibes");
@@ -228,7 +238,14 @@ function Discover({
                 className="cliq-rise flex flex-col rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-4 backdrop-blur-md transition hover:border-zinc-700"
               >
                 <div className="flex items-start gap-3">
-                  <Avatar user={person} size={54} />
+                  <button
+                    type="button"
+                    onClick={() => onOpenProfile(person.id)}
+                    aria-label={`Open ${person.displayName}'s profile`}
+                    className="shrink-0 rounded-full transition hover:brightness-110"
+                  >
+                    <Avatar user={person} size={54} />
+                  </button>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-zinc-100">{person.displayName}</p>
                     <p className="truncate text-[11px] text-zinc-500">
@@ -315,10 +332,12 @@ function Chats({
   openPartner,
   setOpenPartner,
   onDataChanged,
+  onOpenProfile,
 }: {
   openPartner: PublicUser | null;
   setOpenPartner: (user: PublicUser | null) => void;
   onDataChanged: () => void;
+  onOpenProfile: (id: string) => void;
 }) {
   const { toast, apiError } = useCliq();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -422,7 +441,24 @@ function Chats({
                     active ? "bg-[var(--accent-soft)]" : "hover:bg-zinc-800/60",
                   )}
                 >
-                  <Avatar user={c.partner} size={44} />
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenProfile(c.partner.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.stopPropagation();
+                        onOpenProfile(c.partner.id);
+                      }
+                    }}
+                    aria-label={`Open ${c.partner.displayName}'s profile`}
+                    className="shrink-0 rounded-full transition hover:brightness-110"
+                  >
+                    <Avatar user={c.partner} size={44} />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs font-bold text-zinc-100">{c.partner.displayName}</span>
@@ -464,6 +500,7 @@ function Chats({
           key={activePartner.id}
           partner={activePartner}
           onBack={() => setOpenPartner(null)}
+          onOpenProfile={onOpenProfile}
           onChanged={() => {
             void loadConversations(true);
             onDataChanged();
@@ -581,12 +618,14 @@ function ChatWindow({
   partner,
   onBack,
   onChanged,
+  onOpenProfile,
 }: {
   partner: PublicUser;
   onBack: () => void;
   onChanged: () => void;
+  onOpenProfile: (id: string) => void;
 }) {
-  const { toast, apiError, settings } = useCliq();
+  const { user, toast, apiError, settings } = useCliq();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
@@ -653,20 +692,46 @@ function ChatWindow({
   async function send() {
     const content = draft.trim();
     if ((!content && !mediaUrl) || sending) return;
+
+    // Optimistic: the bubble appears the instant you hit send (0ms), then we
+    // reconcile with the server's copy once the request resolves.
+    const optimisticId = `optimistic_${Date.now()}`;
+    const optimistic: Message = {
+      id: optimisticId,
+      senderId: user?.id ?? "me",
+      receiverId: partner.id,
+      content,
+      mediaUrl,
+      replyToId: replyTo?.id ?? null,
+      replyTo: replyTo
+        ? { id: replyTo.id, content: replyTo.content, senderId: replyTo.senderId }
+        : null,
+      reactions: [],
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      fromMe: true,
+    };
+
+    setMessages((prev) => [...prev, optimistic]);
+    setDraft("");
+    setMediaUrl(null);
+    setReplyTo(null);
     setSending(true);
+
     try {
-      await api.sendMessage({
+      const { message } = await api.sendMessage({
         receiverId: partner.id,
         content,
         mediaUrl,
-        replyToId: replyTo?.id ?? null,
+        replyToId: optimistic.replyToId,
       });
-      setDraft("");
-      setMediaUrl(null);
-      setReplyTo(null);
-      await fetchMessages();
+      setMessages((prev) => prev.map((m) => (m.id === optimisticId ? message : m)));
+      seenIds.current.add(message.id);
       onChanged();
     } catch (error) {
+      // Roll the bubble back so the UI never shows a message that failed.
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      setDraft(content);
       apiError(error);
     } finally {
       setSending(false);
@@ -711,9 +776,22 @@ function ChatWindow({
         >
           <ArrowLeft size={17} />
         </button>
-        <Avatar user={partner} size={40} />
+        <button
+          type="button"
+          onClick={() => onOpenProfile(partner.id)}
+          aria-label={`Open ${partner.displayName}'s profile`}
+          className="shrink-0 rounded-full transition hover:brightness-110"
+        >
+          <Avatar user={partner} size={40} />
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-zinc-100">{partner.displayName}</p>
+          <button
+            type="button"
+            onClick={() => onOpenProfile(partner.id)}
+            className="block max-w-full truncate text-left text-sm font-bold text-zinc-100 transition hover:text-[var(--accent-2)]"
+          >
+            {partner.displayName}
+          </button>
           <p className="truncate text-[11px] text-zinc-500">
             @{partner.username}
             {partnerTyping ? (
