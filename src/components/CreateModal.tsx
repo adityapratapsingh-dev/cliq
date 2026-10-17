@@ -55,6 +55,8 @@ export function CreateModal() {
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [busy, setBusy] = useState(false);
   const [preset, setPreset] = useState<VideoPresetName>(DEFAULT_VIDEO_PRESET);
+  const [dragging, setDragging] = useState(false);
+  const [showUrl, setShowUrl] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -262,37 +264,74 @@ export function CreateModal() {
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100"
-              >
-                <UploadCloud size={13} /> {type === "video" ? "Upload video" : "Upload photo"}
-              </button>
-              <span className="text-[11px] text-zinc-600">or paste a link</span>
-              <input
-                ref={fileRef}
-                type="file"
-                accept={type === "video" ? "video/*" : "image/*"}
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleFile(file);
-                  e.target.value = "";
-                }}
-              />
-            </div>
+            {/* Primary upload affordance: large drag & drop / tap target. */}
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) void handleFile(file);
+              }}
+              className={cx(
+                "flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition",
+                dragging
+                  ? "border-indigo-500 bg-indigo-500/10"
+                  : "border-zinc-700 hover:border-indigo-500 hover:bg-zinc-900/60",
+              )}
+            >
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-600/15 text-indigo-400">
+                <UploadCloud size={22} />
+              </span>
+              <span className="text-sm font-bold text-zinc-100">
+                {dragging ? "Drop it here" : `Tap to select ${type === "video" ? "a video" : "a photo"}`}
+              </span>
+              <span className="text-[11px] text-zinc-500">
+                Drag &amp; drop, or pick from your gallery
+                {type !== "video" ? " · images are optimised automatically" : " · videos are compressed on device"}
+              </span>
+            </button>
 
-            <div className="relative mt-2">
-              <Link2 size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input
-                value={mediaUrl.startsWith("blob:") ? "" : mediaUrl}
-                onChange={(e) => setMediaUrl(e.target.value)}
-                placeholder={type === "video" ? "https://.../clip.mp4" : "https://.../photo.jpg"}
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-              />
-            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={type === "video" ? "video/*" : "image/*"}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleFile(file);
+                e.target.value = "";
+              }}
+            />
+
+            {/* Secondary path for people who have a direct URL. */}
+            <button
+              type="button"
+              onClick={() => setShowUrl((v) => !v)}
+              className="text-[11px] font-semibold text-zinc-500 transition hover:text-zinc-300"
+            >
+              <span className="inline-flex items-center gap-1">
+                <Link2 size={12} /> {showUrl ? "Hide URL field" : "Paste direct URL instead"}
+              </span>
+            </button>
+
+            {showUrl ? (
+              <div className="relative">
+                <Link2 size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  value={mediaUrl.startsWith("blob:") ? "" : mediaUrl}
+                  onChange={(e) => setMediaUrl(e.target.value)}
+                  placeholder={type === "video" ? "https://.../clip.mp4" : "https://.../photo.jpg"}
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+                />
+              </div>
+            ) : null}
 
             {upload?.kind === "video" && !uploading ? (
               <div className="mt-2">
@@ -415,7 +454,7 @@ export function CreateModal() {
           type="button"
           onClick={() => void publish()}
           disabled={!canPublish || busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-grad)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {uploading ? (
             <span>

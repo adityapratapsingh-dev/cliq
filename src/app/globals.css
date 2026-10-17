@@ -1,13 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --accent: #8b5cf6;
-  --accent-2: #e879f9;
-  --accent-3: #22d3ee;
-  --accent-grad: linear-gradient(135deg, #7c3aed 0%, #d946ef 55%, #22d3ee 100%);
-  --accent-soft: rgba(139, 92, 246, 0.18);
+  /* Cliq Indigo — flat brand colour, no neon gradient. */
+  --accent: #4f46e5;
+  --accent-2: #6366f1;
+  --accent-3: #818cf8;
+  --accent-grad: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  --accent-soft: rgba(99, 102, 241, 0.16);
+  /* Matte obsidian background, elevated charcoal surfaces. */
   --background: #09090b;
+  --surface: #121317;
   --foreground: #f4f4f5;
+}
+
+/* Elevated card surface used across feeds, sheets and modals. */
+.cliq-surface {
+  background-color: var(--surface);
+}
+
+/* Soft brand glow for primary buttons, replacing heavy box shadows. */
+.cliq-glow {
+  box-shadow: 0 8px 24px -8px rgba(99, 102, 241, 0.35);
 }
 
 @theme inline {

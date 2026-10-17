@@ -160,6 +160,15 @@ export const api = {
     return user;
   },
 
+  /** Set the 24-hour Cliq Note shown at the top of Chats / Chat Posts. */
+  setNote(text: string, emoji: string): Promise<{ user: SessionUser }> {
+    return post<{ user: SessionUser }>("/api/notes", { text, emoji });
+  },
+
+  clearNote(): Promise<{ user: SessionUser }> {
+    return post<{ user: SessionUser }>("/api/notes", { clear: true });
+  },
+
   updateProfile(patch: {
     displayName?: string;
     bio?: string;

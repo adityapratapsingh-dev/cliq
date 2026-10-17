@@ -10,6 +10,22 @@ export type ReactionType = "like" | "dislike" | "upgrade" | "downgrade";
 
 export type FriendshipStatus = "pending" | "accepted";
 
+/**
+ * A "Cliq Note" — Instagram-style 24-hour status.
+ *
+ * Stored inside the user's `settings` JSONB column so no migration is needed,
+ * and the API can return it alongside every user row.
+ */
+export interface CliqNote {
+  text: string;
+  emoji: string;
+  createdAt: string;
+}
+
+export const NOTE_MAX_LENGTH = 60;
+/** Notes disappear after this long, like Instagram. */
+export const NOTE_TTL_HOURS = 24;
+
 export interface Settings {
   privateProfile: boolean;
   whoCanMessage: MessageScope;
@@ -22,6 +38,8 @@ export interface Settings {
   notifMessages: boolean;
   notifVotes: boolean;
   notifComments: boolean;
+  /** The user's current 24-hour status note, if any. */
+  note?: CliqNote | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -49,6 +67,8 @@ export interface PublicUser {
   bannerUrl: string | null;
   interests: string[];
   createdAt: string;
+  /** Active 24-hour status note, when set and not expired. */
+  note?: CliqNote | null;
 }
 
 /** The signed-in user's own record (adds private fields). */

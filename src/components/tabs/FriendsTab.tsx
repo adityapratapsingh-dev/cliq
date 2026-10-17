@@ -9,8 +9,10 @@ import {
   CornerUpLeft,
   Image as ImageIcon,
   MessageSquarePlus,
+  Mic,
   Phone,
   Plus,
+  Square,
   Search,
   Send,
   Shield,
@@ -24,6 +26,14 @@ import {
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { api } from "@/lib/api-client";
+import { uploadMedia } from "@/lib/cloudinary";
+import {
+  formatDuration,
+  startVoiceRecording,
+  voiceRecordingSupported,
+  type VoiceRecorder,
+} from "@/lib/voice";
+import { CliqNotes } from "@/components/CliqNotes";
 import { refreshNotifications } from "@/components/notifications/useNotificationCenter";
 import { Avatar, EmptyState, Skeleton, Spinner, TypingDots } from "@/components/ui/Primitives";
 import { EMOJI_QUICKBAR, INTEREST_FILTERS, MESSAGE_REACTIONS } from "@/lib/constants";
@@ -83,6 +93,8 @@ export function FriendsTab({
           </button>
         ))}
       </div>
+
+      <CliqNotes onOpenProfile={onOpenProfile} />
 
       {mode === "discover" ? (
         <Discover
@@ -658,6 +670,10 @@ function ChatWindow({
   const [reactFor, setReactFor] = useState<string | null>(null);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recorderRef = useRef<VoiceRecorder | null>(null);
+  const [sendingVoice, setSendingVoice] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const seenIds = useRef<Set<string>>(new Set());
 
@@ -731,6 +747,60 @@ function ChatWindow({
       cancelled = true;
     };
   }, [partner.id]);
+
+  /** Tick the elapsed-time display while recording. */
+  useEffect(() => {
+    if (!recording) return;
+    const timer = setInterval(() => {
+      const started = recorderRef.current?.startedAt ?? Date.now();
+      setRecordingSeconds((Date.now() - started) / 1000);
+    }, 250);
+    return () => clearInterval(timer);
+  }, [recording]);
+
+  /** Start recording a voice note. */
+  async function beginRecording() {
+    if (!voiceRecordingSupported()) {
+      toast("Voice notes aren't supported in this browser.", "danger");
+      return;
+    }
+    try {
+      recorderRef.current = await startVoiceRecording();
+      setRecording(true);
+      setRecordingSeconds(0);
+    } catch {
+      toast("Microphone permission is needed to record a voice note.", "danger");
+    }
+  }
+
+  /** Stop, upload the clip to Cloudinary, and send it as a message. */
+  async function finishRecording() {
+    const recorder = recorderRef.current;
+    if (!recorder) return;
+    setSendingVoice(true);
+    try {
+      const blob = await recorder.stop();
+      recorderRef.current = null;
+      setRecording(false);
+      setRecordingSeconds(0);
+
+      if (blob.size < 1200) {
+        toast("That recording was too short — try again.", "danger");
+        return;
+      }
+
+      const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || "audio/webm" });
+      const result = await uploadMedia(file, { compress: false });
+      await api.sendMessage({ receiverId: partner.id, content: "🎤 Voice note", mediaUrl: result.secureUrl });
+      await fetchMessages();
+      onChanged();
+      toast("Voice note sent 🎤", "success");
+    } catch (error) {
+      apiError(error);
+    } finally {
+      setSendingVoice(false);
+    }
+  }
 
   async function send() {
     const content = draft.trim();
@@ -1025,6 +1095,49 @@ function ChatWindow({
             }}
           />
         </label>
+        {/* Voice note */}
+        <button
+          type="button"
+          aria-label={recording ? "Stop and send voice note" : "Record voice note"}
+          data-testid="voice-button"
+          disabled={sendingVoice}
+          onClick={() => (recording ? void finishRecording() : void beginRecording())}
+          className={cx(
+            "grid h-9 w-9 shrink-0 place-items-center rounded-full transition disabled:opacity-60",
+            recording ? "bg-rose-500 text-white" : "text-zinc-400 hover:text-zinc-100",
+          )}
+        >
+          {sendingVoice ? (
+            <Spinner className="h-4 w-4" />
+          ) : recording ? (
+            <Square size={15} className="fill-current" />
+          ) : (
+            <Mic size={19} />
+          )}
+        </button>
+
+        {recording ? (
+          <span className="flex shrink-0 items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/10 px-3 py-1.5">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
+            <span className="text-[11px] font-bold tabular-nums text-rose-200">
+              {formatDuration(recordingSeconds)}
+            </span>
+            <button
+              type="button"
+              aria-label="Cancel recording"
+              onClick={() => {
+                recorderRef.current?.cancel();
+                recorderRef.current = null;
+                setRecording(false);
+                setRecordingSeconds(0);
+              }}
+              className="text-[10px] font-semibold text-zinc-400 hover:text-zinc-100"
+            >
+              Cancel
+            </button>
+          </span>
+        ) : null}
+
         <input
           data-testid="chat-input"
           value={draft}
