@@ -50,8 +50,18 @@ body {
 
 .cliq-no-bar {
   scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 .cliq-no-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Alias used by the Reels feed and horizontal filter pills. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
@@ -228,8 +238,90 @@ body {
     transform: translate3d(2%, -2%, 0) scale(1.06);
   }
 }
+
 .cliq-drift {
   animation: cliqBgDrift 18s ease-in-out infinite;
+}
+
+/* ---------- Reels ---------- */
+
+/* Big neon heart that bursts from the double-tap position. */
+@keyframes cliqReelHeart {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3) rotate(-12deg);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25) rotate(6deg);
+  }
+  45% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -90%) scale(1.1) rotate(0deg);
+  }
+}
+.cliq-reel-heart {
+  animation: cliqReelHeart 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Centre play/pause glyph: pops in, then fades out on its own. */
+@keyframes cliqReelPlayPause {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+.cliq-reel-playpause {
+  animation: cliqReelPlayPause 0.75s ease-out forwards;
+}
+
+/* Bottom sheet rising over the lower half of the reel. */
+@keyframes cliqSheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.cliq-sheet-up {
+  animation: cliqSheetUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cliqSheetFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.cliq-sheet-fade {
+  animation: cliqSheetFade 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cliq-reel-heart,
+  .cliq-reel-playpause,
+  .cliq-sheet-up {
+    animation-duration: 0.01s;
+  }
 }
 
 .snap-y-mandatory {

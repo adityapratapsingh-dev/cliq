@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bookmark, MessageCircle, MessageSquare, Send, Share2, Sparkles, TrendingUp, Vote } from "lucide-react";
+import { Bookmark, Flame, MessageCircle, MessageSquare, Send, Share2, Sparkles, Trash2, Vote, Zap } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { Avatar, EmptyState, IconButton, SkeletonCard } from "@/components/ui/Primitives";
 import { CommentThread, HashtagText, VoteBar } from "@/components/ui/FeedBits";
@@ -14,20 +14,53 @@ import { FLAIRS, flairColor } from "@/lib/constants";
 import type { Post } from "@/types/cliq";
 import { censor, cx, timeAgo } from "@/lib/utils";
 
+type ChatSort = "trending" | "latest";
+
 export function ChatPostsTab({ search, onOpenProfile }: { search: string; onOpenProfile: (id: string) => void }) {
   const { posts, loading } = useFeed("chat");
   const { setCreateOpen } = useCliq();
+  const [sort, setSort] = useState<ChatSort>("trending");
 
-  const visible = posts.filter((p) => matchesSearch(p, search));
+  const matched = posts.filter((p) => matchesSearch(p, search));
+
+  /**
+   * Trending = net upgrades (upgrades - downgrades) plus comment activity, so a
+   * lively discussion outranks a drive-by upvote. Latest = newest first.
+   */
+  const visible = [...matched].sort((a, b) => {
+    if (sort === "latest") return b.createdAt.localeCompare(a.createdAt);
+    const score = (p: (typeof matched)[number]) =>
+      p.upgradesCount - p.downgradesCount + p.commentCount * 2;
+    const diff = score(b) - score(a);
+    return diff !== 0 ? diff : b.createdAt.localeCompare(a.createdAt);
+  });
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4 px-3 py-4 sm:px-4">
       <Composer />
 
-      <div className="flex items-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 px-4 py-2.5">
-        <TrendingUp size={15} className="text-[var(--accent-2)]" />
-        <p className="text-xs font-semibold text-zinc-300">Topic flairs</p>
-        <div className="cliq-no-bar flex flex-1 gap-2 overflow-x-auto">
+      <div className="flex items-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 px-2 py-2">
+        <div className="flex shrink-0 gap-1">
+          {(
+            [
+              { key: "trending", label: "Trending", icon: Flame },
+              { key: "latest", label: "Latest", icon: Zap },
+            ] as const
+          ).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSort(key)}
+              className={cx(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition",
+                sort === key ? "bg-[var(--accent-grad)] text-white" : "text-zinc-400 hover:text-zinc-100",
+              )}
+            >
+              <Icon size={13} /> {label}
+            </button>
+          ))}
+        </div>
+        <div className="no-scrollbar flex flex-1 gap-2 overflow-x-auto border-l border-zinc-800/70 pl-2">
           {FLAIRS.map((f) => (
             <span key={f.label} className="shrink-0 text-[11px] font-semibold" style={{ color: f.color }}>
               {f.label}
@@ -185,7 +218,7 @@ function Composer() {
 
 function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: string) => void }) {
   const { user, toast, savedIds, toggleSaved, settings } = useCliq();
-  const { react, votePoll } = usePostActions();
+  const { react, votePoll, remove } = usePostActions();
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -304,6 +337,13 @@ function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id:
           }}
           title="Save"
         />
+        {mine ? (
+          <IconButton
+            icon={<Trash2 size={17} />}
+            onClick={() => void remove(post.id)}
+            title="Delete post"
+          />
+        ) : null}
         <button
           type="button"
           onClick={() => setShareOpen(true)}
@@ -353,11 +393,7 @@ function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id:
         </div>
       ) : null}
 
-      <ShareSheet
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        title={`@${post.author?.username ?? "unknown"}'s post`}
-      />
+      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} post={post} />
     </article>
   );
 }
