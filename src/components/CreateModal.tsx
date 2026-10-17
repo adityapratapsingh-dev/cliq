@@ -17,9 +17,10 @@ import { FLAIRS } from "@/lib/constants";
 import { api } from "@/lib/api-client";
 import {
   CloudinaryNotConfiguredError,
-  isCompressibleImage,
+  FileTooLargeError,
   uploadMedia,
 } from "@/lib/cloudinary";
+import { formatBytes } from "@/lib/video-compress";
 import { prependPost } from "@/components/tabs/useFeed";
 import type { PostType } from "@/types/cliq";
 import { cx } from "@/lib/utils";
@@ -30,6 +31,11 @@ interface UploadState {
   name: string;
   kind: "image" | "video";
   localUrl: string;
+  /** Compression happens before the upload; the label reflects that. */
+  phase: "compressing" | "uploading" | "done";
+  /** Original size, and the size after compression (once known). */
+  originalBytes: number;
+  compressedBytes: number | null;
 }
 
 export function CreateModal() {
@@ -71,20 +77,35 @@ export function CreateModal() {
 
     const isVideo = file.type.startsWith("video/");
     const localUrl = URL.createObjectURL(file);
-    setUpload({ progress: 0, name: file.name, kind: isVideo ? "video" : "image", localUrl });
+    setUpload({
+      progress: 0,
+      name: file.name,
+      kind: isVideo ? "video" : "image",
+      localUrl,
+      phase: isVideo ? "compressing" : "uploading",
+      originalBytes: file.size,
+      compressedBytes: null,
+    });
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
       const result = await uploadMedia(file, {
-        compress: !isVideo && isCompressibleImage(file),
         signal: controller.signal,
+        onPrepare: ({ percent, detail }) =>
+          setUpload((prev) =>
+            prev ? { ...prev, phase: "compressing", progress: percent, name: `${prev.name} · ${detail}` } : prev,
+          ),
         onProgress: (percent) =>
-          setUpload((prev) => (prev ? { ...prev, progress: percent } : prev)),
+          setUpload((prev) => (prev ? { ...prev, phase: "uploading", progress: percent } : prev)),
       });
       setMediaUrl(result.secureUrl);
-      setUpload((prev) => (prev ? { ...prev, progress: 100 } : prev));
+      setUpload((prev) =>
+        prev
+          ? { ...prev, progress: 100, phase: "done", compressedBytes: result.bytes ?? null }
+          : prev,
+      );
       toast("Upload complete ✅", "success");
     } catch (error) {
       setUpload((prev) => {
@@ -93,6 +114,8 @@ export function CreateModal() {
       });
       if (error instanceof CloudinaryNotConfiguredError) {
         toast("Media uploads are not configured — paste a URL instead.", "danger");
+      } else if (error instanceof FileTooLargeError) {
+        toast(error.message, "danger");
       } else if (error instanceof Error && /cancel/i.test(error.message)) {
         toast("Upload cancelled", "default");
       } else {
@@ -191,7 +214,9 @@ export function CreateModal() {
                 {uploading ? (
                   <div className="absolute inset-x-0 bottom-0 bg-zinc-950/80 px-3 py-2 backdrop-blur">
                     <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-zinc-300">
-                      <span className="truncate">{upload?.name}</span>
+                      <span className="truncate">
+                        {upload?.phase === "compressing" ? "Optimising" : "Uploading"} · {upload?.name}
+                      </span>
                       <span className="tabular-nums">{upload?.progress ?? 0}%</span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
@@ -218,6 +243,12 @@ export function CreateModal() {
                 >
                   <X size={14} />
                 </button>
+
+                {upload?.phase === "done" && upload.compressedBytes && upload.compressedBytes < upload.originalBytes ? (
+                  <span className="absolute left-2 top-2 rounded-full bg-emerald-500/90 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
+                    {formatBytes(upload.originalBytes)} → {formatBytes(upload.compressedBytes)}
+                  </span>
+                ) : null}
               </div>
             ) : null}
 
@@ -345,7 +376,9 @@ export function CreateModal() {
           className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-grad)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {uploading ? (
-            <span>Uploading {upload?.progress ?? 0}%</span>
+            <span>
+              {upload?.phase === "compressing" ? "Optimising" : "Uploading"} {upload?.progress ?? 0}%
+            </span>
           ) : busy ? (
             <span>Publishing...</span>
           ) : (

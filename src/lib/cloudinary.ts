@@ -11,6 +11,8 @@
  * Both are NEXT_PUBLIC_* because the browser performs the upload.
  */
 
+import { compressVideo, formatBytes, isCompressibleVideo, MAX_UPLOAD_BYTES } from "@/lib/video-compress";
+
 export interface CloudinaryConfig {
   cloudName: string;
   uploadPreset: string;
@@ -49,10 +51,23 @@ export interface UploadResult {
 export interface UploadOptions {
   /** Called with 0-100 as the upload progresses. */
   onProgress?: (percent: number) => void;
+  /**
+   * Called while media is being compressed, before the upload starts. Lets the
+   * UI say "Optimising..." rather than showing a stalled 0%.
+   */
+  onPrepare?: (info: { phase: "compressing"; percent: number; detail: string }) => void;
   /** AbortSignal so the UI can cancel an in-flight upload. */
   signal?: AbortSignal;
-  /** Compress images before upload (default true). Ignored for video. */
+  /** Compress before upload (default true). Applies to images and videos. */
   compress?: boolean;
+}
+
+/** Thrown when a file is too large to upload at all. */
+export class FileTooLargeError extends Error {
+  constructor(public readonly bytes: number) {
+    super(`That file is ${formatBytes(bytes)}. The maximum upload size is ${formatBytes(MAX_UPLOAD_BYTES)}.`);
+    this.name = "FileTooLargeError";
+  }
 }
 
 const MAX_IMAGE_EDGE = 2048;
@@ -193,11 +208,33 @@ export function uploadToCloudinary(file: File, options: UploadOptions = {}): Pro
 }
 
 /**
- * Compress (images only) then upload. Returns the permanent `secure_url`.
+ * Compress then upload. Returns the permanent `secure_url`.
  * This is the function the UI should call.
+ *
+ * Images are re-encoded on a canvas (fast, near-instant). Videos are re-recorded
+ * through MediaRecorder, which runs in real time — see `video-compress.ts`.
+ * Every failure path falls back to the original file so posting never blocks.
  */
 export async function uploadMedia(file: File, options: UploadOptions = {}): Promise<UploadResult> {
-  const shouldCompress = options.compress !== false && isCompressibleImage(file);
-  const prepared = shouldCompress ? await compressImage(file) : file;
+  if (file.size > MAX_UPLOAD_BYTES) throw new FileTooLargeError(file.size);
+
+  const shouldCompress = options.compress !== false;
+  let prepared = file;
+
+  if (shouldCompress && isCompressibleImage(file)) {
+    prepared = await compressImage(file);
+  } else if (shouldCompress && isCompressibleVideo(file)) {
+    const result = await compressVideo(file, {
+      signal: options.signal,
+      onProgress: (percent) =>
+        options.onPrepare?.({
+          phase: "compressing",
+          percent,
+          detail: "Compressing video...",
+        }),
+    });
+    prepared = result.file;
+  }
+
   return uploadToCloudinary(prepared, options);
 }
