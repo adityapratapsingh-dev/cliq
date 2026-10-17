@@ -6,6 +6,7 @@ import { useCliq } from "@/components/CliqProvider";
 import { Avatar, EmptyState, IconButton, SkeletonCard } from "@/components/ui/Primitives";
 import { CommentThread, HashtagText, VoteBar } from "@/components/ui/FeedBits";
 import { ShareSheet } from "@/components/ShareSheet";
+import { CliqNotes } from "@/components/CliqNotes";
 import { matchesSearch, useComments, useFeed } from "@/components/tabs/useFeed";
 import { usePostActions } from "@/components/tabs/usePostActions";
 import { api } from "@/lib/api-client";
@@ -36,7 +37,8 @@ export function ChatPostsTab({ search, onOpenProfile }: { search: string; onOpen
   });
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-4 px-3 py-4 sm:px-4">
+    <div className="mx-auto w-full max-w-[620px] space-y-4 px-3 py-4 sm:px-4">
+      <CliqNotes onOpenProfile={onOpenProfile} />
       <Composer />
 
       <div className="flex items-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 px-2 py-2">

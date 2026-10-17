@@ -1,14 +1,16 @@
-import type {
-  Comment,
-  ConversationSummary,
-  FriendGraph,
-  Friendship,
-  Message,
-  Post,
-  PostType,
-  PublicUser,
-  ReactionType,
-  Settings,
+import {
+  NOTE_TTL_HOURS,
+  type CliqNote,
+  type Comment,
+  type ConversationSummary,
+  type FriendGraph,
+  type Friendship,
+  type Message,
+  type Post,
+  type PostType,
+  type PublicUser,
+  type ReactionType,
+  type Settings,
 } from "@/types/cliq";
 
 /** A user as stored in the database (includes the password hash). */
@@ -177,5 +179,20 @@ export function toPublicUser(user: StoredUser): PublicUser {
     bannerUrl: user.bannerUrl,
     interests: user.interests,
     createdAt: user.createdAt,
+    note: activeNote(user.settings.note),
   };
+}
+
+/**
+ * Return the note only while it is still within its 24-hour life.
+ *
+ * Enforced on read so no cron/cleanup job is needed — an expired note simply
+ * stops being returned.
+ */
+export function activeNote(note: CliqNote | null | undefined): CliqNote | null {
+  if (!note || !note.text) return null;
+  const created = new Date(note.createdAt).getTime();
+  if (Number.isNaN(created)) return null;
+  const ageHours = (Date.now() - created) / 3_600_000;
+  return ageHours >= 0 && ageHours < NOTE_TTL_HOURS ? note : null;
 }

@@ -3,6 +3,8 @@
 import {
   Bell,
   Film,
+  LogOut,
+  Settings,
   Home,
   Image as ImageIcon,
   MessageSquare,
@@ -13,7 +15,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useCliq } from "@/components/CliqProvider";
 import { useNotificationCenter } from "@/components/notifications/useNotificationCenter";
 import { ActivityPill } from "@/components/notifications/ActivityPill";
@@ -53,17 +55,20 @@ export function Header({
   onSearch,
   onBell,
   onProfile,
+  searchSlot,
 }: {
   search: string;
   onSearch: (value: string) => void;
   onBell: () => void;
   onProfile: () => void;
+  /** Rendered directly under the search input (the live results dropdown). */
+  searchSlot?: ReactNode;
 }) {
   const { user, setCreateOpen } = useCliq();
   const { unreadCount } = useNotificationCenter();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-[#09090b]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-3 sm:px-5">
         <div className="lg:hidden">
           <CliqLogo compact />
@@ -78,7 +83,7 @@ export function Header({
             value={search}
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Search posts, #hashtags, vibes..."
-            className="h-10 w-full rounded-full border border-zinc-800/80 bg-zinc-900/70 pl-9 pr-9 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-[var(--accent)] focus:bg-zinc-900"
+            className="h-10 w-full rounded-full border border-zinc-800/80 bg-[#121317] pl-9 pr-9 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-indigo-500"
           />
           {search ? (
             <button
@@ -90,12 +95,13 @@ export function Header({
               <X size={15} />
             </button>
           ) : null}
+          {searchSlot}
         </div>
 
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="hidden h-10 items-center gap-1.5 rounded-full bg-[var(--accent-grad)] px-4 text-sm font-bold text-white shadow-[0_0_20px_-6px_var(--accent)] transition hover:brightness-110 active:scale-95 sm:inline-flex"
+          className="hidden h-10 items-center gap-1.5 rounded-full bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-500 active:scale-95 sm:inline-flex"
         >
           <Plus size={16} strokeWidth={3} /> Create
         </button>
@@ -125,7 +131,7 @@ export function Header({
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="grid h-10 w-10 place-items-center rounded-full bg-[var(--accent-grad)] text-white transition active:scale-95 sm:hidden"
+          className="grid h-10 w-10 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 active:scale-95 sm:hidden"
           aria-label="Create post"
         >
           <Plus size={20} strokeWidth={3} />
@@ -142,59 +148,98 @@ export function Header({
 }
 
 export function Sidebar({ children }: { children?: ReactNode }) {
-  const { tab, setTab, user } = useCliq();
+  const { tab, setTab, user, logOut } = useCliq();
   const badges = useNavBadges();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <aside className="cliq-scroll sticky top-16 hidden h-[calc(100dvh-4rem)] w-64 shrink-0 flex-col gap-1 overflow-y-auto border-r border-zinc-800/80 px-3 py-5 lg:flex">
-      <p className="px-3 pb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">Explore Cliq</p>
-      {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
-        const active = tab === key;
-        const badge = badges[key];
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={cx(
-              "group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-semibold transition",
-              active ? "bg-[var(--accent-soft)] text-zinc-50" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100",
-            )}
-          >
-            <span
+    <aside className="sticky top-16 hidden h-[calc(100dvh-4rem)] w-60 shrink-0 flex-col overflow-y-auto border-r border-zinc-800/80 px-3 py-5 cliq-scroll lg:flex">
+      <p className="px-3 pb-3 text-[11px] font-bold uppercase tracking-widest text-zinc-500">Explore Cliq</p>
+
+      <nav className="flex flex-col gap-1">
+        {NAV_ITEMS.map(({ key, label, icon: Icon }) => {
+          const active = tab === key;
+          const badge = badges[key];
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
               className={cx(
-                "relative grid h-8 w-8 place-items-center rounded-xl transition",
-                active ? "bg-[var(--accent-grad)] text-white" : "bg-zinc-900 text-zinc-400 group-hover:text-zinc-100",
+                "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
+                active ? "bg-zinc-800/70 text-zinc-50" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100",
               )}
             >
-              <Icon size={16} />
-              {badge?.dot ? (
-                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-rose-500 shadow-lg shadow-rose-500/40" />
+              {/* Active left pill indicator */}
+              {active ? (
+                <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-indigo-500" />
               ) : null}
-            </span>
-            <span className="flex-1 text-left">{label}</span>
-            {badge?.count ? (
-              <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white shadow-lg shadow-rose-500/40">
-                {badge.count > 9 ? "9+" : badge.count}
+              <span className="relative">
+                <Icon size={18} className={cx(active && "text-indigo-400")} />
+                {badge?.dot ? (
+                  <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-rose-500 shadow-lg shadow-rose-500/40" />
+                ) : null}
               </span>
-            ) : active ? (
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-            ) : null}
-          </button>
-        );
-      })}
+              <span className="flex-1 text-left">{label}</span>
+              {badge?.count ? (
+                <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white shadow-lg shadow-rose-500/40">
+                  {badge.count > 9 ? "9+" : badge.count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </nav>
 
       {children}
 
-      <p className="mt-auto px-3 pt-3 text-[10px] leading-relaxed text-zinc-600">
-        Cliq · Find your Cliq. Share your vibe.
-        {user ? (
+      {/* Compact user pill with a quick menu (replaces the old footer text). */}
+      <div className="relative mt-auto pt-4">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex w-full items-center gap-3 rounded-xl border border-zinc-800/80 bg-[#121317] px-3 py-2.5 text-left transition hover:border-zinc-700"
+        >
+          {user ? <Avatar user={user} size={32} /> : null}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-bold text-zinc-100">{user?.displayName ?? "You"}</span>
+            <span className="block truncate text-[11px] text-zinc-500">@{user?.username ?? "cliq"}</span>
+          </span>
+        </button>
+
+        {menuOpen ? (
           <>
-            <br />
-            Signed in as @{user.username}
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setMenuOpen(false)}
+              className="fixed inset-0 z-10 cursor-default"
+            />
+            <div className="cliq-pop absolute bottom-full left-0 z-20 mb-2 w-full overflow-hidden rounded-xl border border-zinc-800/80 bg-[#121317] py-1 shadow-2xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("profile");
+                  setMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-zinc-300 transition hover:bg-zinc-800/70"
+              >
+                <Settings size={13} /> Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void logOut();
+                  setMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-rose-300 transition hover:bg-zinc-800/70"
+              >
+                <LogOut size={13} /> Log Out
+              </button>
+            </div>
           </>
         ) : null}
-      </p>
+      </div>
     </aside>
   );
 }
@@ -220,7 +265,7 @@ export function BottomNav() {
           type="button"
           onClick={() => setCreateOpen(true)}
           aria-label="Create post"
-          className="grid h-12 w-12 -translate-y-3 place-items-center rounded-2xl bg-[var(--accent-grad)] text-white shadow-[0_0_22px_-4px_var(--accent)] transition active:scale-90"
+          className="grid h-12 w-12 -translate-y-3 place-items-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 transition hover:bg-indigo-500 active:scale-90"
         >
           <Plus size={24} strokeWidth={3} />
         </button>

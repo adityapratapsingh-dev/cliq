@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 import {
   AlertTriangle,
   BadgeCheck,
@@ -8,7 +9,9 @@ import {
   Bookmark,
   Database,
   Film,
+  Heart,
   Image as ImageIcon,
+  MessageCircle,
   LogOut,
   MessageSquare,
   Palette,
@@ -32,7 +35,8 @@ import { ACCENT_LIST } from "@/lib/theme";
 import { INTEREST_OPTIONS, MESSAGE_SCOPES } from "@/lib/constants";
 import { PostCardMini } from "@/components/tabs/PostCardMini";
 import { useFeed, useStats } from "@/components/tabs/useFeed";
-import type { AccentKey, SessionUser } from "@/types/cliq";
+import { swrFetcher } from "@/lib/api-client";
+import type { AccentKey, FriendGraph, Post, PublicUser, SessionUser } from "@/types/cliq";
 import { cx } from "@/lib/utils";
 
 export function ProfileTab() {
@@ -40,6 +44,8 @@ export function ProfileTab() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<"posts" | "videos" | "photos" | "saved">("posts");
+  const [lightboxPost, setLightboxPost] = useState<Post | null>(null);
+  const [connections, setConnections] = useState<"friends" | "following" | null>(null);
 
   const { posts: videoPosts } = useFeed("video");
   const { posts: photoPosts } = useFeed("photo");
@@ -82,6 +88,8 @@ export function ProfileTab() {
         cliqScore={cliqScore}
         friends={stats?.friends ?? 0}
         following={stats?.following ?? 0}
+        onOpenFriends={() => setConnections("friends")}
+        onOpenFollowing={() => setConnections("following")}
         onEdit={() => setEditOpen(true)}
         onSettings={() => setSettingsOpen(true)}
       />
@@ -123,27 +131,24 @@ export function ProfileTab() {
               : "Anything you post on Cliq shows up here."
           }
         />
-      ) : (
-        <div className={cx("grid gap-3", profileTab !== "posts" && "sm:grid-cols-2")}>
+      ) : profileTab === "posts" ? (
+        /* Chat posts stay a readable thread list. */
+        <div className="space-y-3">
           {shown.map((post) => (
             <PostCardMini key={post.id} post={post} viewerId={user.id} />
           ))}
         </div>
+      ) : (
+        /* Videos and photos use an Instagram-style 3-column grid. */
+        <div className="grid grid-cols-3 gap-1.5">
+          {shown.map((post) => (
+            <MediaTile key={post.id} post={post} onOpen={() => setLightboxPost(post)} />
+          ))}
+        </div>
       )}
 
-      <div className="flex items-center justify-between rounded-2xl border border-zinc-800/80 bg-zinc-900/50 px-4 py-3">
-        <span className="text-[11px] text-zinc-500">
-          Signed in as @{user.username}
-          {user.age ? ` · ${user.age}` : ""}
-        </span>
-        <button
-          type="button"
-          onClick={() => setSettingsOpen(true)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-2)] hover:underline"
-        >
-          <SettingsIcon size={13} /> Settings
-        </button>
-      </div>
+      <PostLightbox post={lightboxPost} onClose={() => setLightboxPost(null)} viewerId={user.id} />
+      <ConnectionsModal kind={connections} onClose={() => setConnections(null)} onOpenProfile={() => undefined} />
 
       <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} user={user} onError={apiError} />
     </div>
@@ -158,6 +163,8 @@ function ProfileHeader({
   following,
   onEdit,
   onSettings,
+  onOpenFriends,
+  onOpenFollowing,
 }: {
   user: SessionUser;
   postCount: number;
@@ -166,6 +173,8 @@ function ProfileHeader({
   following: number;
   onEdit: () => void;
   onSettings: () => void;
+  onOpenFriends: () => void;
+  onOpenFollowing: () => void;
 }) {
   const [bannerBroken, setBannerBroken] = useState(false);
   const banner = user.bannerUrl && !bannerBroken ? user.bannerUrl : null;
@@ -177,9 +186,9 @@ function ProfileHeader({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={banner} alt="" className="h-full w-full object-cover" onError={() => setBannerBroken(true)} />
         ) : (
-          <div className="h-full w-full bg-[var(--accent-grad)]">
-            <div className="cliq-drift h-full w-full opacity-70" />
-          </div>
+          /* Deterministic mesh gradient derived from the username, so every
+             profile has a distinct, on-brand cover without an upload. */
+          <div className="h-full w-full" style={{ background: meshGradient(user.username) }} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 to-transparent" />
       </div>
@@ -231,17 +240,27 @@ function ProfileHeader({
           ) : null}
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-2">
+        {/* Compact inline stats bar — no bulky boxes. */}
+        <div className="mt-4 flex items-center gap-5 border-t border-zinc-800/80 pt-3">
           {[
-            { label: "Posts", value: `${postCount}` },
-            { label: "Cliq Score", value: `${cliqScore}` },
-            { label: "Friends", value: `${friends}` },
-            { label: "Following", value: `${following}` },
-          ].map(({ label, value }) => (
-            <div key={label} className="rounded-2xl border border-zinc-800/70 bg-zinc-950/50 px-2 py-2.5 text-center">
-              <p className="text-base font-black text-zinc-50">{value}</p>
-              <p className="text-[10px] text-zinc-500">{label}</p>
-            </div>
+            { label: "Posts", value: `${postCount}`, onClick: undefined },
+            { label: "Cliq Score", value: `${cliqScore}`, onClick: undefined },
+            { label: "Friends", value: `${friends}`, onClick: onOpenFriends },
+            { label: "Following", value: `${following}`, onClick: onOpenFollowing },
+          ].map(({ label, value, onClick }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={onClick}
+              disabled={!onClick}
+              className={cx(
+                "text-left transition",
+                onClick ? "hover:opacity-80" : "cursor-default",
+              )}
+            >
+              <span className="block text-sm font-black text-zinc-50">{value}</span>
+              <span className="block text-[11px] text-zinc-500">{label}</span>
+            </button>
           ))}
         </div>
       </div>
@@ -661,3 +680,190 @@ function Row({ label, value, badge }: { label: string; value: string; badge?: bo
   );
 }
 
+
+/* ------------------------------------------------------------------ media grid */
+
+/**
+ * Square grid thumbnail with a hover overlay showing engagement.
+ *
+ * Instagram-style: the media fills the tile and the counts only appear on
+ * hover/focus so the grid stays visually quiet.
+ */
+function MediaTile({ post, onOpen }: { post: Post; onOpen: () => void }) {
+  const [broken, setBroken] = useState(false);
+  const isVideo = post.type === "video";
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group relative aspect-square w-full overflow-hidden rounded-lg bg-zinc-900"
+      aria-label={`Open ${isVideo ? "video" : "photo"}`}
+    >
+      {post.mediaUrl && !broken ? (
+        isVideo ? (
+          <video
+            src={post.mediaUrl}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={post.mediaUrl}
+            alt={post.content || "Post media"}
+            className="h-full w-full object-cover"
+            onError={() => setBroken(true)}
+          />
+        )
+      ) : (
+        <span className="grid h-full w-full place-items-center bg-gradient-to-br from-zinc-800 to-zinc-900 text-2xl">
+          {isVideo ? "🎬" : "📸"}
+        </span>
+      )}
+
+      {/* Hover overlay with counts */}
+      <span className="absolute inset-0 flex items-center justify-center gap-3 bg-black/60 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className="inline-flex items-center gap-1 text-xs font-bold text-white">
+          <Heart size={14} className="fill-current" /> {post.likesCount}
+        </span>
+        <span className="inline-flex items-center gap-1 text-xs font-bold text-white">
+          <MessageCircle size={14} /> {post.commentCount}
+        </span>
+      </span>
+
+      {isVideo ? (
+        <span className="absolute right-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-white">
+          Reel
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+/** Full-screen viewer for a profile grid item. */
+function PostLightbox({
+  post,
+  onClose,
+  viewerId,
+}: {
+  post: Post | null;
+  onClose: () => void;
+  viewerId: string;
+}) {
+  if (!post) return null;
+  const isVideo = post.type === "video";
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95 p-4">
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default" />
+      <button
+        type="button"
+        aria-label="Close viewer"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/20 text-white/80 transition hover:text-white"
+      >
+        <X size={18} />
+      </button>
+      <div className="relative z-10 max-h-full w-full max-w-lg">
+        {post.mediaUrl ? (
+          isVideo ? (
+            <video src={post.mediaUrl} className="max-h-[70vh] w-full rounded-2xl object-contain" controls autoPlay loop />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={post.mediaUrl} alt={post.content || "Post"} className="max-h-[70vh] w-full rounded-2xl object-contain" />
+          )
+        ) : null}
+        {post.content ? <p className="mt-3 text-sm text-zinc-300">{post.content}</p> : null}
+        <div className="mt-2 flex items-center gap-4 text-xs font-semibold text-zinc-400">
+          <span className="inline-flex items-center gap-1">
+            <Heart size={13} /> {post.likesCount}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <MessageCircle size={13} /> {post.commentCount}
+          </span>
+        </div>
+        <span className="sr-only">{viewerId}</span>
+      </div>
+    </div>
+  );
+}
+
+/** Modal listing the user's friends or the people they follow. */
+function ConnectionsModal({
+  kind,
+  onClose,
+  onOpenProfile,
+}: {
+  kind: "friends" | "following" | null;
+  onClose: () => void;
+  onOpenProfile: (id: string) => void;
+}) {
+  const { data, isLoading } = useSWR<FriendGraph>(kind ? "/api/friends" : null, swrFetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const people: PublicUser[] = kind === "friends" ? (data?.friends ?? []) : (data?.outgoing ?? []).map((o) => o.user);
+
+  return (
+    <Modal
+      open={Boolean(kind)}
+      onClose={onClose}
+      title={kind === "friends" ? "Cliq Friends" : "Following"}
+      subtitle={`${people.length} ${people.length === 1 ? "person" : "people"}`}
+      maxWidth="max-w-sm"
+    >
+      {isLoading ? (
+        <p className="py-8 text-center text-xs text-zinc-500">Loading...</p>
+      ) : people.length === 0 ? (
+        <p className="py-8 text-center text-xs text-zinc-500">
+          {kind === "friends" ? "No Cliq friends yet — send a Cliq Up!" : "Not following anyone yet."}
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {people.map((person) => (
+            <li key={person.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenProfile(person.id);
+                  onClose();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-zinc-800/60"
+              >
+                <Avatar user={person} size={40} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-xs font-bold text-zinc-100">{person.displayName}</span>
+                  <span className="block truncate text-[11px] text-zinc-500">@{person.username}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
+  );
+}
+
+/**
+ * Deterministic mesh gradient for a profile cover.
+ *
+ * Derived from the username so it is stable across sessions and unique per
+ * person — used whenever the user has not uploaded a banner image.
+ */
+function meshGradient(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  const hue2 = (hue + 42) % 360;
+  const hue3 = (hue + 196) % 360;
+  return [
+    `radial-gradient(at 18% 22%, hsl(${hue} 78% 46% / 0.95) 0px, transparent 55%)`,
+    `radial-gradient(at 82% 12%, hsl(${hue2} 74% 52% / 0.85) 0px, transparent 52%)`,
+    `radial-gradient(at 62% 88%, hsl(${hue3} 70% 44% / 0.9) 0px, transparent 58%)`,
+    `linear-gradient(135deg, hsl(${hue} 42% 14%) 0%, hsl(${hue2} 40% 10%) 100%)`,
+  ].join(", ");
+}

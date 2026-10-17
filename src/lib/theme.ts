@@ -11,42 +11,52 @@ export interface AccentDef {
   soft: string;
 }
 
+/**
+ * Accent palettes.
+ *
+ * `violet` is the default and is deliberately **flat indigo** rather than a neon
+ * three-stop gradient — the multi-stop gradient is what made buttons look heavy.
+ * Primary actions read as a solid brand colour with a soft shadow, the way
+ * Instagram / Threads do it.
+ *
+ * The other three remain available from Settings for personalisation.
+ */
 export const ACCENTS: Record<AccentKey, AccentDef> = {
   violet: {
     key: "violet",
-    label: "Neon Violet",
-    accent: "#8b5cf6",
-    accent2: "#e879f9",
-    accent3: "#22d3ee",
-    gradient: "linear-gradient(135deg, #7c3aed 0%, #d946ef 55%, #22d3ee 100%)",
-    soft: "rgba(139, 92, 246, 0.18)",
+    label: "Cliq Indigo",
+    accent: "#4f46e5", // indigo-600
+    accent2: "#6366f1", // indigo-500
+    accent3: "#818cf8", // indigo-400
+    gradient: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
+    soft: "rgba(99, 102, 241, 0.16)",
   },
   cyan: {
     key: "cyan",
     label: "Cyber Cyan",
-    accent: "#22d3ee",
-    accent2: "#38bdf8",
-    accent3: "#a855f7",
-    gradient: "linear-gradient(135deg, #0891b2 0%, #22d3ee 55%, #a855f7 100%)",
-    soft: "rgba(34, 211, 238, 0.18)",
+    accent: "#0891b2",
+    accent2: "#06b6d4",
+    accent3: "#22d3ee",
+    gradient: "linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)",
+    soft: "rgba(6, 182, 212, 0.16)",
   },
   rose: {
     key: "rose",
     label: "Electric Rose",
-    accent: "#fb7185",
-    accent2: "#f472b6",
-    accent3: "#a78bfa",
-    gradient: "linear-gradient(135deg, #e11d48 0%, #f472b6 55%, #a78bfa 100%)",
-    soft: "rgba(251, 113, 133, 0.18)",
+    accent: "#e11d48",
+    accent2: "#f43f5e",
+    accent3: "#fb7185",
+    gradient: "linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)",
+    soft: "rgba(244, 63, 94, 0.16)",
   },
   emerald: {
     key: "emerald",
     label: "Matrix Emerald",
-    accent: "#34d399",
-    accent2: "#22d3ee",
-    accent3: "#a3e635",
-    gradient: "linear-gradient(135deg, #059669 0%, #34d399 55%, #a3e635 100%)",
-    soft: "rgba(52, 211, 153, 0.18)",
+    accent: "#059669",
+    accent2: "#10b981",
+    accent3: "#34d399",
+    gradient: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+    soft: "rgba(16, 185, 129, 0.16)",
   },
 };
 

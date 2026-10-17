@@ -8,6 +8,8 @@ import { CreateModal } from "@/components/CreateModal";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { NotificationBanner } from "@/components/notifications/NotificationBanner";
+import { ContextRail } from "@/components/ContextRail";
+import { SearchDropdown } from "@/components/SearchDropdown";
 import { ProfileModal } from "@/components/ProfileModal";
 import { VideosTab } from "@/components/tabs/VideosTab";
 import { PhotosTab } from "@/components/tabs/PhotosTab";
@@ -58,30 +60,29 @@ export function CliqApp() {
 
   return (
     <div style={accentVars(settings.accent)} className="min-h-dvh bg-zinc-950 text-zinc-100">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div
-          className="cliq-drift absolute -left-24 -top-24 h-72 w-72 rounded-full opacity-20 blur-3xl"
-          style={{ background: "var(--accent-grad)" }}
-        />
-        <div
-          className="cliq-drift absolute -right-20 top-1/3 h-80 w-80 rounded-full opacity-10 blur-3xl"
-          style={{ background: "var(--accent-grad)", animationDelay: "3s" }}
-        />
-      </div>
-
       <div className="relative">
         <Header
           search={search}
           onSearch={setSearch}
           onBell={() => setBellOpen((v) => !v)}
           onProfile={() => setTab("profile")}
+          searchSlot={
+            search.trim() ? (
+              <SearchDropdown
+                query={search}
+                onClose={() => setSearch("")}
+                onOpenProfile={openProfile}
+                onSearch={setSearch}
+              />
+            ) : null
+          }
         />
         {bellOpen ? (
           <NotificationCenter onClose={() => setBellOpen(false)} onNavigate={(next) => setTab(next)} />
         ) : null}
-        <div className="mx-auto flex max-w-7xl">
+        <div className="mx-auto flex w-full max-w-[1400px] justify-center gap-6 px-0 lg:px-4">
           <Sidebar />
-          <main className="cliq-scroll min-w-0 flex-1 pb-24 lg:pb-8">
+          <main className="cliq-scroll min-w-0 w-full max-w-[620px] pb-24 lg:pb-8">
             {tab === "videos" ? (
               <VideosTab search={search} onOpenProfile={openProfile} />
             ) : tab === "photos" ? (
@@ -94,6 +95,14 @@ export function CliqApp() {
               <ProfileTab />
             )}
           </main>
+          <ContextRail
+            onOpenProfile={openProfile}
+            onOpenChats={() => setTab("friends")}
+            onFilterFlair={(flair) => {
+              setSearch(flair);
+              setTab("chatposts");
+            }}
+          />
         </div>
       </div>
 
