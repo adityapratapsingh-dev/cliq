@@ -1,26 +1,62 @@
 "use client";
 
-import { useState } from "react";
-import { Bookmark, Film, Heart, MessageCircle, Play, Send, Share2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronUp, Film, Plus, Volume2, VolumeX } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { Avatar, EmptyState, IconButton, Modal, SkeletonCard } from "@/components/ui/Primitives";
-import { CommentThread, HashtagText } from "@/components/ui/FeedBits";
-import { matchesSearch, useComments, useFeed } from "@/components/tabs/useFeed";
-import { usePostActions } from "@/components/tabs/usePostActions";
-import { ShareSheet } from "@/components/ShareSheet";
+import { EmptyState, SkeletonCard } from "@/components/ui/Primitives";
+import { matchesSearch, useFeed } from "@/components/tabs/useFeed";
+import { Reel } from "@/components/reels/Reel";
 import type { Post } from "@/types/cliq";
-import { cx, formatCount, timeAgo } from "@/lib/utils";
+import { cx } from "@/lib/utils";
 
+type FeedMode = "forYou" | "following";
+
+/**
+ * Instagram Reels / TikTok style vertical player.
+ *
+ * One scroll container with snap points; each slide is a full-height reel. Only
+ * the snapped slide plays (driven by an IntersectionObserver inside `Reel`), so
+ * audio tracks never overlap.
+ */
 export function VideosTab({ search, onOpenProfile }: { search: string; onOpenProfile: (id: string) => void }) {
+  const { setCreateOpen, followingIds } = useCliq();
   const { posts, loading } = useFeed("video");
-  const { setCreateOpen } = useCliq();
+  const [mode, setMode] = useState<FeedMode>("forYou");
+  const [muted, setMuted] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
-  const visible = posts.filter((p) => matchesSearch(p, search));
+  const bySearch = posts.filter((p) => matchesSearch(p, search));
+  const visible: Post[] = mode === "following" ? bySearch.filter((p) => followingIds.includes(p.userId)) : bySearch;
+
+  // Keep the "N / M" indicator in sync with the snapped slide.
+  const onScroll = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const index = Math.round(el.scrollTop / Math.max(1, el.clientHeight));
+    setActiveIndex(Math.min(Math.max(0, index), Math.max(0, visible.length - 1)));
+  }, [visible.length]);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [onScroll]);
+
+  const goTo = useCallback(
+    (index: number) => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      const target = Math.min(Math.max(0, index), Math.max(0, visible.length - 1));
+      el.scrollTo({ top: target * el.clientHeight, behavior: "smooth" });
+    },
+    [visible.length],
+  );
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-md space-y-4 px-4 py-6">
-        <SkeletonCard />
+      <div className="mx-auto w-full max-w-[430px] px-4 py-6">
         <SkeletonCard />
       </div>
     );
@@ -28,184 +64,142 @@ export function VideosTab({ search, onOpenProfile }: { search: string; onOpenPro
 
   if (visible.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-md px-4 py-10">
+      <div className="mx-auto w-full max-w-[430px] px-4 py-10">
         <EmptyState
           icon={<Film size={26} />}
-          title={search ? "No videos match that search" : "No videos on Cliq yet"}
+          title={
+            search
+              ? "No reels match that search"
+              : mode === "following"
+                ? "No reels from people you follow"
+                : "No reels on Cliq yet"
+          }
           hint={
             search
               ? "Try a different vibe or clear the search bar."
-              : "Be the first to post a Video! Upload a clip or paste a link."
+              : mode === "following"
+                ? "Cliq Up creators or switch back to For You to see everything."
+                : "Be the first to post a Reel! Upload a clip or paste a link."
           }
-          actionLabel={search ? undefined : "Post a Video"}
-          onAction={search ? undefined : () => setCreateOpen(true)}
+          actionLabel={mode === "forYou" && !search ? "Post a Reel" : undefined}
+          onAction={mode === "forYou" && !search ? () => setCreateOpen(true) : undefined}
         />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-5 px-3 py-4 sm:px-4">
-      {visible.map((post) => (
-        <VideoCard key={post.id} post={post} onOpenProfile={onOpenProfile} />
-      ))}
-    </div>
-  );
-}
-
-function VideoCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: string) => void }) {
-  const { user, toast, savedIds, toggleSaved } = useCliq();
-  const { react } = usePostActions();
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [broken, setBroken] = useState(false);
-
-  const { comments, loading, add } = useComments(post.id, commentsOpen);
-
-  const liked = post.myReaction === "like";
-  const saved = savedIds.includes(post.id);
-
-  return (
-    <article className="cliq-rise overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/80 backdrop-blur-md">
-      <header className="flex items-center gap-3 px-4 py-3">
-        <button
-          type="button"
-          onClick={() => post.author && onOpenProfile(post.author.id)}
-          className="shrink-0 rounded-full transition hover:brightness-110"
-          aria-label="Open profile"
-        >
-          {post.author ? (
-            <Avatar user={post.author} size={40} ring />
-          ) : (
-            <span className="h-10 w-10 rounded-full bg-zinc-800" />
-          )}
-        </button>
-        <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={() => post.author && onOpenProfile(post.author.id)}
-            className="block max-w-full truncate text-left text-sm font-bold text-zinc-100 transition hover:text-[var(--accent-2)]"
-          >
-            {post.author?.displayName ?? "Cliq User"}
-          </button>
-          <button
-            type="button"
-            onClick={() => post.author && onOpenProfile(post.author.id)}
-            className="block max-w-full truncate text-left text-[11px] text-zinc-500 transition hover:text-[var(--accent-2)]"
-          >
-            @{post.author?.username ?? "unknown"} · {timeAgo(post.createdAt)}
-          </button>
-        </div>
-      </header>
-
-      <div className="relative aspect-[9/14] w-full bg-black sm:aspect-[4/5]">
-        {post.mediaUrl && !broken ? (
-          <video
-            src={post.mediaUrl}
-            className="absolute inset-0 h-full w-full object-cover"
-            controls
-            loop
-            playsInline
-            preload="metadata"
-            onError={() => setBroken(true)}
-          />
-        ) : (
-          <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-violet-900/40 via-fuchsia-900/30 to-cyan-900/40">
-            <div className="flex flex-col items-center gap-2 text-center">
-              <span className="grid h-14 w-14 place-items-center rounded-full border border-white/20 bg-zinc-950/40 text-white backdrop-blur">
-                <Play size={24} className="ml-0.5" />
-              </span>
-              <p className="text-xs text-zinc-400">
-                {post.mediaUrl ? "This video can't play here" : "No video attached"}
-              </p>
-            </div>
+    <div className="relative flex w-full justify-center lg:py-2">
+      {/* Floating prev/next for tablet & desktop, outside the phone frame. */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 hidden items-center justify-center lg:flex">
+        <div className="relative h-full w-full max-w-[430px]">
+          <div className="pointer-events-auto absolute -right-16 top-1/2 flex -translate-y-1/2 flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => goTo(activeIndex - 1)}
+              disabled={activeIndex <= 0}
+              aria-label="Previous Reel"
+              className="group inline-flex items-center gap-2 rounded-full border border-zinc-800/80 bg-zinc-900/80 px-3 py-2.5 text-[11px] font-bold text-zinc-300 backdrop-blur-md transition hover:border-[var(--accent)] hover:text-zinc-100 disabled:opacity-30"
+            >
+              <ChevronUp size={16} />
+              <span className="hidden xl:inline">Previous</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => goTo(activeIndex + 1)}
+              disabled={activeIndex >= visible.length - 1}
+              aria-label="Next Reel"
+              className="group inline-flex items-center gap-2 rounded-full border border-zinc-800/80 bg-zinc-900/80 px-3 py-2.5 text-[11px] font-bold text-zinc-300 backdrop-blur-md transition hover:border-[var(--accent)] hover:text-zinc-100 disabled:opacity-30"
+            >
+              <ChevronDown size={16} />
+              <span className="hidden xl:inline">Next</span>
+            </button>
           </div>
+        </div>
+      </div>
+
+      {/* Phone frame on tablet/desktop; full-bleed on mobile. */}
+      <div
+        className={cx(
+          "relative w-full bg-black",
+          "h-[calc(100dvh-7.5rem)]",
+          "lg:h-[calc(100dvh-5.5rem)] lg:aspect-[9/16] lg:max-w-[430px] lg:rounded-2xl lg:border lg:border-zinc-800/80 lg:shadow-2xl",
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent" />
-        <div className="absolute bottom-3 left-3 right-3">
-          <p className="text-xs leading-relaxed text-zinc-100">
-            <HashtagText text={post.content} />
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between px-3 py-2">
-        <div className="flex items-center gap-0.5">
-          <IconButton
-            icon={<Heart size={20} className={cx(liked && "fill-current")} />}
-            count={formatCount(post.likesCount)}
-            active={liked}
-            activeColor="#fb7185"
-            onClick={() => void react(post.id, "like", post)}
-            title="Like"
-          />
-          <IconButton
-            icon={<MessageCircle size={19} />}
-            count={commentsOpen ? comments.length : post.commentCount}
-            onClick={() => setCommentsOpen(true)}
-            title="Comments"
-          />
-          <IconButton icon={<Share2 size={19} />} onClick={() => setShareOpen(true)} title="Share" />
-        </div>
-        <IconButton
-          icon={<Bookmark size={19} className={cx(saved && "fill-current")} />}
-          active={saved}
-          onClick={() => {
-            toggleSaved(post.id);
-            toast(saved ? "Removed from Saved" : "Saved to your profile 🔖", saved ? "default" : "success");
-          }}
-          title="Save"
-        />
-      </div>
-
-      <Modal
-        open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
-        title="Comments"
-        subtitle={`On @${post.author?.username ?? "unknown"}'s video`}
       >
-        <CommentThread
-          comments={comments}
-          loading={loading}
-          onReply={(parentId, text) => add(text, parentId)}
-          canInteract={Boolean(user)}
-          toxicFilter
-        />
-        <div className="sticky bottom-0 mt-4 flex items-center gap-2 border-t border-zinc-800/80 bg-zinc-900/95 pt-3">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && draft.trim()) {
-                void add(draft);
-                setDraft("");
-              }
-            }}
-            placeholder="Add a comment on Cliq..."
-            className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/70 px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-          />
-          <button
-            type="button"
-            aria-label="Post comment"
-            onClick={() => {
-              if (draft.trim()) {
-                void add(draft);
-                setDraft("");
-              }
-            }}
-            className="grid h-9 w-9 place-items-center rounded-full bg-[var(--accent-grad)] text-white"
-          >
-            <Send size={15} />
-          </button>
-        </div>
-      </Modal>
+        {/* Top overlay */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between p-3">
+          <div className="pointer-events-auto flex gap-1.5">
+            {(
+              [
+                { key: "forYou", label: "For You" },
+                { key: "following", label: "Following" },
+              ] as const
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setMode(key);
+                  scrollerRef.current?.scrollTo({ top: 0 });
+                }}
+                className={cx(
+                  "rounded-full px-3 py-1.5 text-[11px] font-bold backdrop-blur-md transition",
+                  mode === key
+                    ? "bg-white/95 text-zinc-900"
+                    : "bg-black/35 text-zinc-200 hover:bg-black/55",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-      <ShareSheet
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        title={`@${post.author?.username ?? "unknown"}'s video`}
-      />
-    </article>
+          <div className="pointer-events-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label={muted ? "Unmute" : "Mute"}
+              onClick={() => setMuted((m) => !m)}
+              className="grid h-9 w-9 place-items-center rounded-full bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55"
+            >
+              {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+            </button>
+            <button
+              type="button"
+              aria-label="Post a Reel"
+              onClick={() => setCreateOpen(true)}
+              className="grid h-9 w-9 place-items-center rounded-full bg-black/35 text-white backdrop-blur-md transition hover:bg-black/55"
+            >
+              <Plus size={17} strokeWidth={3} />
+            </button>
+          </div>
+        </div>
+
+        {/* Counter */}
+        <span className="pointer-events-none absolute left-1/2 top-14 z-30 -translate-x-1/2 rounded-full bg-black/35 px-2.5 py-1 text-[10px] font-semibold text-zinc-200 backdrop-blur-md lg:hidden">
+          {activeIndex + 1} / {visible.length}
+        </span>
+
+        <div
+          ref={scrollerRef}
+          data-testid="reels-scroller"
+          className="no-scrollbar h-full w-full snap-y snap-mandatory overflow-y-scroll scroll-smooth"
+        >
+          {visible.map((post, index) => (
+            <div
+              key={post.id}
+              className="relative flex h-full w-full snap-start snap-always items-center justify-center overflow-hidden bg-black select-none"
+            >
+              <Reel
+                post={post}
+                muted={muted}
+                onToggleMute={() => setMuted((m) => !m)}
+                active={index === activeIndex}
+                onOpenProfile={onOpenProfile}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

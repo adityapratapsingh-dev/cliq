@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Bookmark, EyeOff, Heart, Image as ImageIcon, MessageCircle, MoreHorizontal, Send, Share2 } from "lucide-react";
+import { useRef } from "react";
+import { Bookmark, EyeOff, Heart, Image as ImageIcon, MessageCircle, MoreHorizontal, Send, Share2, Trash2, X, ZoomIn } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { Avatar, EmptyState, IconButton, Modal, SkeletonCard } from "@/components/ui/Primitives";
 import { CommentThread, HashtagText, LikePair } from "@/components/ui/FeedBits";
@@ -79,10 +80,15 @@ export function PhotoCard({
   hideDislikes: boolean;
 }) {
   const { toast, savedIds, toggleSaved } = useCliq();
-  const { react } = usePostActions();
+  const { react, remove } = usePostActions();
+  const { user: me } = useCliq();
   const [menuOpen, setMenuOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [broken, setBroken] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+  const [bursts, setBursts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const lastTap = useRef(0);
+  const burstId = useRef(0);
 
   const liked = post.myReaction === "like";
   const disliked = post.myReaction === "dislike";
@@ -157,13 +163,48 @@ export function PhotoCard({
                 >
                   <EyeOff size={14} /> Hide
                 </button>
+                {post.userId === me?.id ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void remove(post.id);
+                    }}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-semibold text-rose-300 transition hover:bg-zinc-800/70"
+                  >
+                    <Trash2 size={14} /> Delete
+                  </button>
+                ) : null}
               </div>
             </>
           ) : null}
         </div>
       </header>
 
-      <div className="relative aspect-square w-full bg-zinc-950 sm:aspect-[4/3]">
+      <div
+        className="relative aspect-square w-full cursor-zoom-in bg-zinc-950 sm:aspect-[4/3]"
+        onDoubleClick={(event) => {
+          // Double-tap to like, with a heart at the pointer.
+          const rect = event.currentTarget.getBoundingClientRect();
+          burstId.current += 1;
+          const id = burstId.current;
+          setBursts((prev) => [...prev, { id, x: event.clientX - rect.left, y: event.clientY - rect.top }]);
+          setTimeout(() => setBursts((prev) => prev.filter((b) => b.id !== id)), 900);
+          if (!liked) void react(post.id, "like", post);
+        }}
+        onClick={() => {
+          // A single click opens the lightbox; a double tap must not.
+          const now = Date.now();
+          if (now - lastTap.current < 300) {
+            lastTap.current = 0;
+            return;
+          }
+          lastTap.current = now;
+          setTimeout(() => {
+            if (lastTap.current === now) setLightbox(true);
+          }, 300);
+        }}
+      >
         {post.mediaUrl && !broken ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -177,11 +218,17 @@ export function PhotoCard({
             <p className="text-xs text-zinc-400">{post.mediaUrl ? "This image can't load" : "No image attached"}</p>
           </div>
         )}
-        {liked ? (
-          <span className="pointer-events-none absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-rose-500/90 text-white">
-            <Heart size={16} className="fill-current" />
-          </span>
-        ) : null}
+        {bursts.map((b) => (
+          <Heart
+            key={b.id}
+            size={92}
+            className="cliq-reel-heart pointer-events-none absolute z-20 fill-rose-500 text-rose-500 drop-shadow-[0_0_26px_rgba(244,63,94,0.85)]"
+            style={{ left: b.x, top: b.y }}
+          />
+        ))}
+        <span className="pointer-events-none absolute bottom-3 right-3 grid h-7 w-7 place-items-center rounded-full bg-black/50 text-white/80 backdrop-blur">
+          <ZoomIn size={13} />
+        </span>
       </div>
 
       <div className="flex items-center justify-between px-3 py-2">
@@ -209,6 +256,8 @@ export function PhotoCard({
         />
       </div>
 
+      <ReactionRatio likes={post.likesCount} dislikes={post.dislikesCount} hideDislikes={hideDislikes} />
+
       {post.content ? (
         <div className="px-4 pb-4">
           <p className="text-sm text-zinc-200">
@@ -231,12 +280,54 @@ export function PhotoCard({
         </div>
       ) : null}
 
-      <ShareSheet
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        title={`@${post.author?.username ?? "unknown"}'s photo`}
-      />
+      <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} post={post} />
+
+      {lightbox && post.mediaUrl ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95 p-4">
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setLightbox(false)}
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full border border-white/20 text-white/80 transition hover:text-white"
+          >
+            <X size={18} />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.mediaUrl}
+            alt={post.content || "Photo"}
+            className="max-h-full max-w-full rounded-2xl object-contain"
+          />
+        </div>
+      ) : null}
     </article>
+  );
+}
+
+/** Shows how the community split between likes and dislikes. */
+function ReactionRatio({
+  likes,
+  dislikes,
+  hideDislikes,
+}: {
+  likes: number;
+  dislikes: number;
+  hideDislikes: boolean;
+}) {
+  const total = likes + dislikes;
+  if (hideDislikes || total === 0) return null;
+  const pct = Math.round((likes / total) * 100);
+  return (
+    <div className="px-4 pb-1">
+      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+        <span className="h-full bg-emerald-400 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+        <span className="h-full bg-rose-500/80 transition-[width] duration-300" style={{ width: `${100 - pct}%` }} />
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[10px] font-semibold text-zinc-500">
+        <span>{pct}% liked</span>
+        <span>{100 - pct}% disliked</span>
+      </div>
+    </div>
   );
 }
 

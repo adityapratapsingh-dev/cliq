@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Film, Heart, Image as ImageIcon, MessageSquare, Play, Trash2, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { api } from "@/lib/api-client";
+import { usePostActions } from "@/components/tabs/usePostActions";
 import { ArtBlock, Avatar, Spinner } from "@/components/ui/Primitives";
 import { HashtagText } from "@/components/ui/FeedBits";
 import { flairColor } from "@/lib/constants";
@@ -12,7 +12,9 @@ import { cx, formatCount, timeAgo } from "@/lib/utils";
 
 /** Compact post tile used on the Profile tabs and Saved list. */
 export function PostCardMini({ post, viewerId }: { post: Post; viewerId: string }) {
-  const { bump, toast, apiError } = useCliq();
+  const { bump } = useCliq();
+  // Optimistic delete: the tile disappears immediately, then the request runs.
+  const { remove: removePost } = usePostActions();
   const [broken, setBroken] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [gone, setGone] = useState(false);
@@ -25,16 +27,10 @@ export function PostCardMini({ post, viewerId }: { post: Post; viewerId: string 
 
   async function remove() {
     setDeleting(true);
-    try {
-      await api.deletePost(post.id);
-      setGone(true);
-      toast("Post deleted", "default");
-      bump();
-    } catch (error) {
-      apiError(error);
-    } finally {
-      setDeleting(false);
-    }
+    setGone(true);
+    await removePost(post.id);
+    bump();
+    setDeleting(false);
   }
 
   const icon = isVideo ? <Film size={13} /> : post.type === "photo" ? <ImageIcon size={13} /> : <MessageSquare size={13} />;

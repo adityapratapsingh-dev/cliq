@@ -39,6 +39,12 @@ interface CliqContextValue {
   /** Post ids the user has locally marked saved. */
   savedIds: string[];
   toggleSaved: (postId: string) => void;
+  /** Users the signed-in account follows (derived from friendships.outgoing). */
+  followingIds: string[];
+  /** Send/withdraw a Cliq Up. Optimistic, reconciled against the server. */
+  toggleFollow: (userId: string) => void;
+  /** Re-read the follow graph after it changes elsewhere. */
+  refreshFollowing: () => Promise<void>;
   apiError: (error: unknown) => void;
 }
 
@@ -61,6 +67,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [revision, setRevision] = useState(0);
   const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
   const counter = useRef(0);
 
   const toast = useCallback((text: string, tone: Toast["tone"] = "default") => {
@@ -137,6 +144,55 @@ export function CliqProvider({ children }: { children: ReactNode }) {
 
   const bump = useCallback(() => setRevision((r) => r + 1), []);
 
+  /**
+   * Load who we follow.
+   *
+   * `friendships` holds both directions, so "following" is the set of outgoing
+   * requests/acceptances — that is what the Reels "Following" feed filters on.
+   */
+  const refreshFollowing = useCallback(async () => {
+    try {
+      const graph = await api.getFriends();
+      setFollowingIds([...graph.friends.map((f) => f.id), ...graph.outgoing.map((o) => o.user.id)]);
+    } catch {
+      // Not fatal — the For You feed still works without it.
+      setFollowingIds([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setFollowingIds([]);
+      return;
+    }
+    void refreshFollowing();
+  }, [user, refreshFollowing]);
+
+  /**
+   * Toggle a Cliq Up from anywhere in the app (Reels action column, caption,
+   * profile cards). Updates local state first so the button reacts instantly.
+   */
+  const toggleFollow = useCallback(
+    (userId: string) => {
+      const isFollowing = followingIds.includes(userId);
+      setFollowingIds((prev) => (isFollowing ? prev.filter((id) => id !== userId) : [...prev, userId]));
+      if (isFollowing) {
+        toast("Removed from your Cliq", "default");
+        return;
+      }
+      toast("Cliq Up sent ⚡", "success");
+      void api
+        .requestFriend(userId)
+        .then(() => refreshFollowing())
+        .catch((error) => {
+          // Roll back if the request failed.
+          setFollowingIds((prev) => prev.filter((id) => id !== userId));
+          apiError(error);
+        });
+    },
+    [followingIds, toast, refreshFollowing, apiError],
+  );
+
   const toggleSaved = useCallback((postId: string) => {
     setSavedIds((prev) => {
       const next = prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId];
@@ -197,6 +253,9 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       bump,
       savedIds,
       toggleSaved,
+      followingIds,
+      toggleFollow,
+      refreshFollowing,
       apiError,
     }),
     [
@@ -218,6 +277,9 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       bump,
       savedIds,
       toggleSaved,
+      followingIds,
+      toggleFollow,
+      refreshFollowing,
       apiError,
     ],
   );
