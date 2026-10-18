@@ -48,3 +48,19 @@ Vercel team, or disabling the git-author check.)
 **Verify a fix:** poll the commit status —
 `GET /repos/{owner}/{repo}/commits/{sha}/status` → look for the `Vercel` context
 going `pending` → `success` ("Deployment has completed").
+
+## Recurrence (PR #13, 2026-10-18) — tip-only re-author recipe
+Symptom repeated on PR #13: only the newest commit was bad; the two below it
+were already owner-authored. Fastest fix is amend, NOT filter-branch:
+1. `git -c user.name=adityapratapsingh-dev -c user.email=pratapsinghaditya202@gmail.com commit --amend --no-edit --reset-author`
+2. Confirm content unchanged: tree hash identical before/after (`git rev-parse HEAD^{tree}`).
+3. This repo is a SHALLOW clone and its fetch refspec is ONLY
+   `+refs/heads/main:refs/remotes/origin/main` — so `origin/<feature-branch>`
+   does NOT exist locally and `--force-with-lease` cannot read it. Get the
+   remote SHA via `git ls-remote origin <branch>` and pass it explicitly:
+   `git push --force-with-lease=<branch>:<remote-sha> origin <branch>`.
+4. Vercel goes pending -> success in ~20-40s; poll `GET /repos/{o}/{r}/commits/{sha}/status`.
+
+Also: the agent's PRs are created as DRAFTS (GitHub shows "still a work in
+progress"). To flip: `PATCH /pulls/{n}` with `{"draft":false}` did NOT work;
+use GraphQL `markPullRequestReadyForReview(input:{pullRequestId:<node_id>})`.
