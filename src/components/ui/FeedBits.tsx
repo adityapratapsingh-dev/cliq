@@ -107,7 +107,7 @@ export function CommentThread({
                 type="button"
                 onClick={() => void submitReply(comment.id)}
                 disabled={sending || !replyText.trim()}
-                className="rounded-full bg-[var(--accent-grad)] p-1.5 text-white disabled:opacity-40"
+                className="rounded-full bg-indigo-600 p-1.5 text-white disabled:opacity-40"
                 aria-label="Send reply"
               >
                 {sending ? <Spinner /> : <Send size={13} />}
@@ -160,7 +160,7 @@ export function VoteBar({
         className={cx(
           "min-w-9 text-center font-bold tabular-nums",
           size === "sm" ? "text-xs" : "text-sm",
-          score > 0 ? "text-emerald-300" : score < 0 ? "text-rose-300" : "text-zinc-400",
+          score > 0 ? "text-emerald-300" : score < 0 ? "text-amber-300" : "text-zinc-400",
         )}
       >
         {formatCount(score)}
@@ -172,7 +172,7 @@ export function VoteBar({
         className={cx(
           "inline-flex items-center rounded-full font-bold transition disabled:opacity-40",
           pad,
-          vote === "down" ? "bg-rose-500/20 text-rose-300" : "text-zinc-400 hover:bg-zinc-800 hover:text-rose-300",
+          vote === "down" ? "bg-amber-500/20 text-amber-300" : "text-zinc-400 hover:bg-zinc-800 hover:text-amber-300",
         )}
       >
         <ThumbsDown size={size === "sm" ? 12 : 14} className={vote === "down" ? "fill-current" : ""} />
@@ -207,7 +207,7 @@ export function LikePair({
         icon={<Heart size={19} className={liked ? "fill-current" : ""} />}
         count={formatCount(likes)}
         active={liked}
-        activeColor="#fb7185"
+        activeColor="#ff3040"
         onClick={onLike}
         disabled={disabled}
         title="Like"

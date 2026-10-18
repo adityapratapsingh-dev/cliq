@@ -4,6 +4,8 @@ import type {
   ConversationSummary,
   FriendGraph,
   Friendship,
+  Group,
+  GroupMessage,
   Message,
   MessageReaction,
   Poll,
@@ -12,15 +14,23 @@ import type {
   PublicUser,
   ReactionType,
   Settings,
+  Story,
+  StoryBgStyle,
+  StoryGroup,
+  StreakInfo,
+  UserBadges,
 } from "@/types/cliq";
 import { d1Batch, d1Query } from "@/lib/d1";
 import { ensureTablesExist } from "@/lib/d1-schema";
 import {
   toPublicUser,
   type CreateCommentInput,
+  type CreateGroupInput,
+  type CreateGroupMessageInput,
   type CreateMessageInput,
   type CreateNotificationInput,
   type CreatePostInput,
+  type CreateStoryInput,
   type CreateUserInput,
   type NotificationItem,
   type ProfileStats,
@@ -29,6 +39,8 @@ import {
   type StoredUser,
   type UpdateUserPatch,
 } from "@/lib/store/types";
+import { buildBadges, computeStreak } from "@/lib/achievements";
+import { DEFAULT_LOUNGES, STORY_TTL_MS, groupSeededAt } from "@/lib/social-defaults";
 
 interface UserRow {
   id: string;
@@ -53,6 +65,8 @@ interface PostRow {
   media_url: string | null;
   flair: string | null;
   poll_data: string | null;
+  pinned: number | null;
+  quoted_post_id: string | null;
   likes_count: number;
   dislikes_count: number;
   upgrades_count: number;
@@ -60,6 +74,40 @@ interface PostRow {
   created_at: string;
   comment_count?: number;
   my_reaction?: string | null;
+}
+
+interface StoryRow {
+  id: string;
+  user_id: string;
+  media_url: string | null;
+  caption: string | null;
+  bg_style: string | null;
+  views_count: number;
+  created_at: string;
+  viewed?: number;
+}
+
+interface GroupRow {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  creator_id: string | null;
+  is_public: number | null;
+  created_at: string;
+  member_count?: number;
+  joined?: number;
+  last_message_at?: string | null;
+}
+
+interface GroupMessageRow {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  content: string | null;
+  media_url: string | null;
+  reactions: string | null;
+  created_at: string;
 }
 
 interface CommentRow {
@@ -237,8 +285,56 @@ export class D1Store implements Store {
       downgradesCount: Number(row.downgrades_count) || 0,
       commentCount: Number(row.comment_count) || 0,
       myReaction: reaction,
+      pinned: Number(row.pinned) === 1,
+      quotedPost: null,
       createdAt: row.created_at,
     };
+  }
+
+  /**
+   * Resolve the embedded quote previews for a batch of post rows.
+   *
+   * Fetches every referenced original post and its author in two queries, then
+   * returns a map keyed by the *repost's* id.
+   */
+  private async resolveQuotes(rows: PostRow[]): Promise<Map<string, Post["quotedPost"]>> {
+    const map = new Map<string, Post["quotedPost"]>();
+    const originals = [...new Set(rows.map((r) => r.quoted_post_id).filter((v): v is string => Boolean(v)))];
+    if (originals.length === 0) return map;
+
+    const placeholders = originals.map(() => "?").join(", ");
+    const quotedRows = await d1Query<PostRow>(`SELECT * FROM posts WHERE id IN (${placeholders})`, originals);
+    const authors = await this.usersByIds([...new Set(quotedRows.map((r) => r.user_id))]);
+    const byId = new Map(quotedRows.map((r) => [r.id, r]));
+
+    for (const row of rows) {
+      if (!row.quoted_post_id) continue;
+      const quoted = byId.get(row.quoted_post_id);
+      if (!quoted) continue;
+      const author = authors.get(quoted.user_id);
+      map.set(row.id, {
+        id: quoted.id,
+        type: quoted.type as PostType,
+        content: quoted.content ?? "",
+        mediaUrl: quoted.media_url,
+        author: author
+          ? { id: author.id, username: author.username, displayName: author.displayName, avatarUrl: author.avatarUrl }
+          : null,
+        createdAt: quoted.created_at,
+      });
+    }
+    return map;
+  }
+
+  /** Decorate a batch of rows with authors + quote previews. */
+  private async decoratePosts(rows: PostRow[], viewerId: string): Promise<Post[]> {
+    if (rows.length === 0) return [];
+    const users = await this.usersByIds([...new Set(rows.map((r) => r.user_id))]);
+    const quotes = await this.resolveQuotes(rows);
+    return rows.map((row) => ({
+      ...this.decoratePost(row, users.get(row.user_id) ?? null, viewerId),
+      quotedPost: quotes.get(row.id) ?? null,
+    }));
   }
 
   private async fetchPostRow(id: string, viewerId: string): Promise<PostRow | null> {
@@ -258,13 +354,10 @@ export class D1Store implements Store {
       `SELECT p.*,
               (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count,
               (SELECT reaction_type FROM post_reactions r WHERE r.post_id = p.id AND r.user_id = ?) AS my_reaction
-       FROM posts p WHERE p.type = ? ORDER BY p.created_at DESC`,
+       FROM posts p WHERE p.type = ? ORDER BY p.pinned DESC, p.created_at DESC`,
       [viewerId, type],
     );
-    if (rows.length === 0) return [];
-    const authorIds = [...new Set(rows.map((r) => r.user_id))];
-    const users = await this.usersByIds(authorIds);
-    return rows.map((row) => this.decoratePost(row, users.get(row.user_id) ?? null, viewerId));
+    return this.decoratePosts(rows, viewerId);
   }
 
   private async usersByIds(ids: string[]): Promise<Map<string, StoredUser>> {
@@ -280,8 +373,8 @@ export class D1Store implements Store {
     await this.ready();
     const row = await this.fetchPostRow(id, viewerId);
     if (!row) return null;
-    const author = await this.getUserById(row.user_id);
-    return this.decoratePost(row, author, viewerId);
+    const [post] = await this.decoratePosts([row], viewerId);
+    return post ?? null;
   }
 
   async createPost(input: CreatePostInput): Promise<Post> {
@@ -291,8 +384,8 @@ export class D1Store implements Store {
       : null;
 
     await d1Query(
-      `INSERT INTO posts (id, user_id, type, content, media_url, flair, poll_data, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO posts (id, user_id, type, content, media_url, flair, poll_data, quoted_post_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.id,
         input.userId,
@@ -301,6 +394,7 @@ export class D1Store implements Store {
         input.mediaUrl,
         input.flair,
         pollData ? JSON.stringify(pollData) : null,
+        input.quotedPostId ?? null,
         input.createdAt,
       ],
     );
@@ -320,6 +414,33 @@ export class D1Store implements Store {
       { sql: "DELETE FROM comments WHERE post_id = ?", params: [id] },
     ]);
     return true;
+  }
+
+  async updatePost(id: string, userId: string, content: string): Promise<Post> {
+    await this.ready();
+    const rows = await d1Query<{ user_id: string }>("SELECT user_id FROM posts WHERE id = ? LIMIT 1", [id]);
+    if (rows.length === 0) throw new ApiError(404, "Post not found.");
+    if (rows[0].user_id !== userId) throw new ApiError(403, "You can only edit your own posts.");
+    await d1Query("UPDATE posts SET content = ? WHERE id = ?", [content, id]);
+    const post = await this.getPost(id, userId);
+    if (!post) throw new ApiError(404, "Post not found.");
+    return post;
+  }
+
+  async setPostPinned(id: string, userId: string, pinned: boolean): Promise<Post> {
+    await this.ready();
+    const rows = await d1Query<{ user_id: string }>("SELECT user_id FROM posts WHERE id = ? LIMIT 1", [id]);
+    if (rows.length === 0) throw new ApiError(404, "Post not found.");
+    if (rows[0].user_id !== userId) throw new ApiError(403, "You can only pin your own posts.");
+    const statements: { sql: string; params?: unknown[] }[] = [];
+    if (pinned) {
+      statements.push({ sql: "UPDATE posts SET pinned = 0 WHERE user_id = ? AND id <> ?", params: [userId, id] });
+    }
+    statements.push({ sql: "UPDATE posts SET pinned = ? WHERE id = ?", params: [pinned ? 1 : 0, id] });
+    await d1Batch(statements);
+    const post = await this.getPost(id, userId);
+    if (!post) throw new ApiError(404, "Post not found.");
+    return post;
   }
 
   async setPostReaction(postId: string, userId: string, type: ReactionType): Promise<Post> {
@@ -626,6 +747,11 @@ export class D1Store implements Store {
         partner: toPublicUser(partner),
         lastMessage: last ? this.decorateMessage(last, userId, parentMap) : null,
         unreadCount: thread.filter((r) => r.receiver_id === userId && Number(r.is_read) === 0).length,
+        streak: computeStreak(
+          thread.map((r) => ({ senderId: r.sender_id, receiverId: r.receiver_id, createdAt: r.created_at })),
+          userId,
+          partnerId,
+        ).days,
       });
     }
 
@@ -712,6 +838,301 @@ export class D1Store implements Store {
     await d1Query("UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND sender_id = ?", [userId, partnerId]);
   }
 
+  async getStreak(userId: string, partnerId: string): Promise<StreakInfo> {
+    await this.ready();
+    const rows = await d1Query<{ sender_id: string; receiver_id: string; created_at: string }>(
+      `SELECT sender_id, receiver_id, created_at FROM messages
+       WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)`,
+      [userId, partnerId, partnerId, userId],
+    );
+    return computeStreak(
+      rows.map((r) => ({ senderId: r.sender_id, receiverId: r.receiver_id, createdAt: r.created_at })),
+      userId,
+      partnerId,
+    );
+  }
+
+  // ---------------------------------------------------------------- stories
+  async listStories(viewerId: string): Promise<StoryGroup[]> {
+    await this.ready();
+    const cutoff = new Date(Date.now() - STORY_TTL_MS).toISOString();
+    const rows = await d1Query<StoryRow>(
+      `SELECT s.*, EXISTS(SELECT 1 FROM story_views v WHERE v.story_id = s.id AND v.user_id = ?) AS viewed
+       FROM stories s WHERE s.created_at >= ? ORDER BY s.created_at ASC`,
+      [viewerId, cutoff],
+    );
+    const authors = await this.usersByIds([...new Set(rows.map((r) => r.user_id))]);
+
+    const byAuthor = new Map<string, { author: PublicUser; stories: Story[] }>();
+    for (const row of rows) {
+      const author = authors.get(row.user_id);
+      if (!author) continue;
+      const pub = toPublicUser(author);
+      const story: Story = {
+        id: row.id,
+        userId: row.user_id,
+        author: pub,
+        mediaUrl: row.media_url,
+        caption: row.caption ?? "",
+        bgStyle: (row.bg_style as StoryBgStyle) ?? "indigo",
+        viewsCount: Number(row.views_count) || 0,
+        viewed: Number(row.viewed) === 1,
+        createdAt: row.created_at,
+      };
+      const entry = byAuthor.get(row.user_id) ?? { author: pub, stories: [] };
+      entry.stories.push(story);
+      byAuthor.set(row.user_id, entry);
+    }
+
+    const groups: StoryGroup[] = [...byAuthor.values()].map(({ author, stories }) => ({
+      author,
+      stories,
+      viewed: stories.every((s) => s.viewed),
+    }));
+    return groups.sort((a, b) => {
+      if (a.viewed !== b.viewed) return a.viewed ? 1 : -1;
+      const aLast = a.stories[a.stories.length - 1]?.createdAt ?? "";
+      const bLast = b.stories[b.stories.length - 1]?.createdAt ?? "";
+      return bLast.localeCompare(aLast);
+    });
+  }
+
+  async createStory(input: CreateStoryInput): Promise<Story> {
+    await this.ready();
+    await d1Query(
+      `INSERT INTO stories (id, user_id, media_url, caption, bg_style, views_count, created_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?)`,
+      [input.id, input.userId, input.mediaUrl, input.caption, input.bgStyle, input.createdAt],
+    );
+    const author = await this.getUserById(input.userId);
+    return {
+      id: input.id,
+      userId: input.userId,
+      author: author ? toPublicUser(author) : null,
+      mediaUrl: input.mediaUrl,
+      caption: input.caption,
+      bgStyle: input.bgStyle,
+      viewsCount: 0,
+      viewed: false,
+      createdAt: input.createdAt,
+    };
+  }
+
+  async viewStory(storyId: string, viewerId: string): Promise<void> {
+    await this.ready();
+    const existing = await d1Query<{ story_id: string }>(
+      "SELECT story_id FROM story_views WHERE story_id = ? AND user_id = ? LIMIT 1",
+      [storyId, viewerId],
+    );
+    if (existing.length > 0) return;
+    await d1Batch([
+      {
+        sql: "INSERT INTO story_views (story_id, user_id, created_at) VALUES (?, ?, ?)",
+        params: [storyId, viewerId, new Date().toISOString()],
+      },
+      { sql: "UPDATE stories SET views_count = views_count + 1 WHERE id = ?", params: [storyId] },
+    ]);
+  }
+
+  async deleteStory(id: string, userId: string): Promise<boolean> {
+    await this.ready();
+    const rows = await d1Query<{ user_id: string }>("SELECT user_id FROM stories WHERE id = ? LIMIT 1", [id]);
+    if (rows.length === 0) return false;
+    if (rows[0].user_id !== userId) throw new ApiError(403, "You can only delete your own story.");
+    await d1Batch([
+      { sql: "DELETE FROM stories WHERE id = ?", params: [id] },
+      { sql: "DELETE FROM story_views WHERE story_id = ?", params: [id] },
+    ]);
+    return true;
+  }
+
+  // ----------------------------------------------------------------- groups
+  private async ensureLounges(): Promise<void> {
+    await this.ready();
+    await d1Batch(
+      DEFAULT_LOUNGES.map((lounge, index) => ({
+        sql: `INSERT OR IGNORE INTO groups (id, name, description, icon, creator_id, is_public, created_at)
+              VALUES (?, ?, ?, ?, NULL, 1, ?)`,
+        params: [lounge.id, lounge.name, lounge.description, lounge.icon, groupSeededAt(index)],
+      })),
+    );
+  }
+
+  async listGroups(viewerId: string): Promise<Group[]> {
+    await this.ensureLounges();
+    const rows = await d1Query<GroupRow>(
+      `SELECT g.*,
+              (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) AS member_count,
+              EXISTS(SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = ?) AS joined,
+              (SELECT MAX(created_at) FROM group_messages gm WHERE gm.group_id = g.id) AS last_message_at
+       FROM groups g
+       ORDER BY g.is_public DESC,
+                COALESCE((SELECT MAX(created_at) FROM group_messages gm WHERE gm.group_id = g.id), g.created_at) DESC`,
+      [viewerId],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description ?? "",
+      icon: row.icon ?? "💬",
+      creatorId: row.creator_id ?? "system",
+      isPublic: Number(row.is_public) === 1,
+      memberCount: Number(row.member_count) || 0,
+      joined: Number(row.is_public) === 1 || Number(row.joined) === 1,
+      lastMessageAt: row.last_message_at ?? null,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async createGroup(input: CreateGroupInput): Promise<Group> {
+    await this.ready();
+    const existing = await d1Query<{ id: string }>("SELECT id FROM groups WHERE id = ? LIMIT 1", [input.id]);
+    if (existing.length > 0) throw new ApiError(409, "That group already exists.");
+    const members = [...new Set([input.creatorId, ...(input.memberIds ?? [])])];
+    await d1Batch([
+      {
+        sql: `INSERT INTO groups (id, name, description, icon, creator_id, is_public, created_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        params: [input.id, input.name, input.description, input.icon, input.creatorId, input.isPublic ? 1 : 0, input.createdAt],
+      },
+      ...members.map((userId) => ({
+        sql: "INSERT OR IGNORE INTO group_members (group_id, user_id, created_at) VALUES (?, ?, ?)",
+        params: [input.id, userId, input.createdAt],
+      })),
+    ]);
+    return {
+      id: input.id,
+      name: input.name,
+      description: input.description,
+      icon: input.icon,
+      creatorId: input.creatorId,
+      isPublic: input.isPublic,
+      memberCount: members.length,
+      joined: true,
+      lastMessageAt: null,
+      createdAt: input.createdAt,
+    };
+  }
+
+  async joinGroup(groupId: string, userId: string): Promise<Group> {
+    await this.ensureLounges();
+    const rows = await d1Query<GroupRow>("SELECT * FROM groups WHERE id = ? LIMIT 1", [groupId]);
+    if (rows.length === 0) throw new ApiError(404, "That group does not exist.");
+    await d1Query("INSERT OR IGNORE INTO group_members (group_id, user_id, created_at) VALUES (?, ?, ?)", [
+      groupId,
+      userId,
+      new Date().toISOString(),
+    ]);
+    const count = await d1Query<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM group_members WHERE group_id = ?",
+      [groupId],
+    );
+    const row = rows[0];
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description ?? "",
+      icon: row.icon ?? "💬",
+      creatorId: row.creator_id ?? "system",
+      isPublic: Number(row.is_public) === 1,
+      memberCount: Number(count[0]?.count ?? 0),
+      joined: true,
+      lastMessageAt: null,
+      createdAt: row.created_at,
+    };
+  }
+
+  private decorateGroupMessage(row: GroupMessageRow, sender: PublicUser | null, viewerId: string): GroupMessage {
+    const raw = parseJson<{ userId: string; emoji: string }[]>(row.reactions, []);
+    const counts = new Map<string, number>();
+    for (const r of raw) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+    const reactions: MessageReaction[] = [...counts.entries()].map(([emoji, count]) => ({
+      emoji,
+      count,
+      mine: raw.some((r) => r.emoji === emoji && r.userId === viewerId),
+    }));
+    return {
+      id: row.id,
+      groupId: row.group_id,
+      senderId: row.sender_id,
+      sender,
+      content: row.content ?? "",
+      mediaUrl: row.media_url,
+      reactions,
+      createdAt: row.created_at,
+    };
+  }
+
+  async listGroupMessages(groupId: string, viewerId: string): Promise<GroupMessage[]> {
+    await this.ensureLounges();
+    const group = await d1Query<{ id: string }>("SELECT id FROM groups WHERE id = ? LIMIT 1", [groupId]);
+    if (group.length === 0) throw new ApiError(404, "That group does not exist.");
+    const rows = await d1Query<GroupMessageRow>(
+      "SELECT * FROM group_messages WHERE group_id = ? ORDER BY created_at ASC",
+      [groupId],
+    );
+    const senders = await this.usersByIds([...new Set(rows.map((r) => r.sender_id))]);
+    return rows.map((row) => {
+      const sender = senders.get(row.sender_id);
+      return this.decorateGroupMessage(row, sender ? toPublicUser(sender) : null, viewerId);
+    });
+  }
+
+  async createGroupMessage(input: CreateGroupMessageInput): Promise<GroupMessage> {
+    await this.ensureLounges();
+    const group = await d1Query<{ id: string; is_public: number }>(
+      "SELECT id, is_public FROM groups WHERE id = ? LIMIT 1",
+      [input.groupId],
+    );
+    if (group.length === 0) throw new ApiError(404, "That group does not exist.");
+    const statements: { sql: string; params?: unknown[] }[] = [];
+    if (Number(group[0].is_public) === 1) {
+      statements.push({
+        sql: "INSERT OR IGNORE INTO group_members (group_id, user_id, created_at) VALUES (?, ?, ?)",
+        params: [input.groupId, input.senderId, input.createdAt],
+      });
+    }
+    statements.push({
+      sql: `INSERT INTO group_messages (id, group_id, sender_id, content, media_url, reactions, created_at)
+            VALUES (?, ?, ?, ?, ?, '[]', ?)`,
+      params: [input.id, input.groupId, input.senderId, input.content, input.mediaUrl, input.createdAt],
+    });
+    await d1Batch(statements);
+    const sender = await this.getUserById(input.senderId);
+    return {
+      id: input.id,
+      groupId: input.groupId,
+      senderId: input.senderId,
+      sender: sender ? toPublicUser(sender) : null,
+      content: input.content,
+      mediaUrl: input.mediaUrl,
+      reactions: [],
+      createdAt: input.createdAt,
+    };
+  }
+
+  async setGroupMessageReaction(messageId: string, userId: string, emoji: string): Promise<GroupMessage> {
+    await this.ready();
+    const rows = await d1Query<GroupMessageRow>("SELECT * FROM group_messages WHERE id = ? LIMIT 1", [messageId]);
+    if (rows.length === 0) throw new ApiError(404, "Message not found.");
+    const row = rows[0];
+    const raw = parseJson<{ userId: string; emoji: string }[]>(row.reactions, []);
+    const index = raw.findIndex((r) => r.userId === userId);
+    if (index >= 0) {
+      if (raw[index].emoji === emoji) raw.splice(index, 1);
+      else raw[index].emoji = emoji;
+    } else {
+      raw.push({ userId, emoji });
+    }
+    await d1Query("UPDATE group_messages SET reactions = ? WHERE id = ?", [JSON.stringify(raw), messageId]);
+    const sender = await this.getUserById(row.sender_id);
+    return this.decorateGroupMessage(
+      { ...row, reactions: JSON.stringify(raw) },
+      sender ? toPublicUser(sender) : null,
+      userId,
+    );
+  }
+
   // ------------------------------------------------------------ profile stats
 
   async getStats(userId: string): Promise<ProfileStats> {
@@ -730,6 +1151,43 @@ export class D1Store implements Store {
       following: Number(row?.following ?? 0),
       posts: Number(row?.posts ?? 0),
     };
+  }
+
+  async getBadges(userId: string): Promise<UserBadges> {
+    await this.ready();
+    const totals = await d1Query<{ likes: number; upgrades: number; dislikes: number; downgrades: number }>(
+      `SELECT
+         COALESCE(SUM(likes_count),0) AS likes,
+         COALESCE(SUM(upgrades_count),0) AS upgrades,
+         COALESCE(SUM(dislikes_count),0) AS dislikes,
+         COALESCE(SUM(downgrades_count),0) AS downgrades
+       FROM posts WHERE user_id = ?`,
+      [userId],
+    );
+    const likes = Number(totals[0]?.likes ?? 0);
+    const upgrades = Number(totals[0]?.upgrades ?? 0);
+    const dislikes = Number(totals[0]?.dislikes ?? 0);
+    const downgrades = Number(totals[0]?.downgrades ?? 0);
+    const creatorCount = likes + upgrades;
+    const cliqScore = likes + upgrades - dislikes - downgrades;
+
+    const rank = await d1Query<{ rank: number }>(
+      `SELECT COUNT(*) AS rank FROM users WHERE created_at < (SELECT created_at FROM users WHERE id = ?)`,
+      [userId],
+    );
+    const founding = Number(rank[0]?.rank ?? 999) < 10;
+
+    const partners = await d1Query<{ partner_id: string }>(
+      `SELECT DISTINCT CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id
+       FROM messages WHERE sender_id = ? OR receiver_id = ?`,
+      [userId, userId, userId],
+    );
+    let maxStreak = 0;
+    for (const p of partners) {
+      const streak = await this.getStreak(userId, p.partner_id);
+      maxStreak = Math.max(maxStreak, streak.days);
+    }
+    return { badges: buildBadges({ founding, hasStreak: maxStreak > 0, creatorCount, cliqScore }), streak: maxStreak };
   }
 
   // ---------------------------------------------------------- notifications

@@ -23,7 +23,7 @@ export function PhotosTab({ search, onOpenProfile }: { search: string; onOpenPro
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-2xl space-y-5 px-3 py-4 sm:px-4">
+      <div className="mx-auto w-full max-w-[620px] space-y-5 px-3 py-4 sm:px-4">
         <SkeletonCard />
         <SkeletonCard />
       </div>
@@ -32,7 +32,7 @@ export function PhotosTab({ search, onOpenProfile }: { search: string; onOpenPro
 
   if (visible.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-2xl px-4 py-10">
+      <div className="mx-auto w-full max-w-[620px] px-4 py-10">
         <EmptyState
           icon={<ImageIcon size={26} />}
           title={search ? "No photos match that search" : "No photos on Cliq yet"}
@@ -49,7 +49,7 @@ export function PhotosTab({ search, onOpenProfile }: { search: string; onOpenPro
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5 px-3 py-4 sm:px-4">
+    <div className="mx-auto w-full max-w-[620px] space-y-5 px-3 py-4 sm:px-4">
       {visible.map((post) => (
         <PhotoCard
           key={post.id}
@@ -95,7 +95,7 @@ export function PhotoCard({
   const saved = savedIds.includes(post.id);
 
   return (
-    <article className="cliq-rise overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/80 backdrop-blur-md">
+    <article className="cliq-rise overflow-hidden rounded-3xl border border-zinc-800/80 bg-[#121317]">
       <header className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"
@@ -142,7 +142,7 @@ export function PhotoCard({
                 onClick={() => setMenuOpen(false)}
                 className="fixed inset-0 z-10 cursor-default"
               />
-              <div className="cliq-pop absolute right-0 top-9 z-20 w-44 overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/95 py-1 shadow-2xl backdrop-blur-xl">
+              <div className="cliq-pop absolute right-0 top-9 z-20 w-44 overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121317]/98 py-1 shadow-2xl backdrop-blur-xl">
                 <button
                   type="button"
                   onClick={() => {
@@ -381,7 +381,7 @@ export function CommentModal({
               setDraft("");
             }
           }}
-          className="grid h-9 w-9 place-items-center rounded-full bg-[var(--accent-grad)] text-white"
+          className="grid h-9 w-9 place-items-center rounded-full bg-indigo-600 text-white"
         >
           <Send size={15} />
         </button>

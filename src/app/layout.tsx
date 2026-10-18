@@ -36,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-zinc-950 antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-[#09090b] antialiased`}>
         <Providers>
           <CliqProvider>{children}</CliqProvider>
         </Providers>

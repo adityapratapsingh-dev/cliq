@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   notifMessages: true,
   notifVotes: true,
   notifComments: false,
+  note: null,
 };
 
 /** A user as returned to other users (never includes the password hash). */
@@ -88,6 +89,16 @@ export interface Poll {
   votedOptionId: string | null;
 }
 
+/** Lightweight preview of an original post embedded in a quote repost. */
+export interface QuotedPost {
+  id: string;
+  type: PostType;
+  content: string;
+  mediaUrl: string | null;
+  author: { id: string; username: string; displayName: string; avatarUrl: string | null } | null;
+  createdAt: string;
+}
+
 export interface Post {
   id: string;
   userId: string;
@@ -105,6 +116,10 @@ export interface Post {
   commentCount: number;
   /** the signed-in user's reaction on this post, if any */
   myReaction: ReactionType | null;
+  /** Pinned to the top of the author's profile. */
+  pinned: boolean;
+  /** When set, this post is a quote repost of another post. */
+  quotedPost: QuotedPost | null;
   createdAt: string;
 }
 
@@ -144,6 +159,8 @@ export interface ConversationSummary {
   partner: PublicUser;
   lastMessage: Message | null;
   unreadCount: number;
+  /** Consecutive-day message streak with this partner (0 when none). */
+  streak: number;
 }
 
 export interface Friendship {
@@ -234,4 +251,89 @@ export class ApiError extends Error {
     this.status = status;
     this.name = "ApiError";
   }
+}
+
+/* ----------------------------------------------------------------- stories */
+
+/** A stylized gradient text card, when a story has no media. */
+export type StoryBgStyle =
+  | "indigo"
+  | "sunset"
+  | "mint"
+  | "midnight"
+  | "candy"
+  | "ember";
+
+export interface Story {
+  id: string;
+  userId: string;
+  author: PublicUser | null;
+  mediaUrl: string | null;
+  caption: string;
+  /** Gradient theme key when this is a text card (no media). */
+  bgStyle: StoryBgStyle;
+  viewsCount: number;
+  /** true when the signed-in viewer has already seen this story. */
+  viewed: boolean;
+  createdAt: string;
+}
+
+/** One author's worth of stories, for a single ring in the bar. */
+export interface StoryGroup {
+  author: PublicUser;
+  stories: Story[];
+  /** true when every story in the group has been viewed. */
+  viewed: boolean;
+}
+
+/* ------------------------------------------------------------------ groups */
+
+export interface Group {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  creatorId: string;
+  isPublic: boolean;
+  memberCount: number;
+  /** true when the signed-in user belongs to this group. */
+  joined: boolean;
+  lastMessageAt: string | null;
+  createdAt: string;
+}
+
+export interface GroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  sender: PublicUser | null;
+  content: string;
+  mediaUrl: string | null;
+  reactions: MessageReaction[];
+  createdAt: string;
+}
+
+/* ------------------------------------------------- streaks & achievements */
+
+export interface StreakInfo {
+  /** Consecutive days both users have messaged each other. */
+  days: number;
+  /** true when both users have exchanged a message today. */
+  activeToday: boolean;
+}
+
+/** Ids of the achievement badges a user has earned. */
+export type BadgeId = "founding" | "streak" | "creator" | "legend";
+
+export interface AchievementBadge {
+  id: BadgeId;
+  label: string;
+  emoji: string;
+  description: string;
+  earned: boolean;
+}
+
+export interface UserBadges {
+  badges: AchievementBadge[];
+  streak: number;
 }

@@ -46,7 +46,7 @@ export function ReelCommentsSheet({
         className="cliq-sheet-fade absolute -top-[66%] left-0 h-[66%] w-full cursor-default"
       />
 
-      <div className="cliq-sheet-up flex h-full flex-col overflow-hidden rounded-t-3xl border-t border-zinc-700/50 bg-zinc-900/80 backdrop-blur-xl">
+      <div className="cliq-sheet-up flex h-full flex-col overflow-hidden rounded-t-3xl border-t border-zinc-700/50 bg-[#121317]">
         <div className="flex items-center justify-between border-b border-zinc-800/60 px-4 py-3">
           <div>
             <p className="text-sm font-bold text-zinc-50">{post.commentCount} comments</p>
@@ -88,7 +88,7 @@ export function ReelCommentsSheet({
             aria-label="Post comment"
             onClick={() => void submit()}
             disabled={!draft.trim()}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--accent-grad)] text-white transition disabled:opacity-40"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition disabled:opacity-40"
           >
             <Send size={15} />
           </button>

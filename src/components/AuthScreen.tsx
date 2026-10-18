@@ -61,20 +61,12 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
   }
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-zinc-950 px-4 py-10">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="cliq-drift absolute -left-24 -top-24 h-96 w-96 rounded-full bg-[var(--accent-grad)] opacity-20 blur-3xl" />
-        <div
-          className="cliq-drift absolute -right-24 bottom-0 h-[28rem] w-[28rem] rounded-full bg-[var(--accent-grad)] opacity-10 blur-3xl"
-          style={{ animationDelay: "3s" }}
-        />
-      </div>
-
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#09090b] px-4 py-10">
       <div className="relative grid w-full max-w-4xl gap-8 lg:grid-cols-[1fr_1.1fr] lg:items-center">
         {/* Brand panel */}
         <div className="cliq-rise hidden flex-col gap-5 lg:flex">
           <div className="flex items-center gap-3">
-            <span className="relative grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-grad)] shadow-[0_0_28px_-4px_var(--accent)]">
+            <span className="relative grid h-14 w-14 place-items-center rounded-2xl bg-indigo-600 shadow-[0_0_28px_-4px_var(--accent)]">
               <Zap size={26} className="text-white" fill="currentColor" />
               <span className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full border border-zinc-950 bg-zinc-900 text-[var(--accent-2)]">
                 <Sparkles size={13} />
@@ -109,7 +101,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
         {/* Form card */}
         <div className="cliq-rise rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-6 backdrop-blur-xl sm:p-8">
           <div className="mb-5 flex items-center gap-3 lg:hidden">
-            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent-grad)]">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600">
               <Zap size={20} className="text-white" fill="currentColor" />
             </span>
             <span>
@@ -134,7 +126,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
                 }}
                 className={cx(
                   "inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-bold transition",
-                  mode === key ? "bg-[var(--accent-grad)] text-white" : "text-zinc-400 hover:text-zinc-100",
+                  mode === key ? "bg-indigo-600 text-white" : "text-zinc-400 hover:text-zinc-100",
                 )}
               >
                 <Icon size={15} /> {label}
@@ -260,7 +252,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
                           className={cx(
                             "rounded-full border px-3 py-1 text-xs font-semibold transition",
                             active
-                              ? "border-transparent bg-[var(--accent-grad)] text-white"
+                              ? "border-transparent bg-indigo-600 text-white"
                               : "border-zinc-800 text-zinc-400 hover:text-zinc-200",
                           )}
                         >
@@ -283,7 +275,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
             <button
               type="submit"
               disabled={!canSubmit || busy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent-grad)] px-4 py-3 text-sm font-bold text-white transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy ? "Just a sec..." : mode === "signup" ? "Create my Cliq account" : "Log in to Cliq"}
             </button>

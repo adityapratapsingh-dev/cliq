@@ -28,6 +28,8 @@ export const SCHEMA_STATEMENTS: string[] = [
     media_url TEXT,
     flair TEXT,
     poll_data TEXT,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    quoted_post_id TEXT,
     likes_count INTEGER NOT NULL DEFAULT 0,
     dislikes_count INTEGER NOT NULL DEFAULT 0,
     upgrades_count INTEGER NOT NULL DEFAULT 0,
@@ -79,6 +81,45 @@ export const SCHEMA_STATEMENTS: string[] = [
     is_read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS stories (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    media_url TEXT,
+    caption TEXT NOT NULL DEFAULT '',
+    bg_style TEXT NOT NULL DEFAULT 'indigo',
+    views_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS story_views (
+    story_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (story_id, user_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    icon TEXT NOT NULL DEFAULT '💬',
+    creator_id TEXT,
+    is_public INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS group_members (
+    group_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (group_id, user_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS group_messages (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    media_url TEXT,
+    reactions TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_posts_type_created ON posts (type, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_posts_user ON posts (user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_post_reactions_post ON post_reactions (post_id)`,
@@ -88,4 +129,7 @@ export const SCHEMA_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages (sender_id, receiver_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages (receiver_id, is_read)`,
   `CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, is_read, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_stories_created ON stories (created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_group_messages_group ON group_messages (group_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members (user_id)`,
 ];

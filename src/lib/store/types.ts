@@ -5,12 +5,19 @@ import {
   type ConversationSummary,
   type FriendGraph,
   type Friendship,
+  type Group,
+  type GroupMessage,
   type Message,
   type Post,
   type PostType,
   type PublicUser,
   type ReactionType,
   type Settings,
+  type Story,
+  type StoryBgStyle,
+  type StoryGroup,
+  type StreakInfo,
+  type UserBadges,
 } from "@/types/cliq";
 
 /** A user as stored in the database (includes the password hash). */
@@ -63,6 +70,37 @@ export interface CreatePostInput {
   flair: string | null;
   flairColor: string | null;
   pollOptions: { id: string; text: string }[] | null;
+  quotedPostId?: string | null;
+  createdAt: string;
+}
+
+export interface CreateStoryInput {
+  id: string;
+  userId: string;
+  mediaUrl: string | null;
+  caption: string;
+  bgStyle: StoryBgStyle;
+  createdAt: string;
+}
+
+export interface CreateGroupInput {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  creatorId: string;
+  isPublic: boolean;
+  /** Extra members to seed (the creator is always added). */
+  memberIds?: string[];
+  createdAt: string;
+}
+
+export interface CreateGroupMessageInput {
+  id: string;
+  groupId: string;
+  senderId: string;
+  content: string;
+  mediaUrl: string | null;
   createdAt: string;
 }
 
@@ -136,6 +174,8 @@ export interface Store {
   getPost(id: string, viewerId: string): Promise<Post | null>;
   createPost(input: CreatePostInput): Promise<Post>;
   deletePost(id: string, userId: string): Promise<boolean>;
+  updatePost(id: string, userId: string, content: string): Promise<Post>;
+  setPostPinned(id: string, userId: string, pinned: boolean): Promise<Post>;
   setPostReaction(postId: string, userId: string, type: ReactionType): Promise<Post>;
   votePoll(postId: string, userId: string, optionId: string): Promise<Post>;
 
@@ -155,9 +195,27 @@ export interface Store {
   deleteMessage(id: string, userId: string): Promise<boolean>;
   setMessageReaction(messageId: string, userId: string, emoji: string): Promise<Message>;
   markConversationRead(userId: string, partnerId: string): Promise<void>;
+  /** Consecutive-day message streak between two users. */
+  getStreak(userId: string, partnerId: string): Promise<StreakInfo>;
+
+  // stories (24-hour)
+  listStories(viewerId: string): Promise<StoryGroup[]>;
+  createStory(input: CreateStoryInput): Promise<Story>;
+  viewStory(storyId: string, viewerId: string): Promise<void>;
+  deleteStory(id: string, userId: string): Promise<boolean>;
+
+  // groups
+  listGroups(viewerId: string): Promise<Group[]>;
+  createGroup(input: CreateGroupInput): Promise<Group>;
+  joinGroup(groupId: string, userId: string): Promise<Group>;
+  listGroupMessages(groupId: string, viewerId: string): Promise<GroupMessage[]>;
+  createGroupMessage(input: CreateGroupMessageInput): Promise<GroupMessage>;
+  setGroupMessageReaction(messageId: string, userId: string, emoji: string): Promise<GroupMessage>;
 
   // profile stats (real counters for the profile header)
   getStats(userId: string): Promise<ProfileStats>;
+  /** Earned achievement badges for a user's profile. */
+  getBadges(userId: string): Promise<UserBadges>;
 
   // notifications
   listNotifications(userId: string): Promise<NotificationItem[]>;

@@ -10,9 +10,10 @@ import {
   Image as ImageIcon,
   MessageSquarePlus,
   Mic,
+  Pause,
   Phone,
+  Play,
   Plus,
-  Square,
   Search,
   Send,
   Shield,
@@ -25,24 +26,20 @@ import {
   X,
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
+import { StoryNotesBar } from "@/components/stories/StoryNotesBar";
+import { GroupChats } from "@/components/chats/GroupChats";
 import { api } from "@/lib/api-client";
 import { uploadMedia } from "@/lib/cloudinary";
-import {
-  formatDuration,
-  startVoiceRecording,
-  voiceRecordingSupported,
-  type VoiceRecorder,
-} from "@/lib/voice";
-import { CliqNotes } from "@/components/CliqNotes";
 import { refreshNotifications } from "@/components/notifications/useNotificationCenter";
 import { Avatar, EmptyState, Skeleton, Spinner, TypingDots } from "@/components/ui/Primitives";
 import { EMOJI_QUICKBAR, INTEREST_FILTERS, MESSAGE_REACTIONS } from "@/lib/constants";
+import { formatDuration, isAudioUrl, useVoiceRecorder } from "@/lib/voice-recorder";
 import type { ConversationSummary, FriendGraph, Message, PublicUser } from "@/types/cliq";
 import { clockTime, cx, timeAgo } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 3000;
 
-type Mode = "discover" | "chats";
+type Mode = "discover" | "chats" | "groups";
 
 export function FriendsTab({
   search,
@@ -55,14 +52,22 @@ export function FriendsTab({
 }) {
   const [mode, setMode] = useState<Mode>("discover");
   const [openPartner, setOpenPartner] = useState<PublicUser | null>(null);
-  const { counts } = useCliq();
+  const { counts, chatTarget, clearChatTarget } = useCliq();
+
+  // A "jump to DM" from the notes bar or the right rail opens Chats directly.
+  useEffect(() => {
+    if (!chatTarget) return;
+    setMode("chats");
+    setOpenPartner(chatTarget);
+    clearChatTarget();
+  }, [chatTarget, clearChatTarget]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col px-3 py-4 sm:px-4">
       {/* mode switch — hidden while a mobile chat is open so it feels full-screen */}
       <div
         className={cx(
-          "mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/70 p-1 backdrop-blur-md",
+          "mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-zinc-800/80 bg-[#121317] p-1",
           openPartner && "hidden lg:grid",
         )}
       >
@@ -70,6 +75,7 @@ export function FriendsTab({
           [
             { key: "discover", label: "Find Your Cliq", icon: Sparkles, badge: counts.pendingRequests },
             { key: "chats", label: "Direct Chats", icon: MessageSquarePlus, badge: counts.messages },
+            { key: "groups", label: "Group Cliqs", icon: Users, badge: 0 },
           ] as const
         ).map(({ key, label, icon: Icon, badge }) => (
           <button
@@ -81,10 +87,10 @@ export function FriendsTab({
             }}
             className={cx(
               "relative inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition",
-              mode === key ? "bg-[var(--accent-grad)] text-white" : "text-zinc-400 hover:text-zinc-100",
+              mode === key ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-zinc-400 hover:text-zinc-100",
             )}
           >
-            <Icon size={14} /> {label}
+            <Icon size={14} /> <span className="hidden sm:inline">{label}</span>
             {badge > 0 ? (
               <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-lg shadow-rose-500/40">
                 {badge > 9 ? "9+" : badge}
@@ -94,7 +100,10 @@ export function FriendsTab({
         ))}
       </div>
 
-      <CliqNotes onOpenProfile={onOpenProfile} />
+      {/* Cliq Stories & Notes — tap-through story rings + 24h notes */}
+      <div className="mb-4">
+        <StoryNotesBar onOpenProfile={onOpenProfile} />
+      </div>
 
       {mode === "discover" ? (
         <Discover
@@ -106,6 +115,8 @@ export function FriendsTab({
           onDataChanged={onDataChanged}
           onOpenProfile={onOpenProfile}
         />
+      ) : mode === "groups" ? (
+        <GroupChats onOpenProfile={onOpenProfile} />
       ) : (
         <Chats
           openPartner={openPartner}
@@ -183,9 +194,9 @@ function Discover({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-4 backdrop-blur-md">
+      <div className="rounded-3xl border border-zinc-800/80 bg-[#121317] p-4 backdrop-blur-md">
         <div className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--accent-grad)] text-white">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
             <Users size={17} />
           </span>
           <div>
@@ -215,7 +226,7 @@ function Discover({
               className={cx(
                 "shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
                 filter === f
-                  ? "border-transparent bg-[var(--accent-grad)] text-white"
+                  ? "border-transparent bg-indigo-600 text-white"
                   : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200",
               )}
             >
@@ -228,7 +239,7 @@ function Discover({
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-3xl border border-zinc-800/80 bg-zinc-900/60 p-4">
+            <div key={i} className="rounded-3xl border border-zinc-800/80 bg-[#121317] p-4">
               <Skeleton className="h-12 w-12 rounded-full" />
               <Skeleton className="mt-3 h-3 w-28" />
               <Skeleton className="mt-2 h-2.5 w-20" />
@@ -309,7 +320,7 @@ function Discover({
                         ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
                         : requested
                           ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                          : "bg-[var(--accent-grad)] text-white hover:brightness-110",
+                          : "bg-indigo-600 text-white hover:bg-indigo-500",
                     )}
                   >
                     {isFriend ? (
@@ -407,7 +418,7 @@ function Chats({
       {/* conversation list — hidden on mobile once a chat is open */}
       <aside
         data-testid="conversation-list"
-        className={cx("min-w-0 rounded-3xl border border-zinc-800/80 bg-zinc-900/70 p-3 backdrop-blur-md", openPartner && "hidden lg:block")}
+        className={cx("min-w-0 rounded-3xl border border-zinc-800/80 bg-[#121317] p-3 backdrop-blur-md", openPartner && "hidden lg:block")}
       >
         <div className="relative">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -441,7 +452,7 @@ function Chats({
                 <button
                   type="button"
                   onClick={() => setNewChatOpen(true)}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-grad)] px-3.5 py-1.5 text-xs font-bold text-white"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white"
                 >
                   <UserPlus size={13} /> Start a chat
                 </button>
@@ -488,6 +499,11 @@ function Chats({
                       >
                         {c.partner.displayName}
                       </span>
+                      {c.streak > 1 ? (
+                        <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
+                          🔥 {c.streak}
+                        </span>
+                      ) : null}
                       {c.lastMessage ? (
                         <span className="flex shrink-0 items-center gap-1 text-[10px] text-zinc-500">
                           {c.unreadCount > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> : null}
@@ -670,10 +686,8 @@ function ChatWindow({
   const [reactFor, setReactFor] = useState<string | null>(null);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
-  const recorderRef = useRef<VoiceRecorder | null>(null);
-  const [sendingVoice, setSendingVoice] = useState(false);
+  const [streak, setStreak] = useState<number>(0);
+  const voice = useVoiceRecorder();
   const feedRef = useRef<HTMLDivElement>(null);
   const seenIds = useRef<Set<string>>(new Set());
 
@@ -717,6 +731,20 @@ function ChatWindow({
     void fetchMessages();
   }, [fetchMessages]);
 
+  // Refresh the DM streak whenever the thread reloads.
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getStreak(partner.id)
+      .then(({ streak: info }) => {
+        if (!cancelled) setStreak(info.days);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [partner.id, messages.length]);
+
   // Live polling so two real users see new messages without refreshing.
   useEffect(() => {
     const timer = setInterval(() => void fetchMessages({ silent: true }), POLL_INTERVAL_MS);
@@ -748,63 +776,10 @@ function ChatWindow({
     };
   }, [partner.id]);
 
-  /** Tick the elapsed-time display while recording. */
-  useEffect(() => {
-    if (!recording) return;
-    const timer = setInterval(() => {
-      const started = recorderRef.current?.startedAt ?? Date.now();
-      setRecordingSeconds((Date.now() - started) / 1000);
-    }, 250);
-    return () => clearInterval(timer);
-  }, [recording]);
-
-  /** Start recording a voice note. */
-  async function beginRecording() {
-    if (!voiceRecordingSupported()) {
-      toast("Voice notes aren't supported in this browser.", "danger");
-      return;
-    }
-    try {
-      recorderRef.current = await startVoiceRecording();
-      setRecording(true);
-      setRecordingSeconds(0);
-    } catch {
-      toast("Microphone permission is needed to record a voice note.", "danger");
-    }
-  }
-
-  /** Stop, upload the clip to Cloudinary, and send it as a message. */
-  async function finishRecording() {
-    const recorder = recorderRef.current;
-    if (!recorder) return;
-    setSendingVoice(true);
-    try {
-      const blob = await recorder.stop();
-      recorderRef.current = null;
-      setRecording(false);
-      setRecordingSeconds(0);
-
-      if (blob.size < 1200) {
-        toast("That recording was too short — try again.", "danger");
-        return;
-      }
-
-      const file = new File([blob], `voice-${Date.now()}.webm`, { type: blob.type || "audio/webm" });
-      const result = await uploadMedia(file, { compress: false });
-      await api.sendMessage({ receiverId: partner.id, content: "🎤 Voice note", mediaUrl: result.secureUrl });
-      await fetchMessages();
-      onChanged();
-      toast("Voice note sent 🎤", "success");
-    } catch (error) {
-      apiError(error);
-    } finally {
-      setSendingVoice(false);
-    }
-  }
-
-  async function send() {
+  async function send(overrideMedia?: string) {
     const content = draft.trim();
-    if ((!content && !mediaUrl) || sending) return;
+    const media = overrideMedia ?? mediaUrl;
+    if ((!content && !media) || sending) return;
 
     // Optimistic: the bubble appears the instant you hit send (0ms), then we
     // reconcile with the server's copy once the request resolves.
@@ -814,7 +789,7 @@ function ChatWindow({
       senderId: user?.id ?? "me",
       receiverId: partner.id,
       content,
-      mediaUrl,
+      mediaUrl: media,
       replyToId: replyTo?.id ?? null,
       replyTo: replyTo
         ? { id: replyTo.id, content: replyTo.content, senderId: replyTo.senderId }
@@ -835,7 +810,7 @@ function ChatWindow({
       const { message } = await api.sendMessage({
         receiverId: partner.id,
         content,
-        mediaUrl,
+        mediaUrl: media,
         replyToId: optimistic.replyToId,
       });
       setMessages((prev) => prev.map((m) => (m.id === optimisticId ? message : m)));
@@ -848,6 +823,24 @@ function ChatWindow({
       apiError(error);
     } finally {
       setSending(false);
+    }
+  }
+
+  /** Stop recording, upload the clip, and send it as a voice note. */
+  async function finishVoiceNote() {
+    const blob = await voice.stop();
+    if (!blob) return;
+    const ext = blob.type.includes("mp4") ? "m4a" : "webm";
+    const file = new File([blob], `voice-note.${ext}`, { type: blob.type || "audio/webm" });
+    toast("Sending voice note…", "default");
+    try {
+      const result = await uploadMedia(file, { compress: false });
+      await send(result.secureUrl);
+    } catch {
+      // Fall back to a local blob URL so the note still sends on dev setups
+      // without Cloudinary configured.
+      const localUrl = URL.createObjectURL(blob);
+      await send(localUrl);
     }
   }
 
@@ -879,7 +872,7 @@ function ChatWindow({
   }
 
   return (
-    <section className="flex h-[calc(100dvh-13rem)] min-w-0 flex-col overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/70 backdrop-blur-md lg:h-[38rem]">
+    <section className="flex h-[calc(100dvh-13rem)] min-w-0 flex-col overflow-hidden rounded-3xl border border-zinc-800/80 bg-[#121317] lg:h-[38rem]">
       <header className="flex items-center gap-3 border-b border-zinc-800/80 px-3 py-3 sm:px-4">
         <button
           type="button"
@@ -907,6 +900,11 @@ function ChatWindow({
           </button>
           <p className="truncate text-[11px] text-zinc-500">
             @{partner.username}
+            {streak > 1 ? (
+              <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 font-bold text-orange-300">
+                🔥 {streak} day streak
+              </span>
+            ) : null}
             {partnerTyping ? (
               <span className="ml-1 inline-flex items-center gap-1 text-[var(--accent-2)]">
                 · typing <TypingDots />
@@ -947,7 +945,7 @@ function ChatWindow({
                 onClick={() => setSafetyOpen(false)}
                 className="fixed inset-0 z-10 cursor-default"
               />
-              <div className="cliq-pop absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/95 py-1 shadow-2xl backdrop-blur-xl">
+              <div className="cliq-pop absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121317]/98 py-1 shadow-2xl backdrop-blur-xl">
                 {[
                   { label: "Block User", run: () => toast("Blocking arrives in Step 3 🛡️", "default") },
                   { label: "Report", run: () => toast("Report sent to the safety team 🛡️", "danger") },
@@ -1061,113 +1059,119 @@ function ChatWindow({
       ) : null}
 
       <footer className="flex items-center gap-1.5 border-t border-zinc-800/80 px-3 py-3">
-        <button
-          type="button"
-          aria-label="Emoji"
-          onClick={() => setShowEmoji((v) => !v)}
-          className={cx(
-            "grid h-9 w-9 place-items-center rounded-full transition",
-            showEmoji ? "text-[var(--accent-2)]" : "text-zinc-400 hover:text-zinc-100",
-          )}
-        >
-          <Smile size={19} />
-        </button>
-        <label
-          className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-zinc-400 transition hover:text-zinc-100"
-          title="Attach an image URL or upload"
-          aria-label="Attach media"
-        >
-          <ImageIcon size={19} />
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              if (file.size > 4.5 * 1024 * 1024) {
-                toast("Keep images under 4.5MB, or paste a URL instead.", "danger");
-                return;
-              }
-              const reader = new FileReader();
-              reader.onload = () => setMediaUrl(typeof reader.result === "string" ? reader.result : null);
-              reader.readAsDataURL(file);
-            }}
-          />
-        </label>
-        {/* Voice note */}
-        <button
-          type="button"
-          aria-label={recording ? "Stop and send voice note" : "Record voice note"}
-          data-testid="voice-button"
-          disabled={sendingVoice}
-          onClick={() => (recording ? void finishRecording() : void beginRecording())}
-          className={cx(
-            "grid h-9 w-9 shrink-0 place-items-center rounded-full transition disabled:opacity-60",
-            recording ? "bg-rose-500 text-white" : "text-zinc-400 hover:text-zinc-100",
-          )}
-        >
-          {sendingVoice ? (
-            <Spinner className="h-4 w-4" />
-          ) : recording ? (
-            <Square size={15} className="fill-current" />
-          ) : (
-            <Mic size={19} />
-          )}
-        </button>
-
-        {recording ? (
-          <span className="flex shrink-0 items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/10 px-3 py-1.5">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
-            <span className="text-[11px] font-bold tabular-nums text-rose-200">
-              {formatDuration(recordingSeconds)}
-            </span>
+        {voice.recording ? (
+          <>
             <button
               type="button"
-              aria-label="Cancel recording"
-              onClick={() => {
-                recorderRef.current?.cancel();
-                recorderRef.current = null;
-                setRecording(false);
-                setRecordingSeconds(0);
-              }}
-              className="text-[10px] font-semibold text-zinc-400 hover:text-zinc-100"
+              aria-label="Cancel voice note"
+              onClick={() => voice.cancel()}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:text-rose-300"
             >
-              Cancel
+              <Trash2 size={18} />
             </button>
-          </span>
-        ) : null}
-
-        <input
-          data-testid="chat-input"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onPaste={(e) => {
-            const text = e.clipboardData.getData("text");
-            if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|avif)(\?\S*)?$/i.test(text.trim())) {
-              e.preventDefault();
-              setMediaUrl(text.trim());
-              toast("Image URL attached 🖼️", "success");
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          placeholder={`Message ${partner.displayName.split(" ")[0]}...`}
-          className="h-10 min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/70 px-4 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-        />
-        <button
-          type="button"
-          aria-label="Send message"
-          onClick={() => void send()}
-          disabled={sending || (!draft.trim() && !mediaUrl)}
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--accent-grad)] text-white transition active:scale-90 disabled:opacity-40"
-        >
-          {sending ? <Spinner /> : <Send size={17} />}
-        </button>
+            <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/5 px-4">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500" />
+              <span className="text-sm font-semibold tabular-nums text-zinc-200">{formatDuration(voice.seconds)}</span>
+              <span className="ml-1 flex flex-1 items-end gap-0.5 overflow-hidden">
+                {Array.from({ length: 24 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="w-1 rounded-full bg-rose-400/70"
+                    style={{ height: `${6 + ((i * 7) % 16)}px` }}
+                  />
+                ))}
+              </span>
+              <span className="hidden text-[10px] text-zinc-500 sm:inline">Recording…</span>
+            </div>
+            <button
+              type="button"
+              aria-label="Send voice note"
+              onClick={() => void finishVoiceNote()}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 active:scale-90"
+            >
+              <Send size={17} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              aria-label="Emoji"
+              onClick={() => setShowEmoji((v) => !v)}
+              className={cx(
+                "grid h-9 w-9 place-items-center rounded-full transition",
+                showEmoji ? "text-indigo-300" : "text-zinc-400 hover:text-zinc-100",
+              )}
+            >
+              <Smile size={19} />
+            </button>
+            <label
+              className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-zinc-400 transition hover:text-zinc-100"
+              title="Attach an image URL or upload"
+              aria-label="Attach media"
+            >
+              <ImageIcon size={19} />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 4.5 * 1024 * 1024) {
+                    toast("Keep images under 4.5MB, or paste a URL instead.", "danger");
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => setMediaUrl(typeof reader.result === "string" ? reader.result : null);
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            <input
+              data-testid="chat-input"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text");
+                if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|avif)(\?\S*)?$/i.test(text.trim())) {
+                  e.preventDefault();
+                  setMediaUrl(text.trim());
+                  toast("Image URL attached 🖼️", "success");
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              placeholder={`Message ${partner.displayName.split(" ")[0]}...`}
+              className="h-10 min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/70 px-4 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+            />
+            {draft.trim() || mediaUrl ? (
+              <button
+                type="button"
+                aria-label="Send message"
+                onClick={() => void send()}
+                disabled={sending}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 active:scale-90 disabled:opacity-40"
+              >
+                {sending ? <Spinner /> : <Send size={17} />}
+              </button>
+            ) : (
+              <button
+                type="button"
+                aria-label="Record voice note"
+                data-testid="voice-record"
+                onClick={() => void voice.start()}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 active:scale-90"
+              >
+                <Mic size={18} />
+              </button>
+            )}
+          </>
+        )}
       </footer>
     </section>
   );
@@ -1219,17 +1223,21 @@ function MessageBubble({
           className={cx(
             "rounded-2xl px-3.5 py-2 text-sm shadow-sm",
             mine
-              ? "bg-[var(--accent-grad)] text-white"
+              ? "bg-indigo-600 text-white"
               : "border border-zinc-800/80 bg-zinc-950/70 text-zinc-100",
           )}
         >
           {message.mediaUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={message.mediaUrl}
-              alt="Shared media"
-              className="mb-1.5 max-h-64 w-full rounded-xl object-cover"
-            />
+            isAudioUrl(message.mediaUrl) ? (
+              <VoiceNote url={message.mediaUrl} mine={mine} />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={message.mediaUrl}
+                alt="Shared media"
+                className="mb-1.5 max-h-64 w-full rounded-xl object-cover"
+              />
+            )
           ) : null}
           {message.content ? (
             <p className="whitespace-pre-wrap break-words">{toxicFilter ? message.content : message.content}</p>
@@ -1266,7 +1274,7 @@ function MessageBubble({
             />
             <div
               className={cx(
-                "cliq-pop absolute z-20 w-max rounded-2xl border border-zinc-800/80 bg-zinc-900/95 p-1 shadow-2xl backdrop-blur-xl",
+                "cliq-pop absolute z-20 w-max rounded-2xl border border-zinc-800/80 bg-[#121317]/98 p-1 shadow-2xl backdrop-blur-xl",
                 mine ? "right-0 top-full mt-1" : "left-0 top-full mt-1",
               )}
             >
@@ -1341,3 +1349,78 @@ function MessageBubble({
     </div>
   );
 }
+
+/**
+ * A voice-note bubble: play/pause plus a live waveform-style progress bar.
+ * Works for any audio URL (Cloudinary .webm/.mp4, or a local blob during dev).
+ */
+function VoiceNote({ url, mine }: { url: string; mine: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const bars = 28;
+
+  function toggle() {
+    const el = audioRef.current;
+    if (!el) return;
+    if (el.paused) {
+      void el.play();
+      setPlaying(true);
+    } else {
+      el.pause();
+      setPlaying(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2.5 py-0.5">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? "Pause voice note" : "Play voice note"}
+        className={cx(
+          "grid h-8 w-8 shrink-0 place-items-center rounded-full transition active:scale-90",
+          mine ? "bg-white/25 text-white" : "bg-indigo-600 text-white",
+        )}
+      >
+        {playing ? <Pause size={14} className="fill-current" /> : <Play size={14} className="ml-0.5 fill-current" />}
+      </button>
+      <span className="flex flex-1 items-center gap-[3px]">
+        {Array.from({ length: bars }).map((_, i) => {
+          const active = progress * bars > i;
+          const height = 6 + ((i * 5) % 15);
+          return (
+            <span
+              key={i}
+              className={cx(
+                "w-[3px] rounded-full transition-colors",
+                active ? (mine ? "bg-white" : "bg-indigo-400") : mine ? "bg-white/40" : "bg-zinc-600",
+              )}
+              style={{ height }}
+            />
+          );
+        })}
+      </span>
+      <span className={cx("shrink-0 text-[10px] font-semibold tabular-nums", mine ? "text-white/80" : "text-zinc-400")}>
+        {formatDuration(duration)}
+      </span>
+      <audio
+        ref={audioRef}
+        src={url}
+        preload="metadata"
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => {
+          const el = e.currentTarget;
+          if (el.duration && Number.isFinite(el.duration)) setProgress(el.currentTime / el.duration);
+        }}
+        onEnded={() => {
+          setPlaying(false);
+          setProgress(0);
+        }}
+        className="hidden"
+      />
+    </div>
+  );
+}
+

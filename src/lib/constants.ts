@@ -1,12 +1,13 @@
 import type { AccentKey, MessageScope, PostType, ReactionType } from "@/types/cliq";
 
 export const FLAIRS: { label: string; color: string }[] = [
-  { label: "#AskCliq", color: "#8b5cf6" },
+  { label: "#AskCliq", color: "#6366f1" },
   { label: "#SchoolLife", color: "#38bdf8" },
   { label: "#Gaming", color: "#22c55e" },
   { label: "#Music", color: "#f472b6" },
-  { label: "#LateNightThoughts", color: "#6366f1" },
   { label: "#Memes", color: "#f59e0b" },
+  { label: "#Coding", color: "#8b5cf6" },
+  { label: "#LateNightThoughts", color: "#a78bfa" },
 ];
 
 export const INTEREST_OPTIONS = [

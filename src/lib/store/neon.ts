@@ -4,6 +4,8 @@ import type {
   ConversationSummary,
   FriendGraph,
   Friendship,
+  Group,
+  GroupMessage,
   Message,
   MessageReaction,
   Poll,
@@ -12,15 +14,23 @@ import type {
   PublicUser,
   ReactionType,
   Settings,
+  Story,
+  StoryBgStyle,
+  StoryGroup,
+  StreakInfo,
+  UserBadges,
 } from "@/types/cliq";
 import { query, queryOne, withTransaction } from "@/lib/neon";
 import { ensureTablesExist } from "@/lib/neon-bootstrap";
 import {
   toPublicUser,
   type CreateCommentInput,
+  type CreateGroupInput,
+  type CreateGroupMessageInput,
   type CreateMessageInput,
   type CreateNotificationInput,
   type CreatePostInput,
+  type CreateStoryInput,
   type CreateUserInput,
   type NotificationItem,
   type Store,
@@ -28,6 +38,8 @@ import {
   type StoredUser,
   type UpdateUserPatch,
 } from "@/lib/store/types";
+import { buildBadges, computeStreak } from "@/lib/achievements";
+import { DEFAULT_LOUNGES, groupSeededAt } from "@/lib/social-defaults";
 
 /* ------------------------------------------------------------------ row types */
 
@@ -54,6 +66,8 @@ interface PostRow {
   media_url: string | null;
   flair: string | null;
   poll_data: PollData | null;
+  pinned: boolean | null;
+  quoted_post_id: string | null;
   likes_count: number;
   dislikes_count: number;
   upgrades_count: number;
@@ -62,6 +76,50 @@ interface PostRow {
   comment_count?: string | number;
   my_reaction?: string | null;
   author?: UserRow | null;
+  quoted_type?: string | null;
+  quoted_content?: string | null;
+  quoted_media_url?: string | null;
+  quoted_created_at?: Date | string | null;
+  quoted_author_id?: string | null;
+  quoted_author_username?: string | null;
+  quoted_author_display_name?: string | null;
+  quoted_author_avatar_url?: string | null;
+}
+
+interface StoryRow {
+  id: string;
+  user_id: string;
+  media_url: string | null;
+  caption: string | null;
+  bg_style: string | null;
+  views_count: number;
+  created_at: Date | string;
+  viewed?: boolean;
+  author?: UserRow | null;
+}
+
+interface GroupRow {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  creator_id: string | null;
+  is_public: boolean | null;
+  created_at: Date | string;
+  member_count?: string | number;
+  joined?: boolean;
+  last_message_at?: Date | string | null;
+}
+
+interface GroupMessageRow {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  content: string | null;
+  media_url: string | null;
+  reactions: { userId: string; emoji: string }[] | null;
+  created_at: Date | string;
+  sender?: UserRow | null;
 }
 
 interface CommentRow {
@@ -127,21 +185,25 @@ function rowToUser(row: UserRow): StoredUser {
  * Columns to select for an author, as a json_build_object so a post row can
  * carry its author in a single round-trip instead of a second query.
  */
-const AUTHOR_JSON = `
+function authorJson(alias: string, as: string): string {
+  return `
   json_build_object(
-    'id', u.id,
-    'username', u.username,
-    'display_name', u.display_name,
-    'email', u.email,
+    'id', ${alias}.id,
+    'username', ${alias}.username,
+    'display_name', ${alias}.display_name,
+    'email', ${alias}.email,
     'password_hash', '',
-    'age', u.age,
-    'bio', u.bio,
-    'avatar_url', u.avatar_url,
-    'banner_url', u.banner_url,
-    'interests', u.interests,
-    'settings', u.settings,
-    'created_at', u.created_at
-  ) AS author`;
+    'age', ${alias}.age,
+    'bio', ${alias}.bio,
+    'avatar_url', ${alias}.avatar_url,
+    'banner_url', ${alias}.banner_url,
+    'interests', ${alias}.interests,
+    'settings', ${alias}.settings,
+    'created_at', ${alias}.created_at
+  ) AS ${as}`;
+}
+
+const AUTHOR_JSON = authorJson("u", "author");
 
 function pollFromRow(data: PollData | null, viewerId: string): Poll | null {
   if (!data) return null;
@@ -150,6 +212,24 @@ function pollFromRow(data: PollData | null, viewerId: string): Poll | null {
     votedOptionId: data.votes?.[viewerId] ?? null,
   };
 }
+
+/**
+ * Extra SELECT columns that join the quoted (reposted) post and its author, so a
+ * quote repost renders its embedded preview without a follow-up query.
+ */
+const QUOTED_JSON = `
+  qp.type AS quoted_type,
+  qp.content AS quoted_content,
+  qp.media_url AS quoted_media_url,
+  qp.created_at AS quoted_created_at,
+  qa.id AS quoted_author_id,
+  qa.username AS quoted_author_username,
+  qa.display_name AS quoted_author_display_name,
+  qa.avatar_url AS quoted_author_avatar_url`;
+
+const QUOTED_JOINS = `
+  LEFT JOIN posts qp ON qp.id = p.quoted_post_id
+  LEFT JOIN users qa ON qa.id = qp.user_id`;
 
 function decoratePost(row: PostRow, viewerId: string): Post {
   const author = row.author ? rowToUser(row.author) : null;
@@ -169,6 +249,23 @@ function decoratePost(row: PostRow, viewerId: string): Post {
     downgradesCount: Number(row.downgrades_count) || 0,
     commentCount: Number(row.comment_count) || 0,
     myReaction: (row.my_reaction as ReactionType | null) ?? null,
+    pinned: Boolean(row.pinned),
+    quotedPost:
+      row.quoted_type && row.quoted_author_id
+        ? {
+            id: row.quoted_post_id as string,
+            type: row.quoted_type as PostType,
+            content: row.quoted_content ?? "",
+            mediaUrl: row.quoted_media_url ?? null,
+            author: {
+              id: row.quoted_author_id,
+              username: row.quoted_author_username ?? "unknown",
+              displayName: row.quoted_author_display_name ?? row.quoted_author_username ?? "unknown",
+              avatarUrl: row.quoted_author_avatar_url ?? null,
+            },
+            createdAt: iso(row.quoted_created_at ?? row.created_at),
+          }
+        : null,
     createdAt: iso(row.created_at),
   };
 }
@@ -310,13 +407,14 @@ export class NeonStore implements Store {
   async listPosts(type: PostType, viewerId: string): Promise<Post[]> {
     await this.ready();
     const rows = await query<PostRow>(
-      `SELECT p.*, ${AUTHOR_JSON},
+      `SELECT p.*, ${AUTHOR_JSON}, ${QUOTED_JSON},
               (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count,
               (SELECT reaction_type FROM post_reactions r WHERE r.post_id = p.id AND r.user_id = $2) AS my_reaction
        FROM posts p
        JOIN users u ON u.id = p.user_id
+       ${QUOTED_JOINS}
        WHERE p.type = $1
-       ORDER BY p.created_at DESC`,
+       ORDER BY p.pinned DESC, p.created_at DESC`,
       [type, viewerId],
     );
     return rows.map((row) => decoratePost(row, viewerId));
@@ -325,11 +423,12 @@ export class NeonStore implements Store {
   async getPost(id: string, viewerId: string): Promise<Post | null> {
     await this.ready();
     const row = await queryOne<PostRow>(
-      `SELECT p.*, ${AUTHOR_JSON},
+      `SELECT p.*, ${AUTHOR_JSON}, ${QUOTED_JSON},
               (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count,
               (SELECT reaction_type FROM post_reactions r WHERE r.post_id = p.id AND r.user_id = $2) AS my_reaction
        FROM posts p
        JOIN users u ON u.id = p.user_id
+       ${QUOTED_JOINS}
        WHERE p.id = $1`,
       [id, viewerId],
     );
@@ -343,8 +442,8 @@ export class NeonStore implements Store {
       : null;
 
     await query(
-      `INSERT INTO posts (id, user_id, type, content, media_url, flair, poll_data, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+      `INSERT INTO posts (id, user_id, type, content, media_url, flair, poll_data, quoted_post_id, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)`,
       [
         input.id,
         input.userId,
@@ -353,6 +452,7 @@ export class NeonStore implements Store {
         input.mediaUrl,
         input.flair,
         pollData ? JSON.stringify(pollData) : null,
+        input.quotedPostId ?? null,
         input.createdAt,
       ],
     );
@@ -369,6 +469,34 @@ export class NeonStore implements Store {
     // Children cascade via the foreign keys.
     await query("DELETE FROM posts WHERE id = $1", [id]);
     return true;
+  }
+
+  async updatePost(id: string, userId: string, content: string): Promise<Post> {
+    await this.ready();
+    const row = await queryOne<{ user_id: string }>("SELECT user_id FROM posts WHERE id = $1", [id]);
+    if (!row) throw new ApiError(404, "Post not found.");
+    if (row.user_id !== userId) throw new ApiError(403, "You can only edit your own posts.");
+    await query("UPDATE posts SET content = $1 WHERE id = $2", [content, id]);
+    const post = await this.getPost(id, userId);
+    if (!post) throw new ApiError(404, "Post not found.");
+    return post;
+  }
+
+  async setPostPinned(id: string, userId: string, pinned: boolean): Promise<Post> {
+    await this.ready();
+    const row = await queryOne<{ user_id: string }>("SELECT user_id FROM posts WHERE id = $1", [id]);
+    if (!row) throw new ApiError(404, "Post not found.");
+    if (row.user_id !== userId) throw new ApiError(403, "You can only pin your own posts.");
+    await withTransaction(async (client) => {
+      // Only one pinned post per user — clear siblings first.
+      if (pinned) {
+        await client.query("UPDATE posts SET pinned = false WHERE user_id = $1 AND id <> $2", [userId, id]);
+      }
+      await client.query("UPDATE posts SET pinned = $1 WHERE id = $2", [pinned, id]);
+    });
+    const post = await this.getPost(id, userId);
+    if (!post) throw new ApiError(404, "Post not found.");
+    return post;
   }
 
   async setPostReaction(postId: string, userId: string, type: ReactionType): Promise<Post> {
@@ -636,6 +764,48 @@ export class NeonStore implements Store {
     };
   }
 
+  async getBadges(userId: string): Promise<UserBadges> {
+    await this.ready();
+    const totals = await queryOne<{ likes: string; upgrades: string; dislikes: string; downgrades: string }>(
+      `SELECT
+         COALESCE(SUM(likes_count),0) AS likes,
+         COALESCE(SUM(upgrades_count),0) AS upgrades,
+         COALESCE(SUM(dislikes_count),0) AS dislikes,
+         COALESCE(SUM(downgrades_count),0) AS downgrades
+       FROM posts WHERE user_id = $1`,
+      [userId],
+    );
+    const likes = Number(totals?.likes ?? 0);
+    const upgrades = Number(totals?.upgrades ?? 0);
+    const dislikes = Number(totals?.dislikes ?? 0);
+    const downgrades = Number(totals?.downgrades ?? 0);
+    const creatorCount = likes + upgrades;
+    const cliqScore = likes + upgrades - dislikes - downgrades;
+
+    // Founding = among the first 10 accounts by signup order.
+    const rank = await queryOne<{ rank: string }>(
+      `SELECT COUNT(*) AS rank FROM users
+       WHERE created_at < (SELECT created_at FROM users WHERE id = $1)`,
+      [userId],
+    );
+    const founding = Number(rank?.rank ?? 999) < 10;
+
+    // Any partner with a streak of 1+ today keeps the badge lit.
+    const partners = await query<{ partner_id: string }>(
+      `SELECT DISTINCT CASE WHEN sender_id = $1 THEN receiver_id ELSE sender_id END AS partner_id
+       FROM messages WHERE sender_id = $1 OR receiver_id = $1`,
+      [userId],
+    );
+    let maxStreak = 0;
+    for (const p of partners) {
+      const streak = await this.getStreak(userId, p.partner_id);
+      maxStreak = Math.max(maxStreak, streak.days);
+    }
+    const hasStreak = maxStreak > 0;
+
+    return { badges: buildBadges({ founding, hasStreak, creatorCount, cliqScore }), streak: maxStreak };
+  }
+
   /* --------------------------------------------------------------- messages */
 
   async listConversations(userId: string): Promise<ConversationSummary[]> {
@@ -674,6 +844,11 @@ export class NeonStore implements Store {
         partner: toPublicUser(partner),
         lastMessage: last ? decorateMessage(last, userId, parents) : null,
         unreadCount: thread.filter((r) => r.receiver_id === userId && !r.is_read).length,
+        streak: computeStreak(
+          thread.map((r) => ({ senderId: r.sender_id, receiverId: r.receiver_id, createdAt: iso(r.created_at) })),
+          userId,
+          partnerId,
+        ).days,
       });
     }
 
@@ -749,6 +924,302 @@ export class NeonStore implements Store {
   async markConversationRead(userId: string, partnerId: string): Promise<void> {
     await this.ready();
     await query("UPDATE messages SET is_read = true WHERE receiver_id = $1 AND sender_id = $2", [userId, partnerId]);
+  }
+
+  async getStreak(userId: string, partnerId: string): Promise<StreakInfo> {
+    await this.ready();
+    const rows = await query<{ sender_id: string; receiver_id: string; created_at: Date | string }>(
+      `SELECT sender_id, receiver_id, created_at FROM messages
+       WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)`,
+      [userId, partnerId],
+    );
+    return computeStreak(
+      rows.map((r) => ({ senderId: r.sender_id, receiverId: r.receiver_id, createdAt: iso(r.created_at) })),
+      userId,
+      partnerId,
+    );
+  }
+
+  /* ---------------------------------------------------------------- stories */
+
+  async listStories(viewerId: string): Promise<StoryGroup[]> {
+    await this.ready();
+    const rows = await query<StoryRow>(
+      `SELECT s.*, ${AUTHOR_JSON},
+              EXISTS (SELECT 1 FROM story_views v WHERE v.story_id = s.id AND v.user_id = $1) AS viewed
+       FROM stories s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.created_at >= now() - interval '24 hours'
+       ORDER BY s.created_at ASC`,
+      [viewerId],
+    );
+
+    const byAuthor = new Map<string, { author: PublicUser; stories: Story[] }>();
+    for (const row of rows) {
+      const author = row.author ? toPublicUser(rowToUser(row.author)) : null;
+      if (!author) continue;
+      const story: Story = {
+        id: row.id,
+        userId: row.user_id,
+        author,
+        mediaUrl: row.media_url,
+        caption: row.caption ?? "",
+        bgStyle: (row.bg_style as StoryBgStyle) ?? "indigo",
+        viewsCount: Number(row.views_count) || 0,
+        viewed: Boolean(row.viewed),
+        createdAt: iso(row.created_at),
+      };
+      const entry = byAuthor.get(row.user_id) ?? { author, stories: [] };
+      entry.stories.push(story);
+      byAuthor.set(row.user_id, entry);
+    }
+
+    const groups: StoryGroup[] = [...byAuthor.values()].map(({ author, stories }) => ({
+      author,
+      stories,
+      viewed: stories.every((s) => s.viewed),
+    }));
+    return groups.sort((a, b) => {
+      if (a.viewed !== b.viewed) return a.viewed ? 1 : -1;
+      const aLast = a.stories[a.stories.length - 1]?.createdAt ?? "";
+      const bLast = b.stories[b.stories.length - 1]?.createdAt ?? "";
+      return bLast.localeCompare(aLast);
+    });
+  }
+
+  async createStory(input: CreateStoryInput): Promise<Story> {
+    await this.ready();
+    await query(
+      `INSERT INTO stories (id, user_id, media_url, caption, bg_style, views_count, created_at)
+       VALUES ($1,$2,$3,$4,$5,0,$6)`,
+      [input.id, input.userId, input.mediaUrl, input.caption, input.bgStyle, input.createdAt],
+    );
+    const author = await this.getUserById(input.userId);
+    return {
+      id: input.id,
+      userId: input.userId,
+      author: author ? toPublicUser(author) : null,
+      mediaUrl: input.mediaUrl,
+      caption: input.caption,
+      bgStyle: input.bgStyle,
+      viewsCount: 0,
+      viewed: false,
+      createdAt: input.createdAt,
+    };
+  }
+
+  async viewStory(storyId: string, viewerId: string): Promise<void> {
+    await this.ready();
+    // ON CONFLICT makes a re-view a no-op, so the count never double-increments.
+    const inserted = await query<{ story_id: string }>(
+      `INSERT INTO story_views (story_id, user_id, created_at) VALUES ($1,$2,now())
+       ON CONFLICT (story_id, user_id) DO NOTHING
+       RETURNING story_id`,
+      [storyId, viewerId],
+    );
+    if (inserted.length > 0) {
+      await query("UPDATE stories SET views_count = views_count + 1 WHERE id = $1", [storyId]);
+    }
+  }
+
+  async deleteStory(id: string, userId: string): Promise<boolean> {
+    await this.ready();
+    const row = await queryOne<{ user_id: string }>("SELECT user_id FROM stories WHERE id = $1", [id]);
+    if (!row) return false;
+    if (row.user_id !== userId) throw new ApiError(403, "You can only delete your own story.");
+    await query("DELETE FROM stories WHERE id = $1", [id]);
+    return true;
+  }
+
+  /* ----------------------------------------------------------------- groups */
+
+  /** Ensure the 5 built-in public lounges exist (idempotent, one batch). */
+  private async ensureLounges(): Promise<void> {
+    await this.ready();
+    for (const [index, lounge] of DEFAULT_LOUNGES.entries()) {
+      await query(
+        `INSERT INTO groups (id, name, description, icon, creator_id, is_public, created_at)
+         VALUES ($1,$2,$3,$4,NULL,true,$5)
+         ON CONFLICT (id) DO NOTHING`,
+        [lounge.id, lounge.name, lounge.description, lounge.icon, groupSeededAt(index)],
+      );
+    }
+  }
+
+  async listGroups(viewerId: string): Promise<Group[]> {
+    await this.ensureLounges();
+    const rows = await query<GroupRow>(
+      `SELECT g.*,
+              (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) AS member_count,
+              EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = $1) AS joined,
+              (SELECT MAX(created_at) FROM group_messages gm WHERE gm.group_id = g.id) AS last_message_at
+       FROM groups g
+       ORDER BY g.is_public DESC, COALESCE((SELECT MAX(created_at) FROM group_messages gm WHERE gm.group_id = g.id), g.created_at) DESC`,
+      [viewerId],
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description ?? "",
+      icon: row.icon ?? "💬",
+      creatorId: row.creator_id ?? "system",
+      isPublic: Boolean(row.is_public),
+      memberCount: Number(row.member_count) || 0,
+      joined: Boolean(row.is_public) || Boolean(row.joined),
+      lastMessageAt: row.last_message_at ? iso(row.last_message_at) : null,
+      createdAt: iso(row.created_at),
+    }));
+  }
+
+  async createGroup(input: CreateGroupInput): Promise<Group> {
+    await this.ready();
+    const existing = await queryOne<{ id: string }>("SELECT id FROM groups WHERE id = $1", [input.id]);
+    if (existing) throw new ApiError(409, "That group already exists.");
+    await withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO groups (id, name, description, icon, creator_id, is_public, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [input.id, input.name, input.description, input.icon, input.creatorId, input.isPublic, input.createdAt],
+      );
+      const members = [...new Set([input.creatorId, ...(input.memberIds ?? [])])];
+      for (const userId of members) {
+        await client.query(
+          `INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1,$2,now())
+           ON CONFLICT (group_id, user_id) DO NOTHING`,
+          [input.id, userId],
+        );
+      }
+    });
+    return {
+      id: input.id,
+      name: input.name,
+      description: input.description,
+      icon: input.icon,
+      creatorId: input.creatorId,
+      isPublic: input.isPublic,
+      memberCount: new Set([input.creatorId, ...(input.memberIds ?? [])]).size,
+      joined: true,
+      lastMessageAt: null,
+      createdAt: input.createdAt,
+    };
+  }
+
+  async joinGroup(groupId: string, userId: string): Promise<Group> {
+    await this.ready();
+    const group = await queryOne<GroupRow>("SELECT * FROM groups WHERE id = $1", [groupId]);
+    if (!group) throw new ApiError(404, "That group does not exist.");
+    await query(
+      `INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1,$2,now())
+       ON CONFLICT (group_id, user_id) DO NOTHING`,
+      [groupId, userId],
+    );
+    const count = await queryOne<{ count: string }>(
+      "SELECT COUNT(*) AS count FROM group_members WHERE group_id = $1",
+      [groupId],
+    );
+    return {
+      id: group.id,
+      name: group.name,
+      description: group.description ?? "",
+      icon: group.icon ?? "💬",
+      creatorId: group.creator_id ?? "system",
+      isPublic: Boolean(group.is_public),
+      memberCount: Number(count?.count ?? 0),
+      joined: true,
+      lastMessageAt: null,
+      createdAt: iso(group.created_at),
+    };
+  }
+
+  private decorateGroupMessage(row: GroupMessageRow, sender: PublicUser | null, viewerId: string): GroupMessage {
+    const raw = Array.isArray(row.reactions) ? row.reactions : [];
+    const counts = new Map<string, number>();
+    for (const r of raw) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+    const reactions: MessageReaction[] = [...counts.entries()].map(([emoji, count]) => ({
+      emoji,
+      count,
+      mine: raw.some((r) => r.emoji === emoji && r.userId === viewerId),
+    }));
+    return {
+      id: row.id,
+      groupId: row.group_id,
+      senderId: row.sender_id,
+      sender,
+      content: row.content ?? "",
+      mediaUrl: row.media_url,
+      reactions,
+      createdAt: iso(row.created_at),
+    };
+  }
+
+  async listGroupMessages(groupId: string, viewerId: string): Promise<GroupMessage[]> {
+    await this.ensureLounges();
+    const group = await queryOne<{ id: string }>("SELECT id FROM groups WHERE id = $1", [groupId]);
+    if (!group) throw new ApiError(404, "That group does not exist.");
+    const rows = await query<GroupMessageRow>(
+      `SELECT gm.*, ${authorJson("su", "sender")}
+       FROM group_messages gm
+       JOIN users su ON su.id = gm.sender_id
+       WHERE gm.group_id = $1
+       ORDER BY gm.created_at ASC`,
+      [groupId],
+    );
+    return rows.map((row) =>
+      this.decorateGroupMessage(row, row.sender ? toPublicUser(rowToUser(row.sender)) : null, viewerId),
+    );
+  }
+
+  async createGroupMessage(input: CreateGroupMessageInput): Promise<GroupMessage> {
+    await this.ensureLounges();
+    const group = await queryOne<{ id: string; is_public: boolean }>(
+      "SELECT id, is_public FROM groups WHERE id = $1",
+      [input.groupId],
+    );
+    if (!group) throw new ApiError(404, "That group does not exist.");
+    if (group.is_public) {
+      await query(
+        `INSERT INTO group_members (group_id, user_id, created_at) VALUES ($1,$2,now())
+         ON CONFLICT (group_id, user_id) DO NOTHING`,
+        [input.groupId, input.senderId],
+      );
+    }
+    await query(
+      `INSERT INTO group_messages (id, group_id, sender_id, content, media_url, reactions, created_at)
+       VALUES ($1,$2,$3,$4,$5,'[]'::jsonb,$6)`,
+      [input.id, input.groupId, input.senderId, input.content, input.mediaUrl, input.createdAt],
+    );
+    const sender = await this.getUserById(input.senderId);
+    return {
+      id: input.id,
+      groupId: input.groupId,
+      senderId: input.senderId,
+      sender: sender ? toPublicUser(sender) : null,
+      content: input.content,
+      mediaUrl: input.mediaUrl,
+      reactions: [],
+      createdAt: input.createdAt,
+    };
+  }
+
+  async setGroupMessageReaction(messageId: string, userId: string, emoji: string): Promise<GroupMessage> {
+    await this.ready();
+    const row = await queryOne<GroupMessageRow>("SELECT * FROM group_messages WHERE id = $1", [messageId]);
+    if (!row) throw new ApiError(404, "Message not found.");
+    const raw = Array.isArray(row.reactions) ? [...row.reactions] : [];
+    const index = raw.findIndex((r) => r.userId === userId);
+    if (index >= 0) {
+      if (raw[index].emoji === emoji) raw.splice(index, 1);
+      else raw[index].emoji = emoji;
+    } else {
+      raw.push({ userId, emoji });
+    }
+    const updated = await queryOne<GroupMessageRow>(
+      "UPDATE group_messages SET reactions = $1::jsonb WHERE id = $2 RETURNING *",
+      [JSON.stringify(raw), messageId],
+    );
+    if (!updated) throw new ApiError(404, "Message not found.");
+    const sender = await this.getUserById(updated.sender_id);
+    return this.decorateGroupMessage(updated, sender ? toPublicUser(sender) : null, userId);
   }
 
   /* ---------------------------------------------------------- notifications */

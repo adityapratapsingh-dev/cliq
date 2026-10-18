@@ -1,12 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { Bookmark, Flame, MessageCircle, MessageSquare, Send, Share2, Sparkles, Trash2, Vote, Zap } from "lucide-react";
+import {
+  Bookmark,
+  Flame,
+  MessageCircle,
+  MessageSquare,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  Quote,
+  Send,
+  Share2,
+  Sparkles,
+  Trash2,
+  Vote,
+  Zap,
+} from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { Avatar, EmptyState, IconButton, SkeletonCard } from "@/components/ui/Primitives";
+import { Avatar, EmptyState, IconButton, Modal, SkeletonCard } from "@/components/ui/Primitives";
 import { CommentThread, HashtagText, VoteBar } from "@/components/ui/FeedBits";
+import { QuotedPostEmbed } from "@/components/tabs/QuotedPostEmbed";
 import { ShareSheet } from "@/components/ShareSheet";
-import { CliqNotes } from "@/components/CliqNotes";
+import { StoryNotesBar } from "@/components/stories/StoryNotesBar";
 import { matchesSearch, useComments, useFeed } from "@/components/tabs/useFeed";
 import { usePostActions } from "@/components/tabs/usePostActions";
 import { api } from "@/lib/api-client";
@@ -38,10 +54,11 @@ export function ChatPostsTab({ search, onOpenProfile }: { search: string; onOpen
 
   return (
     <div className="mx-auto w-full max-w-[620px] space-y-4 px-3 py-4 sm:px-4">
-      <CliqNotes onOpenProfile={onOpenProfile} />
+      {/* Cliq Stories & Notes — tap-through story rings + 24h notes */}
+      <StoryNotesBar onOpenProfile={onOpenProfile} />
       <Composer />
 
-      <div className="flex items-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 px-2 py-2">
+      <div className="flex items-center gap-2 rounded-2xl border border-zinc-800/80 bg-[#121317] px-2 py-2">
         <div className="flex shrink-0 gap-1">
           {(
             [
@@ -55,7 +72,7 @@ export function ChatPostsTab({ search, onOpenProfile }: { search: string; onOpen
               onClick={() => setSort(key)}
               className={cx(
                 "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition",
-                sort === key ? "bg-[var(--accent-grad)] text-white" : "text-zinc-400 hover:text-zinc-100",
+                sort === key ? "bg-indigo-600 text-white" : "text-zinc-400 hover:text-zinc-100",
               )}
             >
               <Icon size={13} /> {label}
@@ -204,7 +221,7 @@ function Composer() {
               type="button"
               onClick={() => void submit()}
               disabled={!text.trim() || busy}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-grad)] px-4 py-1.5 text-xs font-bold text-white transition hover:brightness-110 active:scale-95 disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-indigo-500 active:scale-95 disabled:opacity-40"
             >
               <Sparkles size={13} /> {busy ? "Posting..." : "Post"}
             </button>
@@ -219,10 +236,14 @@ function Composer() {
 }
 
 function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: string) => void }) {
-  const { user, toast, savedIds, toggleSaved, settings } = useCliq();
+  const { user, toast, savedIds, toggleSaved, settings, bump, apiError } = useCliq();
   const { react, votePoll, remove } = usePostActions();
+  const { replacePost } = useFeed("chat");
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const [draft, setDraft] = useState("");
 
   const { comments, loading, add } = useComments(post.id, commentsOpen);
@@ -234,8 +255,23 @@ function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id:
   const score = post.upgradesCount - post.downgradesCount;
   const pollTotal = post.poll ? post.poll.options.reduce((sum, o) => sum + o.votes, 0) : 0;
 
+  async function pinPost(id: string, pinned: boolean) {
+    try {
+      const { post: updated } = await api.pinPost(id, pinned);
+      replacePost(updated);
+      toast(pinned ? "Pinned to your profile 📌" : "Unpinned", "success");
+    } catch (error) {
+      apiError(error);
+    }
+  }
+
   return (
     <article className="cliq-rise rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-4 backdrop-blur-md">
+      {post.pinned ? (
+        <p className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+          <Pin size={11} /> Pinned to your profile
+        </p>
+      ) : null}
       <header className="flex items-center gap-3">
         <button
           type="button"
@@ -277,11 +313,76 @@ function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id:
             {post.flair}
           </span>
         ) : null}
+
+        {/* 3-dot menu: edit / pin / quote / delete */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            aria-label="Post options"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="grid h-8 w-8 place-items-center rounded-full text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+          >
+            <MoreHorizontal size={17} />
+          </button>
+          {menuOpen ? (
+            <>
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setMenuOpen(false)}
+                className="fixed inset-0 z-10 cursor-default"
+              />
+              <div className="cliq-pop absolute right-0 top-9 z-20 w-44 overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121317]/98 py-1 shadow-2xl backdrop-blur-xl">
+                <MenuItem
+                  icon={<Quote size={14} />}
+                  label="Quote repost"
+                  onClick={() => {
+                    setQuoteOpen(true);
+                    setMenuOpen(false);
+                  }}
+                />
+                {mine ? (
+                  <>
+                    <MenuItem
+                      icon={<Pencil size={14} />}
+                      label="Edit post"
+                      onClick={() => {
+                        setEditOpen(true);
+                        setMenuOpen(false);
+                      }}
+                    />
+                    <MenuItem
+                      icon={<Pin size={14} />}
+                      label={post.pinned ? "Unpin" : "Pin to profile"}
+                      onClick={() => {
+                        void pinPost(post.id, !post.pinned);
+                        setMenuOpen(false);
+                      }}
+                    />
+                    <MenuItem
+                      icon={<Trash2 size={14} />}
+                      label="Delete"
+                      danger
+                      onClick={() => {
+                        void remove(post.id);
+                        setMenuOpen(false);
+                      }}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </div>
       </header>
 
-      <p className="mt-3 text-sm leading-relaxed text-zinc-100">
-        <HashtagText text={censor(post.content, settings.toxicFilter)} />
-      </p>
+      {post.content ? (
+        <p className="mt-3 text-sm leading-relaxed text-zinc-100">
+          <HashtagText text={censor(post.content, settings.toxicFilter)} />
+        </p>
+      ) : null}
+
+      {post.quotedPost ? <QuotedPostEmbed post={post.quotedPost} /> : null}
 
       {post.poll ? (
         <div className="mt-3 space-y-2">
@@ -376,7 +477,7 @@ function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id:
                 }
               }}
               placeholder="Join the thread..."
-              className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-900/70 px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-[var(--accent)]"
+              className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-[#121317] px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-[var(--accent)]"
             />
             <button
               type="button"
@@ -386,7 +487,7 @@ function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id:
                   setDraft("");
                 }
               }}
-              className="grid h-8 w-8 place-items-center rounded-full bg-[var(--accent-grad)] text-white"
+              className="grid h-8 w-8 place-items-center rounded-full bg-indigo-600 text-white"
               aria-label="Send comment"
             >
               <Send size={14} />
@@ -396,7 +497,170 @@ function ChatPostCard({ post, onOpenProfile }: { post: Post; onOpenProfile: (id:
       ) : null}
 
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} post={post} />
+
+      <EditPostModal
+        open={editOpen}
+        initial={post.content}
+        onClose={() => setEditOpen(false)}
+        onSave={async (text) => {
+          try {
+            const { post: updated } = await api.editPost(post.id, text);
+            replacePost(updated);
+            toast("Post updated ✏️", "success");
+            setEditOpen(false);
+          } catch (error) {
+            apiError(error);
+          }
+        }}
+      />
+
+      <QuoteRepostModal
+        open={quoteOpen}
+        original={post}
+        onClose={() => setQuoteOpen(false)}
+        onDone={() => {
+          setQuoteOpen(false);
+          bump();
+        }}
+      />
     </article>
+  );
+}
+
+/** One row inside a post's 3-dot menu. */
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold transition hover:bg-zinc-800/70",
+        danger ? "text-rose-300 hover:text-rose-200" : "text-zinc-300 hover:text-zinc-100",
+      )}
+    >
+      {icon} {label}
+    </button>
+  );
+}
+
+function EditPostModal({
+  open,
+  initial,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  initial: string;
+  onClose: () => void;
+  onSave: (text: string) => void | Promise<void>;
+}) {
+  const [text, setText] = useState(initial);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Modal open={open} onClose={onClose} title="Edit post" subtitle="Fix a typo or add a thought." maxWidth="max-w-md">
+      <textarea
+        value={text}
+        autoFocus
+        rows={3}
+        maxLength={500}
+        onChange={(e) => setText(e.target.value)}
+        className="w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+      />
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[11px] text-zinc-500">{text.length}/500</span>
+        <button
+          type="button"
+          onClick={async () => {
+            if (!text.trim() || busy) return;
+            setBusy(true);
+            await onSave(text.trim());
+            setBusy(false);
+          }}
+          disabled={!text.trim() || busy}
+          className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-500 disabled:opacity-40"
+        >
+          {busy ? "Saving..." : "Save changes"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function QuoteRepostModal({
+  open,
+  original,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  original: Post;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { toast, apiError } = useCliq();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Modal open={open} onClose={onClose} title="Quote repost" subtitle="Add your take, then share it." maxWidth="max-w-md">
+      <textarea
+        value={text}
+        autoFocus
+        rows={3}
+        maxLength={500}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Add a comment..."
+        className="w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+      />
+      <div className="mt-2">
+        <QuotedPostEmbed
+          post={{
+            id: original.id,
+            type: original.type,
+            content: original.content,
+            mediaUrl: original.mediaUrl,
+            author: original.author,
+            createdAt: original.createdAt,
+          }}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={async () => {
+          if (!text.trim() || busy) return;
+          setBusy(true);
+          try {
+            const { post } = await api.createPost({
+              type: "chat",
+              content: text.trim(),
+              quotedPostId: original.id,
+            });
+            await prependPost("chat", post);
+            toast("Quote reposted ⚡", "success");
+            onDone();
+          } catch (error) {
+            apiError(error);
+          } finally {
+            setBusy(false);
+          }
+        }}
+        disabled={!text.trim() || busy}
+        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-40"
+      >
+        {busy ? "Posting..." : <><Quote size={15} /> Repost with comment</>}
+      </button>
+    </Modal>
   );
 }
 
