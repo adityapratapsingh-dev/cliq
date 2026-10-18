@@ -68,7 +68,7 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search groups"
-            className="h-10 w-full rounded-lg border border-zinc-800/80 bg-[#121317] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+            className="h-10 w-full rounded-lg border border-white/10 bg-[#121216] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
           />
         </div>
         <button
@@ -83,7 +83,7 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
       {loading ? (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3 border-b border-zinc-800/80 py-3">
+            <div key={i} className="flex items-center gap-3 border-b border-white/10 py-3">
               <Skeleton className="h-11 w-11 rounded-lg" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-3 w-32" />
@@ -107,16 +107,16 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
               key={group.id}
               type="button"
               onClick={() => setOpen(group)}
-              className="flex w-full items-center gap-3 border-b border-zinc-800/80 py-3 text-left transition hover:bg-[#121317]"
+              className="flex w-full items-center gap-3 border-b border-white/10 py-3 text-left transition hover:bg-[#121216]"
             >
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#121317] text-zinc-300">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#121216] text-zinc-300">
                 <Users size={20} strokeWidth={1.75} />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-semibold text-white">{group.name}</span>
                   {group.isPublic ? (
-                    <span className="rounded bg-[#121317] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
+                    <span className="rounded bg-[#121216] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
                       Lounge
                     </span>
                   ) : null}
@@ -181,7 +181,7 @@ function CreateGroupModal({
   }
 
   const inputClass =
-    "w-full rounded-lg border border-zinc-800/80 bg-[#121317] px-3 text-sm text-white outline-none focus:border-zinc-600";
+    "w-full rounded-lg border border-white/10 bg-[#121216] px-3 text-sm text-white outline-none focus:border-zinc-600";
 
   return (
     <Modal open onClose={onClose} title="New group">
@@ -218,7 +218,7 @@ function CreateGroupModal({
                     key={friend.id}
                     type="button"
                     onClick={() => toggle(friend.id)}
-                    className={cx("flex w-full items-center gap-3 rounded-lg p-2 text-left transition", on ? "bg-[#121317]" : "hover:bg-[#121317]")}
+                    className={cx("flex w-full items-center gap-3 rounded-lg p-2 text-left transition", on ? "bg-[#121216]" : "hover:bg-[#121216]")}
                   >
                     <Avatar user={friend} size={36} />
                     <div className="min-w-0 flex-1">
@@ -339,11 +339,11 @@ function GroupRoom({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex h-[60px] items-center gap-3 border-b border-zinc-800/80 px-4">
+      <header className="flex h-[60px] items-center gap-3 border-b border-white/10 px-4">
         <button type="button" onClick={onBack} aria-label="Back" className="text-zinc-300 transition hover:text-white">
           <ArrowLeft size={20} strokeWidth={1.75} />
         </button>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#121317] text-zinc-300">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#121216] text-zinc-300">
           <Users size={20} strokeWidth={1.75} />
         </span>
         <div className="min-w-0 flex-1">
@@ -381,7 +381,7 @@ function GroupRoom({
                   <div
                     className={cx(
                       "group relative rounded-[20px] px-4 py-2.5 text-sm",
-                      mine ? "bg-[#4f46e5] text-white" : "bg-[#18181b] text-[#f5f5f5]",
+                      mine ? "bg-[#4f46e5] text-white" : "bg-white/10 text-[#f5f5f5]",
                     )}
                   >
                     {msg.mediaUrl ? (
@@ -402,13 +402,13 @@ function GroupRoom({
                         mine ? "left-1" : "right-1",
                       )}
                     >
-                      <span className="grid h-6 w-6 place-items-center rounded-full border border-zinc-700 bg-[#121317] text-zinc-300">
+                      <span className="grid h-6 w-6 place-items-center rounded-full border border-zinc-700 bg-[#121216] text-zinc-300">
                         <Heart size={12} strokeWidth={1.75} />
                       </span>
                     </button>
 
                     {reactFor === msg.id ? (
-                      <div className={cx("absolute -top-10 z-10 flex gap-0.5 rounded-full border border-zinc-700 bg-[#121317] p-1 shadow-xl", mine ? "right-0" : "left-0")}>
+                      <div className={cx("absolute -top-10 z-10 flex gap-0.5 rounded-full border border-zinc-700 bg-[#121216] p-1 shadow-xl", mine ? "right-0" : "left-0")}>
                         {MESSAGE_REACTIONS.map((emoji) => (
                           <button
                             key={emoji}
@@ -432,7 +432,7 @@ function GroupRoom({
                           onClick={() => void react(msg.id, r.emoji)}
                           className={cx(
                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition",
-                            r.mine ? "bg-[#ff3040]/15 text-[#ff3040]" : "bg-[#18181b] text-zinc-400",
+                            r.mine ? "bg-[#ff3040]/15 text-[#ff3040]" : "bg-white/10 text-zinc-400",
                           )}
                         >
                           {r.emoji} {r.count}
@@ -447,7 +447,7 @@ function GroupRoom({
         )}
       </div>
 
-      <div className="flex items-center gap-3 border-t border-zinc-800/80 p-4">
+      <div className="flex items-center gap-3 border-t border-white/10 p-4">
         <input
           ref={fileRef}
           type="file"
@@ -468,7 +468,7 @@ function GroupRoom({
         >
           {uploading ? <Spinner className="h-4 w-4" /> : <ImageIcon size={20} strokeWidth={1.75} />}
         </button>
-        <div className="flex flex-1 items-center gap-3 rounded-full border border-zinc-700 bg-black px-4 py-2.5">
+        <div className="flex flex-1 items-center gap-3 rounded-full border border-white/10 bg-[#121216] px-4 py-2.5">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

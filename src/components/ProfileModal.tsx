@@ -117,7 +117,7 @@ export function ProfileModal({
                 disabled={busy || following}
                 className={cx(
                   "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition disabled:opacity-70",
-                  following ? "bg-[#18181b] text-zinc-400" : "bg-[#4f46e5] text-white hover:bg-[#6366f1]",
+                  following ? "bg-white/10 text-zinc-400" : "bg-[#4f46e5] text-white hover:bg-[#6366f1]",
                 )}
               >
                 {busy ? <Spinner className="h-4 w-4" /> : following ? "Following" : "Follow"}
@@ -129,7 +129,7 @@ export function ProfileModal({
                     onMessage(profile);
                     onClose();
                   }}
-                  className="flex-1 rounded-lg bg-[#18181b] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#27272a]"
+                  className="flex-1 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                 >
                   Message
                 </button>
@@ -140,7 +140,7 @@ export function ProfileModal({
           {theirMedia.length > 0 ? (
             <div className="grid grid-cols-3 gap-1">
               {theirMedia.map((post) => (
-                <div key={post.id} className="relative aspect-square overflow-hidden bg-[#121317]">
+                <div key={post.id} className="relative aspect-square overflow-hidden bg-[#121216]">
                   {post.mediaUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={post.mediaUrl} alt="" className="h-full w-full object-cover" />

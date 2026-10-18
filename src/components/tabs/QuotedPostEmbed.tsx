@@ -10,7 +10,7 @@ export function QuotedPostEmbed({ post }: { post: QuotedPost }) {
   const Icon = post.type === "video" ? Film : post.type === "photo" ? ImageIcon : MessageSquare;
 
   return (
-    <div className="mt-3 overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950/50">
+    <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/50">
       <div className="flex items-center gap-2 px-3 pt-2.5">
         <span className="grid h-6 w-6 place-items-center rounded-md bg-[var(--accent-soft)] text-[var(--accent-2)]">
           <Icon size={12} />

@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import {
+  ArrowLeft,
   Bell,
   BellRing,
   Heart,
   MessageCircle,
   MessageSquare,
-  Repeat2,
   Rocket,
   UserPlus,
   X,
@@ -140,14 +140,22 @@ export function NotificationCenter({
   ];
 
   return (
-    <div className="fixed inset-0 z-[85] flex justify-end bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-[85] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         data-testid="notification-center"
         onClick={(e) => e.stopPropagation()}
-        className="cliq-pop flex h-full w-full max-w-[400px] flex-col border-l border-zinc-800/80 bg-black"
+        className="cliq-drawer flex h-dvh w-full flex-col border-white/10 bg-zinc-950/90 backdrop-blur-xl md:max-w-[400px] md:border-l"
       >
-        <div className="flex h-[53px] items-center justify-between border-b border-zinc-800/80 px-4">
+        <div className="flex h-[53px] shrink-0 items-center justify-between border-b border-white/10 px-4">
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Back"
+              className="text-zinc-400 transition hover:text-white md:hidden"
+            >
+              <ArrowLeft size={20} strokeWidth={1.75} />
+            </button>
             <p className="text-base font-semibold text-white">Notifications</p>
             {counts.notifications > 0 ? (
               <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#ff3040] px-1 text-[11px] font-bold text-white">
@@ -182,7 +190,7 @@ export function NotificationCenter({
           </div>
         </div>
 
-        <div className="no-scrollbar flex gap-2 border-b border-zinc-800/80 px-3 py-2">
+        <div className="no-scrollbar flex shrink-0 gap-2 border-b border-white/10 px-3 py-2">
           {tabs.map(({ key, label }) => (
             <button
               key={key}
@@ -190,7 +198,7 @@ export function NotificationCenter({
               onClick={() => setFilter(key)}
               className={cx(
                 "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                filter === key ? "bg-white text-black" : "bg-[#121317] text-zinc-400 hover:text-zinc-100",
+                filter === key ? "bg-white text-black" : "bg-[#121216] text-zinc-400 hover:text-zinc-100",
               )}
             >
               {label}
@@ -224,7 +232,7 @@ export function NotificationCenter({
                         key={n.id}
                         className={cx(
                           "flex items-center gap-3 rounded-lg p-2.5 transition hover:bg-zinc-900",
-                          !n.isRead && "bg-[#121317]",
+                          !n.isRead && "bg-[#121216]",
                         )}
                       >
                         <button
@@ -261,6 +269,14 @@ export function NotificationCenter({
                           >
                             {busyId === n.id ? <Spinner className="h-3 w-3" /> : "Follow"}
                           </button>
+                        ) : n.kind === "message" ? (
+                          <button
+                            type="button"
+                            onClick={() => void openNotification(n)}
+                            className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                          >
+                            Reply
+                          </button>
                         ) : n.post ? (
                           <button
                             type="button"
@@ -272,16 +288,14 @@ export function NotificationCenter({
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={n.post.mediaUrl} alt="" className="h-11 w-11 rounded-md object-cover" />
                             ) : (
-                              <span className="grid h-11 w-11 place-items-center rounded-md border border-zinc-800/80 p-1">
+                              <span className="grid h-11 w-11 place-items-center rounded-md border border-white/10 p-1">
                                 <span className="line-clamp-2 text-[8px] leading-tight text-zinc-500">
                                   {n.post.content || "post"}
                                 </span>
                               </span>
                             )}
                           </button>
-                        ) : (
-                          <Repeat2 size={16} strokeWidth={1.75} className="shrink-0 text-zinc-600" />
-                        )}
+                        ) : null}
                       </div>
                     );
                   })}

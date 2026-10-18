@@ -85,7 +85,7 @@ export function NotificationBanner({ onOpenCenter }: { onOpenCenter: () => void 
           {current.actor ? <Avatar user={current.actor} size={40} /> : <span className="h-10 w-10 rounded-full bg-zinc-800" />}
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-[#121317]">
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-[#121216]">
                 {bannerIcon(current.kind)}
               </span>
               <span className="truncate text-xs font-bold text-zinc-50">

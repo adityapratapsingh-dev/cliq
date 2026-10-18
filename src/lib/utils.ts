@@ -67,17 +67,25 @@ export function censor(text: string, enabled: boolean): string {
   return out;
 }
 
-/** Deterministic, muted gradient for a user without an avatar image. */
+/**
+ * Deterministic, vibrant gradient for a user without an avatar image.
+ *
+ * Seeded by the username so every account gets a stable, distinct colour pair
+ * (Instagram-style). Kept in the indigo/violet/rose/cyan family so the palette
+ * stays cohesive with the brand accent.
+ */
 export function avatarGradient(seed: string): [string, string] {
   const palettes: [string, string][] = [
-    ["#3f3f46", "#52525b"],
-    ["#4b5563", "#6b7280"],
-    ["#475569", "#64748b"],
-    ["#525252", "#737373"],
-    ["#5b5b66", "#71717a"],
-    ["#404040", "#57534e"],
-    ["#4c4f5e", "#62636f"],
-    ["#3f4650", "#55606b"],
+    ["#6366f1", "#a855f7"],
+    ["#8b5cf6", "#ec4899"],
+    ["#4f46e5", "#22d3ee"],
+    ["#d946ef", "#6366f1"],
+    ["#0ea5e9", "#8b5cf6"],
+    ["#f43f5e", "#8b5cf6"],
+    ["#10b981", "#0ea5e9"],
+    ["#f59e0b", "#ec4899"],
+    ["#a855f7", "#4f46e5"],
+    ["#06b6d4", "#6366f1"],
   ];
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
