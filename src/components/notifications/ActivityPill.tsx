@@ -48,7 +48,7 @@ export function ActivityPill({ onOpen }: { onOpen: () => void }) {
         setVisible(false);
         onOpen();
       }}
-      className="cliq-pop absolute right-0 top-12 z-50 flex items-center gap-2.5 rounded-2xl border border-zinc-800/80 bg-zinc-900/95 px-3 py-2 shadow-2xl backdrop-blur-xl transition hover:border-[var(--accent)]"
+      className="cliq-pop absolute right-0 top-12 z-50 flex items-center gap-2.5 rounded-2xl border border-white/10 bg-zinc-900/95 px-3 py-2 shadow-2xl backdrop-blur-xl transition hover:border-[var(--accent)]"
     >
       {items.map((item, index) => (
         <span key={index} className={cx("inline-flex items-center gap-1 text-[11px] font-bold", item.className)}>

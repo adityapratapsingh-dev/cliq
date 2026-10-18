@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useCliq } from "@/components/CliqProvider";
 import { AuthScreen } from "@/components/AuthScreen";
-import { BottomNav, LeftRail } from "@/components/Shell";
+import { BottomNav, LeftRail, MobileTopBar } from "@/components/Shell";
 import { CreateModal } from "@/components/CreateModal";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
@@ -20,13 +20,18 @@ import { accentVars } from "@/lib/theme";
 import { Spinner } from "@/components/ui/Primitives";
 import { cx } from "@/lib/utils";
 
-/** Center column width per tab, matching each section's natural content width. */
+/**
+ * Center column width per tab.
+ *
+ * On mobile every column is full-bleed (`max-w-none`) so the feed uses the whole
+ * screen; the fixed caps only kick in once there is room for them.
+ */
 const CENTER_WIDTH: Record<string, string> = {
-  chatposts: "max-w-[620px] border-x border-zinc-800/80",
-  photos: "max-w-[620px]",
-  videos: "max-w-[620px]",
-  friends: "max-w-[900px]",
-  profile: "max-w-[935px]",
+  chatposts: "md:max-w-[640px] md:border-x md:border-white/10",
+  photos: "md:max-w-[640px]",
+  videos: "md:max-w-[640px]",
+  friends: "md:max-w-[1100px]",
+  profile: "md:max-w-[935px]",
 };
 
 export function CliqApp() {
@@ -43,7 +48,7 @@ export function CliqApp() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-black">
+      <div className="flex min-h-dvh items-center justify-center bg-[#09090b]">
         <div className="flex flex-col items-center gap-3">
           <Spinner className="h-6 w-6" />
           <p className="text-xs text-zinc-500">Loading Cliq...</p>
@@ -66,14 +71,21 @@ export function CliqApp() {
     );
   }
 
-  const centerWidth = CENTER_WIDTH[tab] ?? "max-w-[600px]";
+  const centerWidth = CENTER_WIDTH[tab] ?? "md:max-w-[600px]";
 
   return (
-    <div style={accentVars(settings.accent)} className="min-h-dvh bg-black text-zinc-100">
+    <div style={accentVars(settings.accent)} className="min-h-dvh bg-[#09090b] text-zinc-100">
       <LeftRail onOpenSearch={() => setSearchOpen(true)} onOpenNotifications={() => setBellOpen(true)} />
+      <MobileTopBar onOpenSearch={() => setSearchOpen(true)} onOpenNotifications={() => setBellOpen(true)} />
 
-      <div className="flex w-full justify-center lg:pl-[72px] xl:pl-[244px]">
-        <main className={cx("cliq-scroll min-w-0 w-full pb-16 lg:pb-0", centerWidth)}>
+      <div className="flex w-full justify-center md:pl-[68px] min-[1150px]:pl-[240px]">
+        <main
+          className={cx(
+            "cliq-scroll min-w-0 w-full pb-[68px] md:pb-0",
+            tab !== "friends" && "md:py-4",
+            centerWidth,
+          )}
+        >
           {tab === "videos" ? (
             <VideosTab search={search} onOpenProfile={openProfile} />
           ) : tab === "photos" ? (
@@ -90,7 +102,7 @@ export function CliqApp() {
         {tab !== "friends" ? <RightSidebar onOpenProfile={openProfile} onOpenSearch={() => setSearchOpen(true)} /> : null}
       </div>
 
-      <BottomNav onOpenSearch={() => setSearchOpen(true)} />
+      <BottomNav />
       <NotificationBanner onOpenCenter={() => setBellOpen(true)} />
       <CreateModal />
       {searchOpen ? <SearchPanel onClose={() => setSearchOpen(false)} onOpenProfile={openProfile} /> : null}

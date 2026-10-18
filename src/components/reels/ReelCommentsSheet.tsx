@@ -46,8 +46,8 @@ export function ReelCommentsSheet({
         className="cliq-sheet-fade absolute -top-[66%] left-0 h-[66%] w-full cursor-default"
       />
 
-      <div className="cliq-sheet-up flex h-full flex-col overflow-hidden rounded-t-3xl border-t border-zinc-700/50 bg-[#121317]">
-        <div className="flex items-center justify-between border-b border-zinc-800/60 px-4 py-3">
+      <div className="cliq-sheet-up flex h-full flex-col overflow-hidden rounded-t-3xl border-t border-zinc-700/50 bg-[#121216]">
+        <div className="flex items-center justify-between border-b border-white/10/60 px-4 py-3">
           <div>
             <p className="text-sm font-bold text-zinc-50">{post.commentCount} comments</p>
             <p className="text-[11px] text-zinc-500">On @{post.author?.username ?? "unknown"}&apos;s reel</p>
@@ -72,7 +72,7 @@ export function ReelCommentsSheet({
           />
         </div>
 
-        <div className="flex items-center gap-2 border-t border-zinc-800/60 px-3 py-3">
+        <div className="flex items-center gap-2 border-t border-white/10/60 px-3 py-3">
           {user ? <Avatar user={user} size={32} /> : null}
           <input
             value={draft}

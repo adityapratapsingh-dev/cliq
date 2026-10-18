@@ -103,7 +103,7 @@ export function ShareSheet({
     >
       <div className="space-y-3">
         {/* preview of what will be sent */}
-        <div className="flex items-center gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/50 p-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-zinc-950/50 p-3">
           {post.mediaUrl && post.type !== "chat" ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={post.mediaUrl} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
@@ -127,7 +127,7 @@ export function ShareSheet({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search friends..."
-            className="h-10 w-full rounded-full border border-zinc-800/80 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-full border border-white/10 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
           />
         </div>
 
@@ -179,11 +179,11 @@ export function ShareSheet({
           )}
         </div>
 
-        <div className="space-y-1.5 border-t border-zinc-800/80 pt-3">
+        <div className="space-y-1.5 border-t border-white/10 pt-3">
           <button
             type="button"
             onClick={() => void copyLink()}
-            className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/50 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-[var(--accent)] hover:bg-zinc-900"
+            className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-zinc-950/50 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-[var(--accent)] hover:bg-zinc-900"
           >
             {copied ? <Check size={16} className="text-emerald-400" /> : <Link2 size={16} />}
             {copied ? "Link copied" : "Copy Link"}

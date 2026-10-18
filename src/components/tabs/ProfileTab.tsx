@@ -86,7 +86,7 @@ export function ProfileTab() {
   const following = stats?.following ?? connections.following.length;
 
   return (
-    <div className="mx-auto w-full max-w-[935px] px-4 py-8 md:px-8">
+    <div className="mx-auto w-full max-w-[935px] px-0 py-4 md:px-8 md:py-8">
       <ProfileHeader
         user={user}
         postCount={stats?.posts ?? allPosts.length}
@@ -99,30 +99,9 @@ export function ProfileTab() {
         onOpenFollowing={() => setListModal("following")}
       />
 
-      <div className="flex justify-center gap-12 border-b border-zinc-800">
-        {(
-          [
-            { key: "posts", label: "POSTS", icon: MessageSquare },
-            { key: "photos", label: "PHOTOS", icon: ImageIcon },
-            { key: "videos", label: "VIDEOS", icon: Film },
-            { key: "saved", label: "SAVED", icon: Bookmark },
-          ] as const
-        ).map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setProfileTab(key)}
-            className={cx(
-              "-mb-px inline-flex items-center gap-1.5 border-t-2 py-3.5 text-xs font-semibold uppercase tracking-widest transition",
-              profileTab === key ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300",
-            )}
-          >
-            <Icon size={13} strokeWidth={1.75} /> <span className="hidden sm:inline">{label}</span>
-          </button>
-        ))}
-      </div>
+      <ProfileTabs active={profileTab} onChange={setProfileTab} />
 
-      <div className="pt-4">
+      <div className="px-4 pt-4 md:px-0">
         {profileTab === "videos" || profileTab === "photos" ? (
           <MediaGrid posts={profileTab === "videos" ? mineVideos : minePhotos} />
         ) : (
@@ -138,6 +117,46 @@ export function ProfileTab() {
         userIds={listModal === "following" ? connections.following : connections.followers}
         onClose={() => setListModal(null)}
         onOpenProfile={() => setListModal(null)}
+      />
+    </div>
+  );
+}
+
+/** Content tabs with a smooth sliding active underline. */
+function ProfileTabs({
+  active,
+  onChange,
+}: {
+  active: "posts" | "photos" | "videos" | "saved";
+  onChange: (next: "posts" | "photos" | "videos" | "saved") => void;
+}) {
+  const tabs = [
+    { key: "posts", label: "POSTS", icon: MessageSquare },
+    { key: "photos", label: "PHOTOS", icon: ImageIcon },
+    { key: "videos", label: "VIDEOS", icon: Film },
+    { key: "saved", label: "SAVED", icon: Bookmark },
+  ] as const;
+  const activeIndex = tabs.findIndex((t) => t.key === active);
+
+  return (
+    <div className="relative flex border-b border-white/10">
+      {tabs.map(({ key, label, icon: Icon }) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => onChange(key)}
+          className={cx(
+            "inline-flex flex-1 items-center justify-center gap-1.5 py-3.5 text-xs font-semibold uppercase tracking-widest transition",
+            active === key ? "text-white" : "text-zinc-500 hover:text-zinc-300",
+          )}
+        >
+          <Icon size={13} strokeWidth={1.75} /> <span className="hidden sm:inline">{label}</span>
+        </button>
+      ))}
+      <span
+        aria-hidden
+        className="cliq-tab-underline absolute bottom-0 left-0 h-0.5 bg-white"
+        style={{ width: `${100 / tabs.length}%`, transform: `translateX(${activeIndex * 100}%)` }}
       />
     </div>
   );
@@ -159,7 +178,7 @@ function MediaGrid({ posts }: { posts: Post[] }) {
             key={post.id}
             type="button"
             onClick={() => setPreview(post)}
-            className="group relative aspect-square overflow-hidden bg-[#121317]"
+            className="group relative aspect-square overflow-hidden bg-[#121216]"
           >
             {post.mediaUrl ? (
               post.type === "video" ? (
@@ -207,7 +226,7 @@ function MediaModal({ post, onClose }: { post: Post; onClose: () => void }) {
       maxWidth="max-w-lg"
     >
       <div className="space-y-3">
-        <div className="overflow-hidden rounded-lg border border-zinc-800/80 bg-black">
+        <div className="overflow-hidden rounded-lg border border-white/10 bg-black">
           {post.mediaUrl ? (
             post.type === "video" ? (
               <video src={post.mediaUrl} className="max-h-[60vh] w-full object-contain" controls playsInline />
@@ -252,9 +271,9 @@ function PostList({ posts, emptyKind }: { posts: Post[]; emptyKind: "posts" | "s
     );
   }
   return (
-    <div className="border-t border-zinc-800">
+    <div className="border-t border-white/10">
       {visible.map((post) => (
-        <article key={post.id} className="flex gap-3 border-b border-zinc-800/80 px-1 py-4">
+        <article key={post.id} className="flex gap-3 border-b border-white/10 px-1 py-4">
           {user ? <Avatar user={user} size={40} /> : null}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
@@ -312,72 +331,102 @@ function ProfileHeader({
   const banner = user.bannerUrl && !bannerBroken ? user.bannerUrl : null;
 
   const stats = [
-    { label: "Posts", value: postCount, onClick: undefined as undefined | (() => void) },
-    { label: "Cliq Score", value: cliqScore, onClick: undefined },
-    { label: "Friends", value: followers, onClick: onOpenFollowers },
-    { label: "Following", value: following, onClick: onOpenFollowing },
+    { label: "Posts", value: postCount, onClick: undefined as undefined | (() => void), glow: false },
+    { label: "Cliq Score", value: cliqScore, onClick: undefined, glow: true },
+    { label: "Friends", value: followers, onClick: onOpenFollowers, glow: false },
+    { label: "Following", value: following, onClick: onOpenFollowing, glow: false },
   ];
 
   return (
-    <div className="pb-8">
-      {/* Cover banner */}
-      <div className="relative h-32 w-full overflow-hidden rounded-xl sm:h-44">
+    <div className="pb-6 md:pb-8">
+      {/* Cover banner — rich animated mesh gradient until a custom one is set. */}
+      <div className="relative h-32 w-full overflow-hidden rounded-b-2xl sm:h-44 lg:rounded-2xl">
         {banner ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={banner} alt="" className="h-full w-full object-cover" onError={() => setBannerBroken(true)} />
         ) : (
-          <div className="h-full w-full" style={{ backgroundImage: meshGradient(user.username || user.id), backgroundColor: "#121317" }} />
+          <div
+            className="cliq-mesh h-full w-full"
+            style={{ backgroundImage: meshGradient(user.username || user.id), backgroundColor: "#121317" }}
+          />
         )}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
       </div>
 
-      <div className="flex flex-col gap-6 pt-5 md:flex-row md:items-center md:gap-12">
-        <div className="flex justify-center md:justify-start">
-          <Avatar user={user} size={120} />
+      <div className="px-4 md:px-0">
+        {/* Overlapping avatar */}
+        <div className="-mt-10 flex items-end gap-4 sm:-mt-12">
+          <span className="relative shrink-0 rounded-full ring-4 ring-[#09090b]">
+            <Avatar user={user} size={96} />
+            <span className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full border-2 border-[#09090b] bg-[#10b981]" />
+          </span>
         </div>
 
-        <div className="flex-1 space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-xl font-normal text-white">{user.username}</h1>
-            <button
-              type="button"
-              onClick={onEdit}
-              className="rounded-lg bg-[#18181b] px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#27272a]"
-            >
-              Edit profile
-            </button>
-            <button
-              type="button"
-              onClick={onSettings}
-              aria-label="Settings"
-              className="rounded-lg bg-[#18181b] p-2 text-white transition hover:bg-[#27272a]"
-            >
-              <SettingsIcon size={18} strokeWidth={1.75} />
-            </button>
-          </div>
+        <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:gap-10">
+          <div className="flex-1 space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-xl font-semibold text-white">{user.username}</h1>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-white/15"
+              >
+                Edit profile
+              </button>
+              <button
+                type="button"
+                onClick={onSettings}
+                aria-label="Settings"
+                className="rounded-full bg-white/10 p-2 text-white transition hover:bg-white/15"
+              >
+                <SettingsIcon size={18} strokeWidth={1.75} />
+              </button>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-zinc-300">
-            {stats.map(({ label, value, onClick }) => (
-              <span key={label} className="inline-flex items-center gap-1">
-                <span className="font-semibold text-white">{value}</span>
-                {onClick ? (
-                  <button type="button" onClick={onClick} className="text-zinc-300 transition hover:text-white">
-                    {label}
+            {/* Compact inline stats row */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {stats.map(({ label, value, onClick, glow }) => {
+                const body = (
+                  <>
+                    <span className={cx("text-base font-bold", glow ? "text-indigo-300" : "text-white")}>
+                      {formatCount(value)}
+                    </span>
+                    <span className={cx("text-xs", glow ? "text-indigo-300/80" : "text-zinc-400")}>{label}</span>
+                  </>
+                );
+                const shared = cx(
+                  "inline-flex items-baseline gap-1.5",
+                  glow &&
+                    "rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 shadow-sm shadow-indigo-500/20",
+                );
+                return onClick ? (
+                  <button key={label} type="button" onClick={onClick} className={cx(shared, "transition hover:opacity-80")}>
+                    {body}
                   </button>
                 ) : (
-                  <span className="text-zinc-300">{label}</span>
-                )}
-              </span>
-            ))}
-          </div>
+                  <span key={label} className={shared}>
+                    {body}
+                  </span>
+                );
+              })}
+            </div>
 
-          <div>
-            <p className="text-sm font-semibold text-white">{user.displayName}</p>
-            {user.bio ? <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-200">{user.bio}</p> : null}
-            {(user.interests ?? []).length > 0 ? (
-              <p className="mt-1 text-xs text-zinc-400">
-                {(user.interests ?? []).map((i) => `#${i}`).join("  ")}
-              </p>
-            ) : null}
+            <div>
+              <p className="text-sm font-semibold text-white">{user.displayName}</p>
+              {user.bio ? <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-200">{user.bio}</p> : null}
+              {(user.interests ?? []).length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(user.interests ?? []).map((i) => (
+                    <span
+                      key={i}
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300 transition hover:bg-white/10"
+                    >
+                      #{i}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -442,12 +491,12 @@ function EditProfileModal({
   }
 
   const inputClass =
-    "w-full rounded-lg border border-zinc-800/80 bg-[#121317] px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-600";
+    "w-full rounded-lg border border-white/10 bg-[#121216] px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-600";
 
   return (
     <Modal open={open} onClose={onClose} title="Edit profile">
       <div className="space-y-4">
-        <div className="flex items-center gap-3 rounded-lg border border-zinc-800/80 bg-[#121317] p-3">
+        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#121216] p-3">
           <Avatar
             user={{ id: user.id, username: user.username, displayName: displayName || user.displayName, avatarUrl: avatarUrl || null }}
             size={52}
@@ -456,7 +505,7 @@ function EditProfileModal({
             <p className="truncate text-sm font-semibold text-white">{displayName || user.displayName}</p>
             <p className="truncate text-xs text-zinc-500">@{user.username}</p>
           </div>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#18181b] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15">
             <ImageIcon size={13} strokeWidth={1.75} /> Avatar
             <input
               type="file"
@@ -496,7 +545,7 @@ function EditProfileModal({
           </label>
         </div>
 
-        <div className="flex items-center gap-3 rounded-lg border border-zinc-800/80 bg-[#121317] p-3">
+        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#121216] p-3">
           <span className="h-12 w-20 shrink-0 overflow-hidden rounded-md" style={{ backgroundImage: bannerUrl ? undefined : meshGradient(user.username) }}>
             {bannerUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -504,7 +553,7 @@ function EditProfileModal({
             ) : null}
           </span>
           <span className="min-w-0 flex-1 text-xs text-zinc-500">Cover banner — leave empty for an auto gradient</span>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#18181b] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15">
             <UploadCloud size={13} strokeWidth={1.75} /> Banner
             <input
               type="file"
@@ -535,7 +584,7 @@ function EditProfileModal({
                   onClick={() => setInterests((prev) => (active ? prev.filter((i) => i !== interest) : [...prev, interest]))}
                   className={cx(
                     "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition",
-                    active ? "bg-white text-black" : "bg-[#121317] text-zinc-400 hover:text-zinc-200",
+                    active ? "bg-white text-black" : "bg-[#121216] text-zinc-400 hover:text-zinc-200",
                   )}
                 >
                   {active ? <Check size={12} strokeWidth={2.5} /> : null}
@@ -583,7 +632,7 @@ function SettingsPanel({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#18181b] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
         >
           <ArrowLeft size={14} strokeWidth={1.75} /> Back
         </button>
@@ -649,7 +698,7 @@ function SettingsPanel({
             label="Private profile"
             hint="Only approved followers can see your posts"
           />
-          <div className="border-b border-zinc-800/80 py-3.5">
+          <div className="border-b border-white/10 py-3.5">
             <p className="text-sm font-medium text-zinc-100">Who can message me</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {MESSAGE_SCOPES.map((scope) => (
@@ -662,7 +711,7 @@ function SettingsPanel({
                   }}
                   className={cx(
                     "rounded-full px-3 py-1 text-xs font-medium transition",
-                    settings.whoCanMessage === scope.key ? "bg-white text-black" : "bg-[#121317] text-zinc-400 hover:text-zinc-200",
+                    settings.whoCanMessage === scope.key ? "bg-white text-black" : "bg-[#121216] text-zinc-400 hover:text-zinc-200",
                   )}
                 >
                   {scope.label}
@@ -708,7 +757,7 @@ function SettingsPanel({
                 }}
                 className={cx(
                   "rounded-lg border px-3 py-2 text-left transition",
-                  settings.accent === accent.key ? "border-white" : "border-zinc-800/80 hover:border-zinc-600",
+                  settings.accent === accent.key ? "border-white" : "border-white/10 hover:border-zinc-600",
                 )}
               >
                 <span className="block h-2 w-full rounded-full" style={{ background: accent.gradient }} />
@@ -759,7 +808,7 @@ function SettingsPanel({
         <button
           type="button"
           onClick={() => void logOut()}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[#18181b] px-3.5 py-1.5 text-xs font-semibold text-[#ff3040] transition hover:bg-[#27272a]"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-[#ff3040] transition hover:bg-white/15"
         >
           <LogOut size={13} strokeWidth={1.75} /> Log out
         </button>
@@ -779,7 +828,7 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-[#0a0a0a] px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-[#0d0d10] px-3 py-2">
       <span className="text-xs text-zinc-500">{label}</span>
       <span className="truncate text-xs font-medium text-zinc-200">{value}</span>
     </div>

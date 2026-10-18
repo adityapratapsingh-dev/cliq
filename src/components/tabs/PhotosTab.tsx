@@ -97,7 +97,7 @@ export function PhotoCard({
   const saved = savedIds.includes(post.id);
 
   return (
-    <article className="border-b border-zinc-800/80 pb-5 mb-5">
+    <article className="border-b border-white/10 pb-5 mb-5">
       <header className="flex items-center justify-between py-3">
         <button
           type="button"
@@ -123,7 +123,7 @@ export function PhotoCard({
           {menuOpen ? (
             <>
               <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-              <div className="cliq-pop absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-zinc-800/80 bg-[#121317] py-1 shadow-2xl">
+              <div className="cliq-pop absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-white/10 bg-[#121216] py-1 shadow-2xl">
                 <button
                   type="button"
                   onClick={() => {
@@ -163,7 +163,7 @@ export function PhotoCard({
       </header>
 
       <div
-        className="relative w-full cursor-zoom-in overflow-hidden rounded-[4px] border border-zinc-800/80 bg-[#121317]"
+        className="relative w-full cursor-zoom-in overflow-hidden rounded-[4px] border border-white/10 bg-[#121216]"
         onDoubleClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           burstId.current += 1;
@@ -193,7 +193,7 @@ export function PhotoCard({
             onError={() => setBroken(true)}
           />
         ) : (
-          <div className="grid aspect-square w-full place-items-center bg-[#121317] text-zinc-600">
+          <div className="grid aspect-square w-full place-items-center bg-[#121216] text-zinc-600">
             <ImageIcon size={32} strokeWidth={1.5} />
           </div>
         )}
@@ -325,7 +325,7 @@ export function CommentModal({
         canInteract={Boolean(user)}
         toxicFilter
       />
-      <div className="sticky bottom-0 mt-4 flex items-center gap-2 border-t border-zinc-800/80 bg-[#121317] pt-3">
+      <div className="sticky bottom-0 mt-4 flex items-center gap-2 border-t border-white/10 bg-[#121216] pt-3">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -336,7 +336,7 @@ export function CommentModal({
             }
           }}
           placeholder="Add a comment..."
-          className="min-w-0 flex-1 rounded-lg border border-zinc-800/80 bg-black px-3.5 py-2 text-sm text-white outline-none focus:border-zinc-600"
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#121216] px-3.5 py-2 text-sm text-white outline-none focus:border-zinc-600"
         />
         <button
           type="button"

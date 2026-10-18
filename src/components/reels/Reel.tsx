@@ -184,7 +184,7 @@ export function Reel({
           }}
         />
       ) : (
-        <div className="absolute inset-0 grid place-items-center bg-[#0a0a0a]">
+        <div className="absolute inset-0 grid place-items-center bg-[#0d0d10]">
           <div className="flex flex-col items-center gap-2 text-center">
             <span className="grid h-14 w-14 place-items-center rounded-full border border-white/15 text-white">
               <Play size={24} className="ml-0.5" strokeWidth={1.75} />
@@ -291,7 +291,7 @@ export function Reel({
                     setMenuOpen(false);
                     void remove(post.id);
                   }}
-                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-zinc-800/80 bg-[#121317] px-3 py-2 text-left text-xs font-semibold text-[#ff3040] shadow-2xl"
+                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-white/10 bg-[#121216] px-3 py-2 text-left text-xs font-semibold text-[#ff3040] shadow-2xl"
                 >
                   Delete
                 </button>
@@ -303,7 +303,7 @@ export function Reel({
                     setMenuOpen(false);
                     if (post.author) onOpenProfile(post.author.id);
                   }}
-                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-zinc-800/80 bg-[#121317] px-3 py-2 text-left text-xs font-semibold text-zinc-200 shadow-2xl"
+                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-white/10 bg-[#121216] px-3 py-2 text-left text-xs font-semibold text-zinc-200 shadow-2xl"
                 >
                   View profile
                 </button>

@@ -56,12 +56,12 @@ export function FriendsTab({
   }, [chatTarget, clearChatTarget]);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-[calc(100dvh-3.5rem)] flex-col pb-[60px] md:h-dvh md:pb-0">
       {/* Mode switcher: Messages / Discover / Groups */}
       <div
         className={cx(
-          "flex items-center gap-1 border-b border-zinc-800/80 px-3 py-2",
-          openPartner && "hidden lg:flex",
+          "flex shrink-0 items-center gap-1 border-b border-white/10 px-3 py-2",
+          openPartner && "hidden md:flex",
         )}
       >
         {(
@@ -93,13 +93,7 @@ export function FriendsTab({
         ))}
       </div>
 
-      <div className={cx("flex-1 overflow-hidden", openPartner && "hidden lg:block")}>
-        <div className="mb-0 border-b border-zinc-800/80 px-3 py-2">
-          <StoryNotesBar onOpenProfile={onOpenProfile} />
-        </div>
-      </div>
-
-      <div className={cx("min-h-0 flex-1 overflow-hidden", openPartner && "hidden lg:flex")}>
+      <div className={cx("min-h-0 flex-1 overflow-hidden", openPartner && "hidden md:flex")}>
         {mode === "discover" ? (
           <Discover
             search={search}
@@ -198,7 +192,7 @@ function Discover({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search people"
-          className="h-10 w-full rounded-lg border border-zinc-800/80 bg-[#121317] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+          className="h-10 w-full rounded-lg border border-white/10 bg-[#121216] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
         />
       </div>
 
@@ -210,7 +204,7 @@ function Discover({
             onClick={() => setFilter(f)}
             className={cx(
               "shrink-0 rounded-full px-3.5 py-1.5 text-xs transition",
-              filter === f ? "bg-white font-semibold text-black" : "bg-[#121317] text-zinc-400 hover:text-zinc-200",
+              filter === f ? "bg-white font-semibold text-black" : "bg-[#121216] text-zinc-400 hover:text-zinc-200",
             )}
           >
             {f}
@@ -247,7 +241,7 @@ function Discover({
             const requested = outgoingIds.has(person.id);
             const shared = (person.interests ?? []).filter((i) => (user?.interests ?? []).includes(i));
             return (
-              <li key={person.id} className="flex items-center gap-3 border-b border-zinc-800/80 py-3">
+              <li key={person.id} className="flex items-center gap-3 border-b border-white/10 py-3">
                 <button
                   type="button"
                   onClick={() => onOpenProfile(person.id)}
@@ -272,7 +266,7 @@ function Discover({
                     className={cx(
                       "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition",
                       isFriend || requested
-                        ? "bg-[#18181b] text-zinc-400"
+                        ? "bg-white/10 text-zinc-400"
                         : "bg-[#4f46e5] text-white hover:bg-[#6366f1] disabled:opacity-50",
                     )}
                   >
@@ -281,7 +275,7 @@ function Discover({
                   <button
                     type="button"
                     onClick={() => onMessage(person)}
-                    className="rounded-lg bg-[#18181b] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]"
+                    className="rounded-lg bg-white/10 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                   >
                     Message
                   </button>
@@ -355,11 +349,11 @@ function Chats({
       <aside
         data-testid="conversation-list"
         className={cx(
-          "flex h-full w-full flex-col border-r border-zinc-800/80 md:w-[360px]",
+          "flex h-full w-full flex-col border-r border-white/10 md:w-[340px]",
           openPartner && "hidden md:flex",
         )}
       >
-        <div className="flex h-[60px] items-center justify-between border-b border-zinc-800/80 px-5">
+        <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/10 px-5">
           <span className="text-base font-bold text-white">Messages</span>
           <button
             type="button"
@@ -371,14 +365,19 @@ function Chats({
           </button>
         </div>
 
-        <div className="px-5 py-2.5">
+        {/* Compact unified Stories + Notes tray */}
+        <div className="shrink-0 border-b border-white/10 px-3 py-2">
+          <StoryNotesBar onOpenProfile={onOpenProfile} compact />
+        </div>
+
+        <div className="shrink-0 px-5 py-2.5">
           <div className="relative">
             <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search messages"
-              className="h-9 w-full rounded-full border border-zinc-800/80 bg-[#121317] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+              className="h-9 w-full rounded-full border border-white/10 bg-[#121216]/90 pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
             />
           </div>
         </div>
@@ -410,7 +409,7 @@ function Chats({
                   onClick={() => setOpenPartner(c.partner)}
                   className={cx(
                     "flex w-full items-center gap-3 px-5 py-3 text-left transition",
-                    active ? "bg-[#121317]" : "hover:bg-[#121317]",
+                    active ? "bg-[#121216]" : "hover:bg-[#121216]",
                   )}
                 >
                   <span
@@ -456,8 +455,8 @@ function Chats({
         </div>
       </aside>
 
-      {/* Active chat pane */}
-      <div className={cx("min-w-0 flex-1", !openPartner && "hidden md:flex")}>
+      {/* Active chat pane — full height so media never squishes. */}
+      <div className={cx("flex min-w-0 flex-1 flex-col", !openPartner && "hidden md:flex")}>
         {activePartner ? (
           <ChatWindow
             key={activePartner.id}
@@ -472,7 +471,7 @@ function Chats({
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-full border border-zinc-800/80 text-zinc-600">
+              <span className="grid h-16 w-16 place-items-center rounded-full border border-white/10 text-zinc-600">
                 <Send size={26} strokeWidth={1.5} />
               </span>
               <p className="text-lg font-semibold text-zinc-200">Your messages</p>
@@ -658,8 +657,8 @@ function ChatWindow({
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-black">
-      <header className="flex h-[60px] items-center gap-3 border-b border-zinc-800/80 px-4">
+    <section className="flex h-full min-h-0 flex-1 flex-col bg-[#09090b]">
+      <header className="flex h-[60px] shrink-0 items-center gap-3 border-b border-white/10 px-4">
         <button
           type="button"
           onClick={onBack}
@@ -703,7 +702,7 @@ function ChatWindow({
         </button>
       </header>
 
-      <div data-testid="message-feed" ref={feedRef} className="cliq-scroll flex-1 space-y-2 overflow-y-auto p-6">
+      <div data-testid="message-feed" ref={feedRef} className="cliq-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-5 md:px-6">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-xs text-zinc-500">
             <Spinner /> <span className="ml-2">Loading messages...</span>
@@ -732,7 +731,7 @@ function ChatWindow({
         {partnerTyping ? (
           <div className="flex items-center gap-2">
             <Avatar user={partner} size={26} />
-            <span className="rounded-[20px] bg-[#18181b] px-4 py-2.5 text-zinc-400">
+            <span className="rounded-[20px] bg-white/10 px-4 py-2.5 text-zinc-400">
               <TypingDots />
             </span>
           </div>
@@ -740,7 +739,7 @@ function ChatWindow({
       </div>
 
       {replyTo ? (
-        <div className="flex items-center gap-2 border-t border-zinc-800/80 px-4 py-2">
+        <div className="flex shrink-0 items-center gap-2 border-t border-white/10 px-4 py-2">
           <CornerUpLeft size={14} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold text-zinc-400">
@@ -755,7 +754,7 @@ function ChatWindow({
       ) : null}
 
       {mediaUrl ? (
-        <div className="flex items-center gap-2 border-t border-zinc-800/80 px-4 py-2">
+        <div className="flex shrink-0 items-center gap-2 border-t border-white/10 px-4 py-2">
           <ImageIcon size={14} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold text-zinc-400">Image attached</p>
@@ -767,7 +766,7 @@ function ChatWindow({
         </div>
       ) : null}
 
-      <footer className="p-4">
+      <footer className="shrink-0 border-t border-white/10 p-3 md:p-4">
         {voice.recording ? (
           <div className="flex items-center gap-2">
             <button
@@ -797,7 +796,7 @@ function ChatWindow({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-full border border-zinc-700 bg-black px-4 py-2.5">
+          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#121216] px-4 py-2.5">
             <label className="cursor-pointer text-zinc-400 transition hover:text-white" aria-label="Attach media">
               <ImageIcon size={20} strokeWidth={1.75} />
               <input
@@ -901,7 +900,7 @@ function MessageBubble({
         <div
           className={cx(
             "rounded-[20px] px-4 py-2.5 text-[15px]",
-            mine ? "bg-[#4f46e5] text-white" : "bg-[#18181b] text-[#f5f5f5]",
+            mine ? "bg-[#4f46e5] text-white" : "bg-white/10 text-[#f5f5f5]",
           )}
         >
           {message.mediaUrl ? (
@@ -922,7 +921,7 @@ function MessageBubble({
                 key={r.emoji}
                 className={cx(
                   "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
-                  r.mine ? "bg-[#ff3040]/15 text-[#ff3040]" : "bg-[#18181b] text-zinc-300",
+                  r.mine ? "bg-[#ff3040]/15 text-[#ff3040]" : "bg-white/10 text-zinc-300",
                 )}
               >
                 <span className={cx(r.mine && "text-[#ff3040]")}>{r.emoji}</span> {r.count}
@@ -941,11 +940,11 @@ function MessageBubble({
             />
             <div
               className={cx(
-                "cliq-pop absolute z-20 w-max rounded-xl border border-zinc-800/80 bg-[#121317] p-1 shadow-2xl",
+                "cliq-pop absolute z-20 w-max rounded-xl border border-white/10 bg-[#121216] p-1 shadow-2xl",
                 mine ? "right-0 top-full mt-1" : "left-0 top-full mt-1",
               )}
             >
-              <div className="flex gap-0.5 border-b border-zinc-800/80 pb-1">
+              <div className="flex gap-0.5 border-b border-white/10 pb-1">
                 {MESSAGE_REACTIONS.map((emoji) => (
                   <button
                     key={emoji}

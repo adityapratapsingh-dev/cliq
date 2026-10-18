@@ -18,9 +18,12 @@ import { cx, timeAgo } from "@/lib/utils";
 export function StoryBar({
   onOpenViewer,
   onCompose,
+  inline = false,
 }: {
   onOpenViewer: (groups: StoryGroup[], startIndex: number) => void;
   onCompose: () => void;
+  /** Inline renders the rings as a bare row (no card chrome, tighter padding). */
+  inline?: boolean;
 }) {
   const { user, revision } = useCliq();
   const [groups, setGroups] = useState<StoryGroup[]>([]);
@@ -50,7 +53,13 @@ export function StoryBar({
   const ordered = mine ? [mine, ...groups.filter((_, i) => i !== mineIndex)] : groups;
 
   return (
-    <div className="no-scrollbar flex gap-3.5 overflow-x-auto px-1 py-3">
+    <div
+      className={
+        inline
+          ? "no-scrollbar flex shrink-0 items-center gap-3.5 overflow-x-auto"
+          : "no-scrollbar flex gap-3.5 overflow-x-auto px-1 py-3"
+      }
+    >
       {/* Your own story ring */}
       <StoryRing
         label="Your Story"

@@ -91,7 +91,7 @@ export function UserListModal({
                   onClose();
                   openChat(person);
                 }}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-800/80 px-3 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:border-indigo-500 hover:text-zinc-100"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:border-indigo-500 hover:text-zinc-100"
               >
                 <MessageSquare size={12} /> Message
               </button>

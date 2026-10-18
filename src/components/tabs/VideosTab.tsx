@@ -75,7 +75,7 @@ export function VideosTab({ search, onOpenProfile }: { search: string; onOpenPro
 
   return (
     <div className="flex w-full justify-center py-4">
-      <div className="relative aspect-[9/16] h-[calc(100dvh-6rem)] max-h-[840px] w-auto overflow-hidden rounded-xl border border-zinc-800/80 bg-[#0a0a0a]">
+      <div className="relative aspect-[9/16] h-[calc(100dvh-9.5rem)] max-h-[840px] w-auto overflow-hidden rounded-xl border border-white/10 bg-[#0d0d10] md:h-[calc(100dvh-6rem)]">
         {/* Top overlay */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between p-3">
           <div className="pointer-events-auto flex gap-4">
