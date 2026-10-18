@@ -128,7 +128,7 @@ export function ProfileModal({
                   "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition disabled:opacity-70",
                   requested
                     ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                    : "bg-[var(--accent-grad)] text-white hover:brightness-110",
+                    : "bg-indigo-600 text-white hover:bg-indigo-500",
                 )}
               >
                 {requested ? (

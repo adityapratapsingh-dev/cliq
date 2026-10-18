@@ -25,11 +25,13 @@ type Filter = "all" | "likes" | "comments" | "cliqs";
 function badgeFor(kind: NotificationKind) {
   switch (kind) {
     case "like":
-    case "dislike":
       return { icon: <Heart size={10} className="fill-current" />, className: "bg-rose-500" };
+    case "dislike":
+      return { icon: <Heart size={10} className="fill-current" />, className: "bg-amber-500" };
     case "upgrade":
-    case "downgrade":
       return { icon: <Rocket size={10} />, className: "bg-emerald-500" };
+    case "downgrade":
+      return { icon: <Rocket size={10} className="rotate-180" />, className: "bg-amber-500" };
     case "comment":
     case "reply":
       return { icon: <MessageCircle size={10} />, className: "bg-cyan-500" };
@@ -145,7 +147,7 @@ export function NotificationCenter({
   return (
     <div
       data-testid="notification-center"
-      className="cliq-pop fixed right-3 top-[4.25rem] z-50 flex max-h-[80vh] w-[min(94vw,26rem)] flex-col overflow-hidden rounded-3xl border border-zinc-800/80 bg-zinc-900/95 shadow-2xl backdrop-blur-xl sm:right-5"
+      className="cliq-pop fixed right-3 top-[4.25rem] z-50 flex max-h-[80vh] w-[min(94vw,26rem)] flex-col overflow-hidden rounded-3xl border border-zinc-800/80 bg-[#121317]/98 shadow-2xl backdrop-blur-xl sm:right-5"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
@@ -193,7 +195,7 @@ export function NotificationCenter({
             onClick={() => setFilter(key)}
             className={cx(
               "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition",
-              filter === key ? "bg-[var(--accent-grad)] text-white" : "text-zinc-400 hover:text-zinc-100",
+              filter === key ? "bg-indigo-600 text-white" : "text-zinc-400 hover:text-zinc-100",
             )}
           >
             {label}
@@ -278,7 +280,7 @@ export function NotificationCenter({
                           type="button"
                           onClick={() => void cliqBack(n)}
                           disabled={busyId === n.id}
-                          className="shrink-0 rounded-full bg-[var(--accent-grad)] px-3 py-1.5 text-[10px] font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+                          className="shrink-0 rounded-full bg-indigo-600 px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-indigo-500 disabled:opacity-50"
                         >
                           {busyId === n.id ? <Spinner className="h-3 w-3" /> : "Cliq Back ⚡"}
                         </button>

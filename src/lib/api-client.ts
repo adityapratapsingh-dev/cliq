@@ -2,6 +2,8 @@ import type {
   Comment,
   ConversationSummary,
   FriendGraph,
+  Group,
+  GroupMessage,
   Message,
   Post,
   PostType,
@@ -11,7 +13,12 @@ import type {
   ReactionType,
   SessionUser,
   Settings,
+  Story,
+  StoryBgStyle,
+  StoryGroup,
+  StreakInfo,
   UnreadCounts,
+  UserBadges,
 } from "@/types/cliq";
 
 export class ApiClientError extends Error {
@@ -196,12 +203,29 @@ export const api = {
     mediaUrl?: string | null;
     flair?: string | null;
     pollOptions?: string[];
+    quotedPostId?: string | null;
   }): Promise<{ post: Post }> {
     return post<{ post: Post }>("/api/posts", input);
   },
 
   deletePost(id: string): Promise<{ ok: boolean }> {
     return request<{ ok: boolean }>(`/api/posts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+
+  /** Edit your post's caption / text. */
+  editPost(id: string, content: string): Promise<{ post: Post }> {
+    return request<{ post: Post }>("/api/posts", {
+      method: "PATCH",
+      body: JSON.stringify({ id, content }),
+    });
+  },
+
+  /** Pin (or unpin) a post to the top of your profile. */
+  pinPost(id: string, pinned: boolean): Promise<{ post: Post }> {
+    return request<{ post: Post }>("/api/posts", {
+      method: "PATCH",
+      body: JSON.stringify({ id, pinned }),
+    });
   },
 
   react(postId: string, reaction: ReactionType): Promise<{ post: Post }> {
@@ -281,5 +305,83 @@ export const api = {
 
   deleteMessage(id: string): Promise<{ ok: boolean }> {
     return request<{ ok: boolean }>(`/api/messages?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+
+  // ---------------------------------------------------------------- stories
+  async listStories(): Promise<StoryGroup[]> {
+    const { groups } = await request<{ groups: StoryGroup[] }>("/api/stories");
+    return groups;
+  },
+
+  createStory(input: {
+    mediaUrl?: string | null;
+    caption?: string;
+    bgStyle?: StoryBgStyle;
+  }): Promise<{ story: Story }> {
+    return post<{ story: Story }>("/api/stories", input);
+  },
+
+  viewStory(viewId: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>("/api/stories", {
+      method: "PATCH",
+      body: JSON.stringify({ viewId }),
+    });
+  },
+
+  deleteStory(id: string): Promise<{ ok: boolean }> {
+    return request<{ ok: boolean }>(`/api/stories?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+
+  // ----------------------------------------------------------------- groups
+  async listGroups(): Promise<Group[]> {
+    const { groups } = await request<{ groups: Group[] }>("/api/groups");
+    return groups;
+  },
+
+  async listGroupMessages(groupId: string): Promise<GroupMessage[]> {
+    const { messages } = await request<{ messages: GroupMessage[] }>(
+      `/api/groups?id=${encodeURIComponent(groupId)}`,
+    );
+    return messages;
+  },
+
+  createGroup(input: {
+    name: string;
+    description?: string;
+    icon?: string;
+    memberIds?: string[];
+  }): Promise<{ group: Group }> {
+    return post<{ group: Group }>("/api/groups", { action: "create", ...input });
+  },
+
+  joinGroup(groupId: string): Promise<{ group: Group }> {
+    return post<{ group: Group }>("/api/groups", { action: "join", groupId });
+  },
+
+  sendGroupMessage(input: {
+    groupId: string;
+    content?: string;
+    mediaUrl?: string | null;
+  }): Promise<{ message: GroupMessage }> {
+    return request<{ message: GroupMessage }>("/api/groups", {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+  },
+
+  reactToGroupMessage(messageId: string, emoji: string): Promise<{ message: GroupMessage }> {
+    return request<{ message: GroupMessage }>("/api/groups", {
+      method: "PATCH",
+      body: JSON.stringify({ messageId, emoji }),
+    });
+  },
+
+  // --------------------------------------------------- streaks & badges
+  getStreak(partnerId: string): Promise<{ streak: StreakInfo }> {
+    return request<{ streak: StreakInfo }>(`/api/streaks?with=${encodeURIComponent(partnerId)}`);
+  },
+
+  getBadges(userId?: string): Promise<UserBadges> {
+    return request<UserBadges>(`/api/badges${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`);
   },
 };

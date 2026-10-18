@@ -104,7 +104,7 @@ export function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-4 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 px-4 py-3 text-left transition hover:border-zinc-700 hover:bg-zinc-900"
+      className="flex w-full items-center justify-between gap-4 rounded-2xl border border-zinc-800/80 bg-[#121317] px-4 py-3 text-left transition hover:border-zinc-700 hover:bg-zinc-900"
     >
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-zinc-100">{label}</span>
@@ -153,7 +153,7 @@ export function Modal({
       />
       <div
         className={cx(
-          "cliq-pop relative w-full overflow-hidden rounded-t-3xl border border-zinc-800/80 bg-zinc-900/95 shadow-2xl backdrop-blur-xl sm:rounded-3xl",
+          "cliq-pop relative w-full overflow-hidden rounded-t-3xl border border-zinc-800/80 bg-[#121317]/98 shadow-2xl backdrop-blur-xl sm:rounded-3xl",
           maxWidth,
         )}
       >
@@ -285,7 +285,7 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="cliq-rise flex flex-col items-center justify-center gap-3 rounded-3xl border border-zinc-800/80 bg-zinc-900/60 px-6 py-16 text-center backdrop-blur-md">
+    <div className="cliq-rise flex flex-col items-center justify-center gap-3 rounded-3xl border border-zinc-800/80 bg-[#121317] px-6 py-16 text-center backdrop-blur-md">
       <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-2)]">
         {icon}
       </span>
@@ -295,7 +295,7 @@ export function EmptyState({
         <button
           type="button"
           onClick={onAction}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-grad)] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 active:scale-95"
+          className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-500 active:scale-95"
         >
           {actionLabel}
         </button>
@@ -335,7 +335,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/60 p-4">
+    <div className="rounded-3xl border border-zinc-800/80 bg-[#121317] p-4">
       <div className="flex items-center gap-3">
         <Skeleton className="h-10 w-10 rounded-full" />
         <div className="flex-1 space-y-2">

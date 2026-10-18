@@ -447,7 +447,7 @@ export function Reel({
         className="absolute inset-x-0 bottom-0 z-30 h-1 cursor-pointer bg-white/20"
       >
         <div
-          className="h-full bg-[var(--accent-grad)] transition-[width] duration-150"
+          className="h-full bg-indigo-600 transition-[width] duration-150"
           style={{ width: `${progress}%` }}
         />
       </div>

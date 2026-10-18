@@ -17,6 +17,7 @@ import {
   DEFAULT_SETTINGS,
   type SessionUser,
   type Post,
+  type PublicUser,
   type Settings,
   type TabKey,
   type Toast,
@@ -36,6 +37,17 @@ interface CliqContextValue {
   setTab: (tab: TabKey) => void;
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
+  /** Open the Profile tab straight into its Settings panel. */
+  settingsOpen: boolean;
+  openSettings: () => void;
+  closeSettings: () => void;
+  /** Global search query, shared by the header, feed tabs and the trend rail. */
+  search: string;
+  setSearch: (value: string) => void;
+  /** User to jump straight into a DM with (set by the rail / notes bar). */
+  chatTarget: PublicUser | null;
+  openChat: (user: PublicUser) => void;
+  clearChatTarget: () => void;
   toasts: Toast[];
   toast: (text: string, tone?: Toast["tone"]) => void;
   dismissToast: (id: string) => void;
@@ -82,6 +94,9 @@ export function CliqProvider({ children }: { children: ReactNode }) {
   const [mediaUnconfigured, setMediaUnconfigured] = useState(false);
   const [tab, setTab] = useState<TabKey>("videos");
   const [createOpen, setCreateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [chatTarget, setChatTarget] = useState<PublicUser | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [revision, setRevision] = useState(0);
   const [savedIds, setSavedIds] = useState<string[]>([]);
@@ -249,6 +264,22 @@ export function CliqProvider({ children }: { children: ReactNode }) {
     window.localStorage.removeItem("cliq:saved");
   }, []);
 
+  /** Jump to the Profile tab and open its Settings panel in one tap. */
+  const openSettings = useCallback(() => {
+    setTab("profile");
+    setSettingsOpen(true);
+  }, []);
+
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
+  /** Jump to Chats and open a DM with this user in one tap. */
+  const openChat = useCallback((user: PublicUser) => {
+    setChatTarget(user);
+    setTab("friends");
+  }, []);
+
+  const clearChatTarget = useCallback(() => setChatTarget(null), []);
+
   /**
    * Newest post per feed.
    *
@@ -329,6 +360,14 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       setTab,
       createOpen,
       setCreateOpen,
+      settingsOpen,
+      openSettings,
+      closeSettings,
+      search,
+      setSearch,
+      chatTarget,
+      openChat,
+      clearChatTarget,
       toasts,
       toast,
       dismissToast,
@@ -357,6 +396,13 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       mediaUnconfigured,
       tab,
       createOpen,
+      settingsOpen,
+      openSettings,
+      closeSettings,
+      search,
+      chatTarget,
+      openChat,
+      clearChatTarget,
       toasts,
       toast,
       dismissToast,

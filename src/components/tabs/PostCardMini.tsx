@@ -36,7 +36,7 @@ export function PostCardMini({ post, viewerId }: { post: Post; viewerId: string 
   const icon = isVideo ? <Film size={13} /> : post.type === "photo" ? <ImageIcon size={13} /> : <MessageSquare size={13} />;
 
   return (
-    <div className="cliq-rise overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/70">
+    <div className="cliq-rise overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121317]">
       {!isChat ? (
         <div className="relative h-36 w-full bg-zinc-950">
           {post.mediaUrl && !broken ? (
@@ -122,7 +122,7 @@ export function PostCardMini({ post, viewerId }: { post: Post; viewerId: string 
               <span className="inline-flex items-center gap-1 text-emerald-400/80">
                 <ThumbsUp size={12} /> {formatCount(post.upgradesCount)}
               </span>
-              <span className="inline-flex items-center gap-1 text-rose-400/80">
+              <span className="inline-flex items-center gap-1 text-amber-400/80">
                 <ThumbsDown size={12} /> {formatCount(post.downgradesCount)}
               </span>
             </>

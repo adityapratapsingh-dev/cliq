@@ -84,6 +84,29 @@ export function avatarGradient(seed: string): [string, string] {
   return palettes[hash % palettes.length];
 }
 
+/**
+ * A deterministic mesh-gradient cover for a user, derived from their username.
+ *
+ * Used when no custom banner image has been uploaded, so a profile never shows
+ * an empty black box. Hue is anchored to the Cliq indigo-violet family with a
+ * small per-user rotation so covers feel personal but stay on-brand.
+ */
+export function meshGradient(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  const rot = hash % 40; // 0-39deg of drift
+  const hue = 245 + rot; // indigo (245) -> violet (285)
+  const hue2 = (hue + 70) % 360;
+  const hue3 = (hue + 190) % 360;
+  return [
+    `radial-gradient(at 16% 18%, hsl(${hue} 82% 58% / 0.62) 0px, transparent 55%)`,
+    `radial-gradient(at 84% 14%, hsl(${hue2} 78% 60% / 0.5) 0px, transparent 50%)`,
+    `radial-gradient(at 74% 88%, hsl(${hue3} 72% 58% / 0.34) 0px, transparent 52%)`,
+    `radial-gradient(at 10% 90%, hsl(${hue} 70% 46% / 0.4) 0px, transparent 50%)`,
+    "linear-gradient(135deg, #14151a 0%, #101116 100%)",
+  ].join(", ");
+}
+
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -93,4 +116,16 @@ export function initials(name: string): string {
 
 export function ageBadge(age: number | null): string {
   return age ? `${age}` : "Teen";
+}
+
+/** How long a Cliq Note stays live. */
+export const NOTE_TTL_MS = 24 * 60 * 60 * 1000;
+export const NOTE_MAX_CHARS = 60;
+
+/** True when a note exists and was set within the last 24 hours. */
+export function noteIsFresh(note: { updatedAt?: string | null } | null | undefined): boolean {
+  if (!note?.updatedAt) return false;
+  const then = new Date(note.updatedAt).getTime();
+  if (Number.isNaN(then)) return false;
+  return Date.now() - then < NOTE_TTL_MS;
 }

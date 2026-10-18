@@ -158,7 +158,7 @@ export function ShareSheet({
                       "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold transition disabled:opacity-60",
                       sent
                         ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                        : "bg-[var(--accent-grad)] text-white hover:brightness-110",
+                        : "bg-indigo-600 text-white hover:bg-indigo-500",
                     )}
                   >
                     {sent ? (

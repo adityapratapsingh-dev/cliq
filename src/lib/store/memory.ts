@@ -4,6 +4,8 @@ import type {
   ConversationSummary,
   FriendGraph,
   Friendship,
+  Group,
+  GroupMessage,
   Message,
   MessageReaction,
   Post,
@@ -11,13 +13,21 @@ import type {
   PostType,
   PublicUser,
   ReactionType,
+  Story,
+  StoryBgStyle,
+  StoryGroup,
+  StreakInfo,
+  UserBadges,
 } from "@/types/cliq";
 import {
   toPublicUser,
   type CreateCommentInput,
+  type CreateGroupInput,
+  type CreateGroupMessageInput,
   type CreateMessageInput,
   type CreateNotificationInput,
   type CreatePostInput,
+  type CreateStoryInput,
   type CreateUserInput,
   type NotificationItem,
   type ProfileStats,
@@ -26,6 +36,8 @@ import {
   type StoredUser,
   type UpdateUserPatch,
 } from "@/lib/store/types";
+import { buildBadges, computeStreak } from "@/lib/achievements";
+import { DEFAULT_LOUNGES, STORY_TTL_MS, groupSeededAt } from "@/lib/social-defaults";
 
 interface StoredPost {
   id: string;
@@ -36,6 +48,8 @@ interface StoredPost {
   flair: string | null;
   flairColor: string | null;
   poll: Poll | null;
+  pinned: boolean;
+  quotedPostId: string | null;
   likesCount: number;
   dislikesCount: number;
   upgradesCount: number;
@@ -81,6 +95,36 @@ interface StoredNotification {
   createdAt: string;
 }
 
+interface StoredStory {
+  id: string;
+  userId: string;
+  mediaUrl: string | null;
+  caption: string;
+  bgStyle: StoryBgStyle;
+  viewsCount: number;
+  createdAt: string;
+}
+
+interface StoredGroup {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  creatorId: string;
+  isPublic: boolean;
+  createdAt: string;
+}
+
+interface StoredGroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  content: string;
+  mediaUrl: string | null;
+  reactions: { userId: string; emoji: string }[];
+  createdAt: string;
+}
+
 interface MemoryState {
   users: Map<string, StoredUser>;
   posts: Map<string, StoredPost>;
@@ -89,6 +133,11 @@ interface MemoryState {
   friendships: Friendship[];
   messages: StoredMessage[];
   notifications: StoredNotification[];
+  stories: StoredStory[];
+  storyViews: { storyId: string; userId: string }[];
+  groups: Map<string, StoredGroup>;
+  groupMembers: { groupId: string; userId: string }[];
+  groupMessages: StoredGroupMessage[];
 }
 
 /**
@@ -146,6 +195,8 @@ export class MemoryStore implements Store {
   private decoratePost(post: StoredPost, viewerId: string): Post {
     const author = this.state.users.get(post.userId);
     const reaction = this.state.reactions.find((r) => r.postId === post.id && r.userId === viewerId);
+    const quoted = post.quotedPostId ? this.state.posts.get(post.quotedPostId) : undefined;
+    const quotedAuthor = quoted ? this.state.users.get(quoted.userId) : undefined;
     return {
       id: post.id,
       userId: post.userId,
@@ -162,6 +213,24 @@ export class MemoryStore implements Store {
       downgradesCount: post.downgradesCount,
       commentCount: this.state.comments.filter((c) => c.postId === post.id).length,
       myReaction: reaction?.type ?? null,
+      pinned: post.pinned,
+      quotedPost: quoted
+        ? {
+            id: quoted.id,
+            type: quoted.type,
+            content: quoted.content,
+            mediaUrl: quoted.mediaUrl,
+            author: quotedAuthor
+              ? {
+                  id: quotedAuthor.id,
+                  username: quotedAuthor.username,
+                  displayName: quotedAuthor.displayName,
+                  avatarUrl: quotedAuthor.avatarUrl,
+                }
+              : null,
+            createdAt: quoted.createdAt,
+          }
+        : null,
       createdAt: post.createdAt,
     };
   }
@@ -169,7 +238,10 @@ export class MemoryStore implements Store {
   async listPosts(type: PostType, viewerId: string): Promise<Post[]> {
     return [...this.state.posts.values()]
       .filter((p) => p.type === type)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      })
       .map((p) => this.decoratePost(p, viewerId));
   }
 
@@ -191,6 +263,8 @@ export class MemoryStore implements Store {
       flair: input.flair,
       flairColor: input.flairColor,
       poll,
+      pinned: false,
+      quotedPostId: input.quotedPostId ?? null,
       likesCount: 0,
       dislikesCount: 0,
       upgradesCount: 0,
@@ -209,6 +283,28 @@ export class MemoryStore implements Store {
     this.state.reactions = this.state.reactions.filter((r) => r.postId !== id);
     this.state.comments = this.state.comments.filter((c) => c.postId !== id);
     return true;
+  }
+
+  async updatePost(id: string, userId: string, content: string): Promise<Post> {
+    const post = this.state.posts.get(id);
+    if (!post) throw new ApiError(404, "Post not found.");
+    if (post.userId !== userId) throw new ApiError(403, "You can only edit your own posts.");
+    post.content = content;
+    return this.decoratePost(post, userId);
+  }
+
+  async setPostPinned(id: string, userId: string, pinned: boolean): Promise<Post> {
+    const post = this.state.posts.get(id);
+    if (!post) throw new ApiError(404, "Post not found.");
+    if (post.userId !== userId) throw new ApiError(403, "You can only pin your own posts.");
+    if (pinned) {
+      // Only one pinned post per user — unpin any sibling first.
+      for (const other of this.state.posts.values()) {
+        if (other.userId === userId && other.id !== id) other.pinned = false;
+      }
+    }
+    post.pinned = pinned;
+    return this.decoratePost(post, userId);
   }
 
   async setPostReaction(postId: string, userId: string, type: ReactionType): Promise<Post> {
@@ -433,6 +529,7 @@ export class MemoryStore implements Store {
         partner,
         lastMessage: last ? this.decorateMessage(last, userId) : null,
         unreadCount: thread.filter((m) => m.receiverId === userId && !m.isRead).length,
+        streak: computeStreak(thread, userId, partnerId).days,
       });
     }
 
@@ -485,6 +582,222 @@ export class MemoryStore implements Store {
     }
   }
 
+  async getStreak(userId: string, partnerId: string): Promise<StreakInfo> {
+    const thread = this.state.messages.filter(
+      (m) =>
+        (m.senderId === userId && m.receiverId === partnerId) ||
+        (m.senderId === partnerId && m.receiverId === userId),
+    );
+    return computeStreak(thread, userId, partnerId);
+  }
+
+  // ---------------------------------------------------------------- stories
+  private decorateStory(story: StoredStory, viewerId: string): Story {
+    const author = this.state.users.get(story.userId);
+    return {
+      id: story.id,
+      userId: story.userId,
+      author: author ? toPublicUser(author) : null,
+      mediaUrl: story.mediaUrl,
+      caption: story.caption,
+      bgStyle: story.bgStyle,
+      viewsCount: story.viewsCount,
+      viewed: this.state.storyViews.some((v) => v.storyId === story.id && v.userId === viewerId),
+      createdAt: story.createdAt,
+    };
+  }
+
+  async listStories(viewerId: string): Promise<StoryGroup[]> {
+    const cutoff = Date.now() - STORY_TTL_MS;
+    const fresh = this.state.stories.filter((s) => new Date(s.createdAt).getTime() >= cutoff);
+    const byAuthor = new Map<string, StoredStory[]>();
+    for (const story of fresh) {
+      const list = byAuthor.get(story.userId) ?? [];
+      list.push(story);
+      byAuthor.set(story.userId, list);
+    }
+
+    const groups: StoryGroup[] = [];
+    for (const [authorId, list] of byAuthor) {
+      const author = this.state.users.get(authorId);
+      if (!author) continue;
+      list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const stories = list.map((s) => this.decorateStory(s, viewerId));
+      groups.push({
+        author: toPublicUser(author),
+        stories,
+        viewed: stories.every((s) => s.viewed),
+      });
+    }
+    // Unviewed groups first, then most recent activity.
+    return groups.sort((a, b) => {
+      if (a.viewed !== b.viewed) return a.viewed ? 1 : -1;
+      const aLast = a.stories[a.stories.length - 1]?.createdAt ?? "";
+      const bLast = b.stories[b.stories.length - 1]?.createdAt ?? "";
+      return bLast.localeCompare(aLast);
+    });
+  }
+
+  async createStory(input: CreateStoryInput): Promise<Story> {
+    const story: StoredStory = {
+      id: input.id,
+      userId: input.userId,
+      mediaUrl: input.mediaUrl,
+      caption: input.caption,
+      bgStyle: input.bgStyle,
+      viewsCount: 0,
+      createdAt: input.createdAt,
+    };
+    this.state.stories.push(story);
+    return this.decorateStory(story, input.userId);
+  }
+
+  async viewStory(storyId: string, viewerId: string): Promise<void> {
+    const story = this.state.stories.find((s) => s.id === storyId);
+    if (!story) return;
+    if (this.state.storyViews.some((v) => v.storyId === storyId && v.userId === viewerId)) return;
+    this.state.storyViews.push({ storyId, userId: viewerId });
+    story.viewsCount += 1;
+  }
+
+  async deleteStory(id: string, userId: string): Promise<boolean> {
+    const story = this.state.stories.find((s) => s.id === id);
+    if (!story) return false;
+    if (story.userId !== userId) throw new ApiError(403, "You can only delete your own story.");
+    this.state.stories = this.state.stories.filter((s) => s.id !== id);
+    this.state.storyViews = this.state.storyViews.filter((v) => v.storyId !== id);
+    return true;
+  }
+
+  // ----------------------------------------------------------------- groups
+  private ensureLounges(): void {
+    for (const [index, lounge] of DEFAULT_LOUNGES.entries()) {
+      if (!this.state.groups.has(lounge.id)) {
+        this.state.groups.set(lounge.id, {
+          id: lounge.id,
+          name: lounge.name,
+          description: lounge.description,
+          icon: lounge.icon,
+          creatorId: "system",
+          isPublic: true,
+          createdAt: groupSeededAt(index),
+        });
+      }
+    }
+  }
+
+  private decorateGroup(group: StoredGroup, viewerId: string): Group {
+    const lastMessage = this.state.groupMessages
+      .filter((m) => m.groupId === group.id)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .pop();
+    return {
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      icon: group.icon,
+      creatorId: group.creatorId,
+      isPublic: group.isPublic,
+      memberCount: this.state.groupMembers.filter((m) => m.groupId === group.id).length,
+      joined: group.isPublic || this.state.groupMembers.some((m) => m.groupId === group.id && m.userId === viewerId),
+      lastMessageAt: lastMessage?.createdAt ?? null,
+      createdAt: group.createdAt,
+    };
+  }
+
+  async listGroups(viewerId: string): Promise<Group[]> {
+    this.ensureLounges();
+    return [...this.state.groups.values()]
+      .map((g) => this.decorateGroup(g, viewerId))
+      .sort((a, b) => {
+        if (a.isPublic !== b.isPublic) return a.isPublic ? -1 : 1;
+        return (b.lastMessageAt ?? b.createdAt).localeCompare(a.lastMessageAt ?? a.createdAt);
+      });
+  }
+
+  async createGroup(input: CreateGroupInput): Promise<Group> {
+    if (this.state.groups.has(input.id)) throw new ApiError(409, "That group already exists.");
+    const group: StoredGroup = {
+      id: input.id,
+      name: input.name,
+      description: input.description,
+      icon: input.icon,
+      creatorId: input.creatorId,
+      isPublic: input.isPublic,
+      createdAt: input.createdAt,
+    };
+    this.state.groups.set(group.id, group);
+    const members = new Set([input.creatorId, ...(input.memberIds ?? [])]);
+    for (const userId of members) this.state.groupMembers.push({ groupId: group.id, userId });
+    return this.decorateGroup(group, input.creatorId);
+  }
+
+  async joinGroup(groupId: string, userId: string): Promise<Group> {
+    this.ensureLounges();
+    const group = this.state.groups.get(groupId);
+    if (!group) throw new ApiError(404, "That group does not exist.");
+    if (!this.state.groupMembers.some((m) => m.groupId === groupId && m.userId === userId)) {
+      this.state.groupMembers.push({ groupId, userId });
+    }
+    return this.decorateGroup(group, userId);
+  }
+
+  private decorateGroupMessage(msg: StoredGroupMessage, viewerId: string): GroupMessage {
+    const sender = this.state.users.get(msg.senderId);
+    const counts = new Map<string, number>();
+    for (const r of msg.reactions) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+    const reactions: MessageReaction[] = [...counts.entries()].map(([emoji, count]) => ({
+      emoji,
+      count,
+      mine: msg.reactions.some((r) => r.emoji === emoji && r.userId === viewerId),
+    }));
+    return {
+      id: msg.id,
+      groupId: msg.groupId,
+      senderId: msg.senderId,
+      sender: sender ? toPublicUser(sender) : null,
+      content: msg.content,
+      mediaUrl: msg.mediaUrl,
+      reactions,
+      createdAt: msg.createdAt,
+    };
+  }
+
+  async listGroupMessages(groupId: string, viewerId: string): Promise<GroupMessage[]> {
+    this.ensureLounges();
+    if (!this.state.groups.has(groupId)) throw new ApiError(404, "That group does not exist.");
+    return this.state.groupMessages
+      .filter((m) => m.groupId === groupId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((m) => this.decorateGroupMessage(m, viewerId));
+  }
+
+  async createGroupMessage(input: CreateGroupMessageInput): Promise<GroupMessage> {
+    this.ensureLounges();
+    const group = this.state.groups.get(input.groupId);
+    if (!group) throw new ApiError(404, "That group does not exist.");
+    // Posting implicitly joins a public lounge.
+    if (group.isPublic && !this.state.groupMembers.some((m) => m.groupId === group.id && m.userId === input.senderId)) {
+      this.state.groupMembers.push({ groupId: group.id, userId: input.senderId });
+    }
+    const msg: StoredGroupMessage = { ...input, reactions: [] };
+    this.state.groupMessages.push(msg);
+    return this.decorateGroupMessage(msg, input.senderId);
+  }
+
+  async setGroupMessageReaction(messageId: string, userId: string, emoji: string): Promise<GroupMessage> {
+    const msg = this.state.groupMessages.find((m) => m.id === messageId);
+    if (!msg) throw new ApiError(404, "Message not found.");
+    const index = msg.reactions.findIndex((r) => r.userId === userId);
+    if (index >= 0) {
+      if (msg.reactions[index].emoji === emoji) msg.reactions.splice(index, 1);
+      else msg.reactions[index].emoji = emoji;
+    } else {
+      msg.reactions.push({ userId, emoji });
+    }
+    return this.decorateGroupMessage(msg, userId);
+  }
+
   // ------------------------------------------------------------ profile stats
 
   async getStats(userId: string): Promise<ProfileStats> {
@@ -499,6 +812,59 @@ export class MemoryStore implements Store {
       following,
       posts: [...this.state.posts.values()].filter((p) => p.userId === userId).length,
     };
+  }
+
+  async getBadges(userId: string): Promise<UserBadges> {
+    const mine = [...this.state.posts.values()].filter((p) => p.userId === userId);
+    const creatorCount = mine.reduce((sum, p) => sum + p.likesCount + p.upgradesCount, 0);
+    const cliqScore = mine.reduce(
+      (sum, p) => sum + p.likesCount + p.upgradesCount - p.dislikesCount - p.downgradesCount,
+      0,
+    );
+    const hasStreak = this.state.messages.some(
+      (m) => (m.senderId === userId || m.receiverId === userId),
+    ) && this.activeStreakExists(userId);
+
+    // Founding = among the first 10 registered accounts.
+    const ordered = [...this.state.users.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const founding = ordered.findIndex((u) => u.id === userId) < 10 && ordered.some((u) => u.id === userId);
+
+    let maxStreak = 0;
+    const partners = new Set<string>();
+    for (const m of this.state.messages) {
+      if (m.senderId === userId) partners.add(m.receiverId);
+      else if (m.receiverId === userId) partners.add(m.senderId);
+    }
+    for (const partnerId of partners) {
+      const thread = this.state.messages.filter(
+        (m) =>
+          (m.senderId === userId && m.receiverId === partnerId) ||
+          (m.senderId === partnerId && m.receiverId === userId),
+      );
+      maxStreak = Math.max(maxStreak, computeStreak(thread, userId, partnerId).days);
+    }
+
+    return {
+      badges: buildBadges({ founding, hasStreak, creatorCount, cliqScore }),
+      streak: maxStreak,
+    };
+  }
+
+  private activeStreakExists(userId: string): boolean {
+    const partners = new Set<string>();
+    for (const m of this.state.messages) {
+      if (m.senderId === userId) partners.add(m.receiverId);
+      else if (m.receiverId === userId) partners.add(m.senderId);
+    }
+    for (const partnerId of partners) {
+      const thread = this.state.messages.filter(
+        (m) =>
+          (m.senderId === userId && m.receiverId === partnerId) ||
+          (m.senderId === partnerId && m.receiverId === userId),
+      );
+      if (computeStreak(thread, userId, partnerId).days > 0) return true;
+    }
+    return false;
   }
 
   // ---------------------------------------------------------- notifications
@@ -572,6 +938,11 @@ function freshState(): MemoryState {
     friendships: [],
     messages: [],
     notifications: [],
+    stories: [],
+    storyViews: [],
+    groups: new Map(),
+    groupMembers: [],
+    groupMessages: [],
   };
 }
 
