@@ -124,9 +124,9 @@ export function CliqProvider({ children }: { children: ReactNode }) {
           // Keep the underlying cause so Settings can show something actionable.
           setDbError(error.detail ?? error.message);
         }
-        toast(error.message, "danger");
+    toast(error.message,"danger");
       } else {
-        toast("Something went wrong. Please try again.", "danger");
+    toast("Something went wrong. Please try again.","danger");
       }
     },
     [toast],
@@ -212,10 +212,10 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       const isFollowing = followingIds.includes(userId);
       setFollowingIds((prev) => (isFollowing ? prev.filter((id) => id !== userId) : [...prev, userId]));
       if (isFollowing) {
-        toast("Removed from your Cliq", "default");
+    toast("Removed from your Cliq","default");
         return;
       }
-      toast("Cliq Up sent ⚡", "success");
+   toast("Cliq Up sent","success");
       void api
         .requestFriend(userId)
         .then(() => refreshFollowing())

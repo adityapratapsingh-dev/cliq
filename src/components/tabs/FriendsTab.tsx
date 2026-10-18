@@ -5,24 +5,17 @@ import {
   ArrowLeft,
   Check,
   CheckCheck,
-  Copy,
   CornerUpLeft,
   Image as ImageIcon,
-  MessageSquarePlus,
+  Info,
   Mic,
   Pause,
-  Phone,
   Play,
-  Plus,
   Search,
   Send,
-  Shield,
-  Smile,
-  Sparkles,
   Trash2,
   UserPlus,
   Users,
-  Video,
   X,
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
@@ -32,7 +25,7 @@ import { api } from "@/lib/api-client";
 import { uploadMedia } from "@/lib/cloudinary";
 import { refreshNotifications } from "@/components/notifications/useNotificationCenter";
 import { Avatar, EmptyState, Skeleton, Spinner, TypingDots } from "@/components/ui/Primitives";
-import { EMOJI_QUICKBAR, INTEREST_FILTERS, MESSAGE_REACTIONS } from "@/lib/constants";
+import { INTEREST_FILTERS, MESSAGE_REACTIONS } from "@/lib/constants";
 import { formatDuration, isAudioUrl, useVoiceRecorder } from "@/lib/voice-recorder";
 import type { ConversationSummary, FriendGraph, Message, PublicUser } from "@/types/cliq";
 import { clockTime, cx, timeAgo } from "@/lib/utils";
@@ -50,7 +43,7 @@ export function FriendsTab({
   onDataChanged: () => void;
   onOpenProfile: (id: string) => void;
 }) {
-  const [mode, setMode] = useState<Mode>("discover");
+  const [mode, setMode] = useState<Mode>("chats");
   const [openPartner, setOpenPartner] = useState<PublicUser | null>(null);
   const { counts, chatTarget, clearChatTarget } = useCliq();
 
@@ -63,21 +56,21 @@ export function FriendsTab({
   }, [chatTarget, clearChatTarget]);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col px-3 py-4 sm:px-4">
-      {/* mode switch — hidden while a mobile chat is open so it feels full-screen */}
+    <div className="flex h-screen flex-col">
+      {/* Mode switcher: Messages / Discover / Groups */}
       <div
         className={cx(
-          "mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-zinc-800/80 bg-[#121317] p-1",
-          openPartner && "hidden lg:grid",
+          "flex items-center gap-1 border-b border-zinc-800/80 px-3 py-2",
+          openPartner && "hidden lg:flex",
         )}
       >
         {(
           [
-            { key: "discover", label: "Find Your Cliq", icon: Sparkles, badge: counts.pendingRequests },
-            { key: "chats", label: "Direct Chats", icon: MessageSquarePlus, badge: counts.messages },
-            { key: "groups", label: "Group Cliqs", icon: Users, badge: 0 },
+            { key: "chats", label: "Messages", badge: counts.messages },
+            { key: "discover", label: "Discover People", badge: counts.pendingRequests },
+            { key: "groups", label: "Groups", badge: 0 },
           ] as const
-        ).map(({ key, label, icon: Icon, badge }) => (
+        ).map(({ key, label, badge }) => (
           <button
             key={key}
             type="button"
@@ -86,13 +79,13 @@ export function FriendsTab({
               setOpenPartner(null);
             }}
             className={cx(
-              "relative inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition",
-              mode === key ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-zinc-400 hover:text-zinc-100",
+              "relative rounded-full px-3.5 py-1.5 text-sm transition",
+              mode === key ? "bg-white font-semibold text-black" : "text-zinc-400 hover:text-zinc-100",
             )}
           >
-            <Icon size={14} /> <span className="hidden sm:inline">{label}</span>
+            {label}
             {badge > 0 ? (
-              <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-lg shadow-rose-500/40">
+              <span className="ml-1.5 inline-grid h-[16px] min-w-[16px] place-items-center rounded-full bg-[#ff3040] px-1 text-[10px] font-bold text-white">
                 {badge > 9 ? "9+" : badge}
               </span>
             ) : null}
@@ -100,31 +93,36 @@ export function FriendsTab({
         ))}
       </div>
 
-      {/* Cliq Stories & Notes — tap-through story rings + 24h notes */}
-      <div className="mb-4">
-        <StoryNotesBar onOpenProfile={onOpenProfile} />
+      <div className={cx("flex-1 overflow-hidden", openPartner && "hidden lg:block")}>
+        <div className="mb-0 border-b border-zinc-800/80 px-3 py-2">
+          <StoryNotesBar onOpenProfile={onOpenProfile} />
+        </div>
       </div>
 
-      {mode === "discover" ? (
-        <Discover
-          search={search}
-          onMessage={(user) => {
-            setMode("chats");
-            setOpenPartner(user);
-          }}
-          onDataChanged={onDataChanged}
-          onOpenProfile={onOpenProfile}
-        />
-      ) : mode === "groups" ? (
-        <GroupChats onOpenProfile={onOpenProfile} />
-      ) : (
-        <Chats
-          openPartner={openPartner}
-          setOpenPartner={setOpenPartner}
-          onDataChanged={onDataChanged}
-          onOpenProfile={onOpenProfile}
-        />
-      )}
+      <div className={cx("min-h-0 flex-1 overflow-hidden", openPartner && "hidden lg:flex")}>
+        {mode === "discover" ? (
+          <Discover
+            search={search}
+            onMessage={(user) => {
+              setMode("chats");
+              setOpenPartner(user);
+            }}
+            onDataChanged={onDataChanged}
+            onOpenProfile={onOpenProfile}
+          />
+        ) : mode === "groups" ? (
+          <div className="cliq-scroll h-full overflow-y-auto p-4">
+            <GroupChats onOpenProfile={onOpenProfile} />
+          </div>
+        ) : (
+          <Chats
+            openPartner={openPartner}
+            setOpenPartner={setOpenPartner}
+            onDataChanged={onDataChanged}
+            onOpenProfile={onOpenProfile}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -178,12 +176,12 @@ function Discover({
   const friendIds = useMemo(() => new Set(graph?.friends.map((f) => f.id) ?? []), [graph]);
   const outgoingIds = useMemo(() => new Set(graph?.outgoing.map((o) => o.user.id) ?? []), [graph]);
 
-  async function cliqUp(target: PublicUser) {
+  async function follow(target: PublicUser) {
     setBusyId(target.id);
     try {
       const updated = await api.requestFriend(target.id);
       setGraph(updated);
-      toast(`Cliq Up sent to @${target.username} ⚡`, "success");
+      toast(`Follow request sent to @${target.username}`, "success");
       onDataChanged();
     } catch (error) {
       apiError(error);
@@ -193,63 +191,49 @@ function Discover({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-3xl border border-zinc-800/80 bg-[#121317] p-4 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
-            <Users size={17} />
-          </span>
-          <div>
-            <p className="text-sm font-bold text-zinc-100">Meet real people who match your vibe</p>
-            <p className="text-[11px] text-zinc-500">
-              {loading ? "Loading members..." : `${people.length} member${people.length === 1 ? "" : "s"} on Cliq`}
-            </p>
-          </div>
-        </div>
+    <div className="cliq-scroll h-full overflow-y-auto p-4">
+      <div className="relative">
+        <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search people"
+          className="h-10 w-full rounded-lg border border-zinc-800/80 bg-[#121317] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+        />
+      </div>
 
-        <div className="relative mt-3">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by @username, name or interest..."
-            className="h-10 w-full rounded-full border border-zinc-800 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-          />
-        </div>
-
-        <div className="cliq-no-bar mt-3 flex gap-2 overflow-x-auto pb-1">
-          {INTEREST_FILTERS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={cx(
-                "shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
-                filter === f
-                  ? "border-transparent bg-indigo-600 text-white"
-                  : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200",
-              )}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+      <div className="cliq-no-bar mt-3 flex gap-2 overflow-x-auto pb-1">
+        {INTEREST_FILTERS.map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setFilter(f)}
+            className={cx(
+              "shrink-0 rounded-full px-3.5 py-1.5 text-xs transition",
+              filter === f ? "bg-white font-semibold text-black" : "bg-[#121317] text-zinc-400 hover:text-zinc-200",
+            )}
+          >
+            {f}
+          </button>
+        ))}
       </div>
 
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-3xl border border-zinc-800/80 bg-[#121317] p-4">
+            <div key={i} className="flex items-center gap-3">
               <Skeleton className="h-12 w-12 rounded-full" />
-              <Skeleton className="mt-3 h-3 w-28" />
-              <Skeleton className="mt-2 h-2.5 w-20" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-2.5 w-20" />
+              </div>
             </div>
           ))}
         </div>
       ) : people.length === 0 ? (
         <EmptyState
-          icon={<Users size={26} />}
-          title={combinedQuery || filter !== "All Vibes" ? "No one matches that filter" : "No one else is on Cliq yet"}
+          icon={<Users size={26} strokeWidth={1.75} />}
+          title={combinedQuery || filter !== "All Vibes" ? "No one matches that filter" : "No one else is here yet"}
           hint={
             combinedQuery || filter !== "All Vibes"
               ? "Try another vibe or clear your search."
@@ -257,100 +241,55 @@ function Discover({
           }
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-4">
           {people.map((person) => {
             const isFriend = friendIds.has(person.id);
             const requested = outgoingIds.has(person.id);
             const shared = (person.interests ?? []).filter((i) => (user?.interests ?? []).includes(i));
             return (
-              <div
-                key={person.id}
-                className="cliq-rise flex flex-col rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-4 backdrop-blur-md transition hover:border-zinc-700"
-              >
-                <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => onOpenProfile(person.id)}
-                    aria-label={`Open ${person.displayName}'s profile`}
-                    className="shrink-0 rounded-full transition hover:brightness-110"
-                  >
-                    <Avatar user={person} size={54} />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-zinc-100">{person.displayName}</p>
-                    <p className="truncate text-[11px] text-zinc-500">
-                      @{person.username}
-                      {person.age ? ` · ${person.age}` : ""}
-                    </p>
-                    {shared.length > 0 ? (
-                      <p className="mt-1 text-[10px] font-semibold text-emerald-400">
-                        {shared.length} shared interest{shared.length > 1 ? "s" : ""} ⚡
-                      </p>
-                    ) : null}
-                  </div>
+              <li key={person.id} className="flex items-center gap-3 border-b border-zinc-800/80 py-3">
+                <button
+                  type="button"
+                  onClick={() => onOpenProfile(person.id)}
+                  className="shrink-0 rounded-full"
+                  aria-label={`Open ${person.displayName}'s profile`}
+                >
+                  <Avatar user={person} size={48} />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{person.displayName}</p>
+                  <p className="truncate text-xs text-zinc-500">
+                    @{person.username}
+                    {shared.length > 0 ? ` · ${shared.length} shared` : ""}
+                  </p>
+                  {person.bio ? <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500">{person.bio}</p> : null}
                 </div>
-                {person.bio ? (
-                  <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-zinc-400">{person.bio}</p>
-                ) : null}
-                {(person.interests ?? []).length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {(person.interests ?? []).map((interest) => (
-                      <span
-                        key={interest}
-                        className={cx(
-                          "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-                          shared.includes(interest)
-                            ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-2)]"
-                            : "border-zinc-800 text-zinc-400",
-                        )}
-                      >
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="mt-4 flex gap-2">
+                <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
-                    onClick={() => void cliqUp(person)}
-                    disabled={isFriend || busyId === person.id}
+                    onClick={() => void follow(person)}
+                    disabled={isFriend || requested || busyId === person.id}
                     className={cx(
-                      "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition disabled:opacity-60",
-                      isFriend
-                        ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                        : requested
-                          ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                          : "bg-indigo-600 text-white hover:bg-indigo-500",
+                      "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition",
+                      isFriend || requested
+                        ? "bg-[#18181b] text-zinc-400"
+                        : "bg-[#4f46e5] text-white hover:bg-[#6366f1] disabled:opacity-50",
                     )}
                   >
-                    {isFriend ? (
-                      <>
-                        <Check size={13} /> In Cliq
-                      </>
-                    ) : requested ? (
-                      <>
-                        <Check size={13} /> Sent ✓
-                      </>
-                    ) : busyId === person.id ? (
-                      <Spinner />
-                    ) : (
-                      <>
-                        <UserPlus size={13} /> Cliq Up ⚡
-                      </>
-                    )}
+                    {busyId === person.id ? <Spinner className="h-3 w-3" /> : isFriend || requested ? "Following" : "Follow"}
                   </button>
                   <button
                     type="button"
                     onClick={() => onMessage(person)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100"
+                    className="rounded-lg bg-[#18181b] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]"
                   >
-                    <Send size={13} /> Message
+                    Message
                   </button>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </div>
   );
@@ -369,20 +308,17 @@ function Chats({
   onDataChanged: () => void;
   onOpenProfile: (id: string) => void;
 }) {
-  const { toast, apiError } = useCliq();
+  const { apiError } = useCliq();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [friends, setFriends] = useState<PublicUser[]>([]);
-  const [newChatOpen, setNewChatOpen] = useState(false);
 
   const loadConversations = useCallback(
     async (silent = false) => {
       if (!silent) setLoading(true);
       try {
-        const [list, graph] = await Promise.all([api.listConversations(), api.getFriends()]);
+        const list = await api.listConversations();
         setConversations(list);
-        setFriends(graph.friends);
       } catch (error) {
         apiError(error);
       } finally {
@@ -411,31 +347,48 @@ function Chats({
     );
   });
 
-  const activePartner = openPartner ?? (conversations[0]?.partner ?? null);
+  const activePartner = openPartner ?? null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
-      {/* conversation list — hidden on mobile once a chat is open */}
+    <div className="flex h-full min-h-0">
+      {/* Inbox column */}
       <aside
         data-testid="conversation-list"
-        className={cx("min-w-0 rounded-3xl border border-zinc-800/80 bg-[#121317] p-3 backdrop-blur-md", openPartner && "hidden lg:block")}
+        className={cx(
+          "flex h-full w-full flex-col border-r border-zinc-800/80 md:w-[360px]",
+          openPartner && "hidden md:flex",
+        )}
       >
-        <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search messages..."
-            className="h-10 w-full rounded-full border border-zinc-800 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-          />
+        <div className="flex h-[60px] items-center justify-between border-b border-zinc-800/80 px-5">
+          <span className="text-base font-bold text-white">Messages</span>
+          <button
+            type="button"
+            onClick={() => setOpenPartner(null)}
+            aria-label="New message"
+            className="text-zinc-400 transition hover:text-white"
+          >
+            <UserPlus size={20} strokeWidth={1.75} />
+          </button>
         </div>
 
-        <div className="cliq-scroll mt-3 max-h-[30rem] space-y-1 overflow-y-auto">
+        <div className="px-5 py-2.5">
+          <div className="relative">
+            <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search messages"
+              className="h-9 w-full rounded-full border border-zinc-800/80 bg-[#121317] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+            />
+          </div>
+        </div>
+
+        <div className="cliq-scroll min-h-0 flex-1 overflow-y-auto">
           {loading ? (
-            <div className="space-y-2 p-1">
+            <div className="space-y-1 p-2">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="flex items-center gap-3 p-2">
-                  <Skeleton className="h-11 w-11 rounded-full" />
+                <div key={i} className="flex items-center gap-3 p-3">
+                  <Skeleton className="h-13 w-13 rounded-full" />
                   <div className="flex-1 space-y-2">
                     <Skeleton className="h-3 w-28" />
                     <Skeleton className="h-2.5 w-40" />
@@ -444,20 +397,9 @@ function Chats({
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="px-2 py-8 text-center">
-              <p className="text-xs text-zinc-500">
-                {conversations.length === 0 ? "No chats yet." : "No messages match that search."}
-              </p>
-              {conversations.length === 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setNewChatOpen(true)}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white"
-                >
-                  <UserPlus size={13} /> Start a chat
-                </button>
-              ) : null}
-            </div>
+            <p className="px-4 py-10 text-center text-sm text-zinc-500">
+              {conversations.length === 0 ? "No messages yet." : "No messages match that search."}
+            </p>
           ) : (
             filtered.map((c) => {
               const active = activePartner?.id === c.partner.id;
@@ -467,8 +409,8 @@ function Chats({
                   type="button"
                   onClick={() => setOpenPartner(c.partner)}
                   className={cx(
-                    "flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition",
-                    active ? "bg-[var(--accent-soft)]" : "hover:bg-zinc-800/60",
+                    "flex w-full items-center gap-3 px-5 py-3 text-left transition",
+                    active ? "bg-[#121317]" : "hover:bg-[#121317]",
                   )}
                 >
                   <span
@@ -485,178 +427,61 @@ function Chats({
                       }
                     }}
                     aria-label={`Open ${c.partner.displayName}'s profile`}
-                    className="shrink-0 rounded-full transition hover:brightness-110"
+                    className="shrink-0 rounded-full"
                   >
-                    <Avatar user={c.partner} size={44} />
+                    <Avatar user={c.partner} size={52} online />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={cx(
-                          "truncate text-xs",
-                          c.unreadCount > 0 ? "font-bold text-white" : "font-semibold text-zinc-300",
-                        )}
-                      >
+                      <span className={cx("truncate text-sm", c.unreadCount > 0 ? "font-bold text-white" : "font-medium text-zinc-200")}>
                         {c.partner.displayName}
                       </span>
-                      {c.streak > 1 ? (
-                        <span className="flex shrink-0 items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[10px] font-bold text-orange-300">
-                          🔥 {c.streak}
-                        </span>
-                      ) : null}
                       {c.lastMessage ? (
-                        <span className="flex shrink-0 items-center gap-1 text-[10px] text-zinc-500">
-                          {c.unreadCount > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> : null}
-                          {timeAgo(c.lastMessage.createdAt)}
-                        </span>
+                        <span className="shrink-0 text-xs text-zinc-500">{timeAgo(c.lastMessage.createdAt)}</span>
                       ) : null}
                     </div>
-                    <p
-                      className={cx(
-                        "truncate text-[11px]",
-                        c.unreadCount > 0 ? "font-medium text-zinc-200" : "text-zinc-500",
-                      )}
-                    >
+                    <p className={cx("truncate text-xs", c.unreadCount > 0 ? "text-zinc-200" : "text-zinc-500")}>
                       {c.lastMessage
                         ? `${c.lastMessage.senderId === c.partner.id ? "" : "You: "}${
-                            c.lastMessage.content || "📷 Photo"
+                            c.lastMessage.content || "Photo"
                           }`
                         : "No messages yet"}
                     </p>
                   </div>
-                  {c.unreadCount > 0 ? (
-                    <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-lg shadow-rose-500/40">
-                      {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                    </span>
-                  ) : null}
+                  {c.unreadCount > 0 ? <span className="h-2 w-2 shrink-0 rounded-full bg-[#0095F6]" /> : null}
                 </button>
               );
             })
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => setNewChatOpen(true)}
-          className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-zinc-700 px-3 py-2.5 text-xs font-semibold text-zinc-400 transition hover:border-[var(--accent)] hover:text-zinc-100"
-        >
-          <Plus size={14} /> New chat
-        </button>
       </aside>
 
-      {/* chat window */}
-      {activePartner ? (
-        <ChatWindow
-          key={activePartner.id}
-          partner={activePartner}
-          onBack={() => setOpenPartner(null)}
-          onOpenProfile={onOpenProfile}
-          onChanged={() => {
-            void loadConversations(true);
-            onDataChanged();
-          }}
-        />
-      ) : (
-        <div className={cx(openPartner && "hidden lg:block")}>
-          <EmptyState
-            icon={<MessageSquarePlus size={26} />}
-            title="No chats yet"
-            hint="Discover real people in Find Your Cliq, send a Cliq Up, then start a 1-on-1 chat."
-            actionLabel="Find Your Cliq"
-            onAction={() => setNewChatOpen(true)}
+      {/* Active chat pane */}
+      <div className={cx("min-w-0 flex-1", !openPartner && "hidden md:flex")}>
+        {activePartner ? (
+          <ChatWindow
+            key={activePartner.id}
+            partner={activePartner}
+            onBack={() => setOpenPartner(null)}
+            onOpenProfile={onOpenProfile}
+            onChanged={() => {
+              void loadConversations(true);
+              onDataChanged();
+            }}
           />
-        </div>
-      )}
-
-      {newChatOpen ? (
-        <NewChatModal
-          friends={friends}
-          onClose={() => setNewChatOpen(false)}
-          onPick={(user) => {
-            setOpenPartner(user);
-            setNewChatOpen(false);
-            void loadConversations(true);
-            toast(`Opening chat with @${user.username}`, "success");
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function NewChatModal({
-  friends,
-  onClose,
-  onPick,
-}: {
-  friends: PublicUser[];
-  onClose: () => void;
-  onPick: (user: PublicUser) => void;
-}) {
-  const { apiError } = useCliq();
-  const [people, setPeople] = useState<PublicUser[]>(friends);
-  const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    if (friends.length > 0) return;
-    void api
-      .listUsers()
-      .then(setPeople)
-      .catch((error) => apiError(error));
-  }, [friends.length, apiError]);
-
-  const filtered = people.filter((p) => {
-    if (!query.trim()) return true;
-    const q = query.toLowerCase().replace(/^@/, "");
-    return p.username.toLowerCase().includes(q) || p.displayName.toLowerCase().includes(q);
-  });
-
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-4">
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
-      <div className="cliq-pop relative w-full max-w-md overflow-hidden rounded-t-3xl border border-zinc-800/80 bg-zinc-900/95 sm:rounded-3xl">
-        <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
-          <div>
-            <p className="text-sm font-bold text-zinc-100">New chat</p>
-            <p className="text-[11px] text-zinc-500">Message any member of Cliq</p>
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <span className="grid h-16 w-16 place-items-center rounded-full border border-zinc-800/80 text-zinc-600">
+                <Send size={26} strokeWidth={1.5} />
+              </span>
+              <p className="text-lg font-semibold text-zinc-200">Your messages</p>
+              <p className="max-w-xs text-sm text-zinc-500">
+                Send a message to start a chat, or discover new people to follow.
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-zinc-500 hover:text-zinc-200">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-4">
-          <div className="relative">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <input
-              value={query}
-              autoFocus
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search people..."
-              className="h-10 w-full rounded-full border border-zinc-800 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-            />
-          </div>
-          <div className="cliq-scroll mt-3 max-h-72 space-y-1 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs text-zinc-500">No people found.</p>
-            ) : (
-              filtered.map((person) => (
-                <button
-                  key={person.id}
-                  type="button"
-                  onClick={() => onPick(person)}
-                  className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition hover:bg-zinc-800/60"
-                >
-                  <Avatar user={person} size={40} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-bold text-zinc-100">{person.displayName}</span>
-                    <span className="block truncate text-[11px] text-zinc-500">@{person.username}</span>
-                  </span>
-                  <Send size={14} className="text-zinc-500" />
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -681,12 +506,9 @@ function ChatWindow({
   const [draft, setDraft] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [showEmoji, setShowEmoji] = useState(false);
   const [sending, setSending] = useState(false);
   const [reactFor, setReactFor] = useState<string | null>(null);
-  const [safetyOpen, setSafetyOpen] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
-  const [streak, setStreak] = useState<number>(0);
   const voice = useVoiceRecorder();
   const feedRef = useRef<HTMLDivElement>(null);
   const seenIds = useRef<Set<string>>(new Set());
@@ -704,7 +526,6 @@ function ChatWindow({
         if (opts?.silent) {
           const incoming = list.filter((m) => !m.fromMe && !seenIds.current.has(m.id));
           const newest = list[list.length - 1];
-          // A brand-new inbound message from the partner = they just sent one.
           if (incoming.length > 0 && newest && !newest.fromMe) {
             setPartnerTyping(true);
             setTimeout(() => setPartnerTyping(false), 1200);
@@ -731,21 +552,6 @@ function ChatWindow({
     void fetchMessages();
   }, [fetchMessages]);
 
-  // Refresh the DM streak whenever the thread reloads.
-  useEffect(() => {
-    let cancelled = false;
-    void api
-      .getStreak(partner.id)
-      .then(({ streak: info }) => {
-        if (!cancelled) setStreak(info.days);
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [partner.id, messages.length]);
-
-  // Live polling so two real users see new messages without refreshing.
   useEffect(() => {
     const timer = setInterval(() => void fetchMessages({ silent: true }), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
@@ -755,12 +561,6 @@ function ChatWindow({
     scrollToBottom(true);
   }, [messages.length, scrollToBottom]);
 
-  /**
-   * Mark this conversation read as soon as it opens.
-   *
-   * This is what clears the red badge on the conversation row, the Direct Chats
-   * sub-tab and the Chats nav item — all from one optimistic write.
-   */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -768,7 +568,7 @@ function ChatWindow({
         await api.markConversationRead(partner.id);
         if (!cancelled) void refreshNotifications();
       } catch {
-        // Non-fatal: the thread still renders.
+        /* non-fatal */
       }
     })();
     return () => {
@@ -781,8 +581,6 @@ function ChatWindow({
     const media = overrideMedia ?? mediaUrl;
     if ((!content && !media) || sending) return;
 
-    // Optimistic: the bubble appears the instant you hit send (0ms), then we
-    // reconcile with the server's copy once the request resolves.
     const optimisticId = `optimistic_${Date.now()}`;
     const optimistic: Message = {
       id: optimisticId,
@@ -791,9 +589,7 @@ function ChatWindow({
       content,
       mediaUrl: media,
       replyToId: replyTo?.id ?? null,
-      replyTo: replyTo
-        ? { id: replyTo.id, content: replyTo.content, senderId: replyTo.senderId }
-        : null,
+      replyTo: replyTo ? { id: replyTo.id, content: replyTo.content, senderId: replyTo.senderId } : null,
       reactions: [],
       isRead: false,
       createdAt: new Date().toISOString(),
@@ -817,7 +613,6 @@ function ChatWindow({
       seenIds.current.add(message.id);
       onChanged();
     } catch (error) {
-      // Roll the bubble back so the UI never shows a message that failed.
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setDraft(content);
       apiError(error);
@@ -826,7 +621,6 @@ function ChatWindow({
     }
   }
 
-  /** Stop recording, upload the clip, and send it as a voice note. */
   async function finishVoiceNote() {
     const blob = await voice.stop();
     if (!blob) return;
@@ -837,8 +631,6 @@ function ChatWindow({
       const result = await uploadMedia(file, { compress: false });
       await send(result.secureUrl);
     } catch {
-      // Fall back to a local blob URL so the note still sends on dev setups
-      // without Cloudinary configured.
       const localUrl = URL.createObjectURL(blob);
       await send(localUrl);
     }
@@ -865,48 +657,37 @@ function ChatWindow({
     }
   }
 
-  function copy(text: string) {
-    navigator.clipboard?.writeText(text).catch(() => undefined);
-    toast("Copied to clipboard", "success");
-    setReactFor(null);
-  }
-
   return (
-    <section className="flex h-[calc(100dvh-13rem)] min-w-0 flex-col overflow-hidden rounded-3xl border border-zinc-800/80 bg-[#121317] lg:h-[38rem]">
-      <header className="flex items-center gap-3 border-b border-zinc-800/80 px-3 py-3 sm:px-4">
+    <section className="flex h-full min-h-0 flex-col bg-black">
+      <header className="flex h-[60px] items-center gap-3 border-b border-zinc-800/80 px-4">
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to conversations"
-          className="grid h-9 w-9 place-items-center rounded-full border border-zinc-800 text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100 lg:hidden"
+          className="text-zinc-300 transition hover:text-white md:hidden"
         >
-          <ArrowLeft size={17} />
+          <ArrowLeft size={20} strokeWidth={1.75} />
         </button>
         <button
           type="button"
           onClick={() => onOpenProfile(partner.id)}
+          className="shrink-0 rounded-full"
           aria-label={`Open ${partner.displayName}'s profile`}
-          className="shrink-0 rounded-full transition hover:brightness-110"
         >
-          <Avatar user={partner} size={40} />
+          <Avatar user={partner} size={40} online />
         </button>
         <div className="min-w-0 flex-1">
           <button
             type="button"
             onClick={() => onOpenProfile(partner.id)}
-            className="block max-w-full truncate text-left text-sm font-bold text-zinc-100 transition hover:text-[var(--accent-2)]"
+            className="block max-w-full truncate text-left text-sm font-semibold text-white"
           >
             {partner.displayName}
           </button>
-          <p className="truncate text-[11px] text-zinc-500">
+          <p className="truncate text-xs text-zinc-500">
             @{partner.username}
-            {streak > 1 ? (
-              <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 font-bold text-orange-300">
-                🔥 {streak} day streak
-              </span>
-            ) : null}
             {partnerTyping ? (
-              <span className="ml-1 inline-flex items-center gap-1 text-[var(--accent-2)]">
+              <span className="ml-1 inline-flex items-center gap-1 text-[#4f46e5]">
                 · typing <TypingDots />
               </span>
             ) : null}
@@ -914,76 +695,22 @@ function ChatWindow({
         </div>
         <button
           type="button"
-          aria-label="Voice call"
-          onClick={() => toast("Voice calls arrive in Step 3 📞", "default")}
-          className="grid h-9 w-9 place-items-center rounded-full border border-zinc-800 text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100"
+          aria-label="Conversation info"
+          onClick={() => onOpenProfile(partner.id)}
+          className="text-zinc-400 transition hover:text-white"
         >
-          <Phone size={16} />
+          <Info size={20} strokeWidth={1.75} />
         </button>
-        <button
-          type="button"
-          aria-label="Video call"
-          onClick={() => toast("Video calls arrive in Step 3 🎥", "default")}
-          className="grid h-9 w-9 place-items-center rounded-full border border-zinc-800 text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100"
-        >
-          <Video size={16} />
-        </button>
-        <div className="relative">
-          <button
-            type="button"
-            aria-label="Safety menu"
-            onClick={() => setSafetyOpen((v) => !v)}
-            className="grid h-9 w-9 place-items-center rounded-full border border-zinc-800 text-zinc-300 transition hover:border-emerald-500/60 hover:text-emerald-300"
-          >
-            <Shield size={16} />
-          </button>
-          {safetyOpen ? (
-            <>
-              <button
-                type="button"
-                aria-label="Close safety menu"
-                onClick={() => setSafetyOpen(false)}
-                className="fixed inset-0 z-10 cursor-default"
-              />
-              <div className="cliq-pop absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#121317]/98 py-1 shadow-2xl backdrop-blur-xl">
-                {[
-                  { label: "Block User", run: () => toast("Blocking arrives in Step 3 🛡️", "default") },
-                  { label: "Report", run: () => toast("Report sent to the safety team 🛡️", "danger") },
-                  {
-                    label: "Clear Chat",
-                    run: () => {
-                      setMessages([]);
-                      toast("Chat cleared locally", "default");
-                    },
-                  },
-                ].map(({ label, run }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => {
-                      run();
-                      setSafetyOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-semibold text-zinc-300 transition hover:bg-zinc-800/70 hover:text-zinc-100"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : null}
-        </div>
       </header>
 
-      <div data-testid="message-feed" ref={feedRef} className="cliq-scroll flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:px-4">
+      <div data-testid="message-feed" ref={feedRef} className="cliq-scroll flex-1 space-y-2 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-xs text-zinc-500">
             <Spinner /> <span className="ml-2">Loading messages...</span>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <span className="text-3xl">👋</span>
-            <p className="text-xs text-zinc-400">
+            <p className="text-sm text-zinc-500">
               Say hi to {partner.displayName.split(" ")[0]} — this is the start of your chat.
             </p>
           </div>
@@ -998,7 +725,6 @@ function ChatWindow({
               reactFor={reactFor}
               onPickReaction={(emoji) => void react(msg.id, emoji)}
               onUnsend={() => void unsend(msg.id)}
-              onCopy={copy}
               toxicFilter={settings.toxicFilter}
             />
           ))
@@ -1006,111 +732,74 @@ function ChatWindow({
         {partnerTyping ? (
           <div className="flex items-center gap-2">
             <Avatar user={partner} size={26} />
-            <span className="rounded-2xl border border-zinc-800/80 bg-zinc-950/70 px-3 py-2 text-zinc-400">
+            <span className="rounded-[20px] bg-[#18181b] px-4 py-2.5 text-zinc-400">
               <TypingDots />
             </span>
           </div>
         ) : null}
       </div>
 
-      {/* reply preview banner */}
       {replyTo ? (
-        <div className="flex items-center gap-2 border-t border-zinc-800/80 bg-zinc-950/60 px-4 py-2">
-          <CornerUpLeft size={14} className="shrink-0 text-[var(--accent-2)]" />
+        <div className="flex items-center gap-2 border-t border-zinc-800/80 px-4 py-2">
+          <CornerUpLeft size={14} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold text-[var(--accent-2)]">
+            <p className="text-[10px] font-semibold text-zinc-400">
               Replying to {replyTo.fromMe ? "yourself" : `@${partner.username}`}
             </p>
-            <p className="truncate text-[11px] text-zinc-400">{replyTo.content || "📷 Photo"}</p>
+            <p className="truncate text-xs text-zinc-500">{replyTo.content || "Photo"}</p>
           </div>
-          <button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply" className="text-zinc-500 hover:text-zinc-200">
+          <button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply" className="text-zinc-500 hover:text-white">
             <X size={14} />
           </button>
         </div>
       ) : null}
 
-      {/* media preview */}
       {mediaUrl ? (
-        <div className="flex items-center gap-2 border-t border-zinc-800/80 bg-zinc-950/60 px-4 py-2">
-          <ImageIcon size={14} className="shrink-0 text-[var(--accent-2)]" />
+        <div className="flex items-center gap-2 border-t border-zinc-800/80 px-4 py-2">
+          <ImageIcon size={14} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold text-[var(--accent-2)]">Image attached</p>
-            <p className="truncate text-[11px] text-zinc-400">{mediaUrl.slice(0, 60)}</p>
+            <p className="text-[10px] font-semibold text-zinc-400">Image attached</p>
+            <p className="truncate text-xs text-zinc-500">{mediaUrl.slice(0, 60)}</p>
           </div>
-          <button type="button" onClick={() => setMediaUrl(null)} aria-label="Remove image" className="text-zinc-500 hover:text-zinc-200">
+          <button type="button" onClick={() => setMediaUrl(null)} aria-label="Remove image" className="text-zinc-500 hover:text-white">
             <X size={14} />
           </button>
         </div>
       ) : null}
 
-      {showEmoji ? (
-        <div className="flex flex-wrap gap-1 border-t border-zinc-800/80 px-4 py-2.5">
-          {EMOJI_QUICKBAR.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => setDraft((d) => d + emoji)}
-              className="grid h-8 w-8 place-items-center rounded-lg text-lg transition hover:bg-zinc-800"
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <footer className="flex items-center gap-1.5 border-t border-zinc-800/80 px-3 py-3">
+      <footer className="p-4">
         {voice.recording ? (
-          <>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               aria-label="Cancel voice note"
               onClick={() => voice.cancel()}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:text-rose-300"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:text-[#ff3040]"
             >
-              <Trash2 size={18} />
+              <Trash2 size={18} strokeWidth={1.75} />
             </button>
-            <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-rose-500/40 bg-rose-500/5 px-4">
-              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500" />
+            <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full border border-[#ff3040]/40 bg-[#ff3040]/5 px-4">
+              <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[#ff3040]" />
               <span className="text-sm font-semibold tabular-nums text-zinc-200">{formatDuration(voice.seconds)}</span>
               <span className="ml-1 flex flex-1 items-end gap-0.5 overflow-hidden">
                 {Array.from({ length: 24 }).map((_, i) => (
-                  <span
-                    key={i}
-                    className="w-1 rounded-full bg-rose-400/70"
-                    style={{ height: `${6 + ((i * 7) % 16)}px` }}
-                  />
+                  <span key={i} className="w-1 rounded-full bg-[#ff3040]/60" style={{ height: `${6 + ((i * 7) % 16)}px` }} />
                 ))}
               </span>
-              <span className="hidden text-[10px] text-zinc-500 sm:inline">Recording…</span>
             </div>
             <button
               type="button"
               aria-label="Send voice note"
               onClick={() => void finishVoiceNote()}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 active:scale-90"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#4f46e5] text-white transition hover:bg-[#6366f1] active:scale-90"
             >
-              <Send size={17} />
+              <Send size={17} strokeWidth={1.75} />
             </button>
-          </>
+          </div>
         ) : (
-          <>
-            <button
-              type="button"
-              aria-label="Emoji"
-              onClick={() => setShowEmoji((v) => !v)}
-              className={cx(
-                "grid h-9 w-9 place-items-center rounded-full transition",
-                showEmoji ? "text-indigo-300" : "text-zinc-400 hover:text-zinc-100",
-              )}
-            >
-              <Smile size={19} />
-            </button>
-            <label
-              className="grid h-9 w-9 cursor-pointer place-items-center rounded-full text-zinc-400 transition hover:text-zinc-100"
-              title="Attach an image URL or upload"
-              aria-label="Attach media"
-            >
-              <ImageIcon size={19} />
+          <div className="flex items-center gap-3 rounded-full border border-zinc-700 bg-black px-4 py-2.5">
+            <label className="cursor-pointer text-zinc-400 transition hover:text-white" aria-label="Attach media">
+              <ImageIcon size={20} strokeWidth={1.75} />
               <input
                 type="file"
                 accept="image/*"
@@ -1119,7 +808,7 @@ function ChatWindow({
                   const file = e.target.files?.[0];
                   if (!file) return;
                   if (file.size > 4.5 * 1024 * 1024) {
-                    toast("Keep images under 4.5MB, or paste a URL instead.", "danger");
+                    toast("Keep images under 4.5MB.", "danger");
                     return;
                   }
                   const reader = new FileReader();
@@ -1137,7 +826,7 @@ function ChatWindow({
                 if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|avif)(\?\S*)?$/i.test(text.trim())) {
                   e.preventDefault();
                   setMediaUrl(text.trim());
-                  toast("Image URL attached 🖼️", "success");
+                  toast("Image attached", "success");
                 }
               }}
               onKeyDown={(e) => {
@@ -1146,31 +835,30 @@ function ChatWindow({
                   void send();
                 }
               }}
-              placeholder={`Message ${partner.displayName.split(" ")[0]}...`}
-              className="h-10 min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/70 px-4 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+              placeholder="Message..."
+              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
             />
+            <button
+              type="button"
+              aria-label="Record voice note"
+              data-testid="voice-record"
+              onClick={() => void voice.start()}
+              className="text-zinc-400 transition hover:text-white"
+            >
+              <Mic size={20} strokeWidth={1.75} />
+            </button>
             {draft.trim() || mediaUrl ? (
               <button
                 type="button"
                 aria-label="Send message"
                 onClick={() => void send()}
                 disabled={sending}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 active:scale-90 disabled:opacity-40"
+                className="text-sm font-semibold text-[#4f46e5] transition hover:text-white disabled:opacity-40"
               >
-                {sending ? <Spinner /> : <Send size={17} />}
+                {sending ? <Spinner className="h-4 w-4" /> : "Send"}
               </button>
-            ) : (
-              <button
-                type="button"
-                aria-label="Record voice note"
-                data-testid="voice-record"
-                onClick={() => void voice.start()}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 active:scale-90"
-              >
-                <Mic size={18} />
-              </button>
-            )}
-          </>
+            ) : null}
+          </div>
         )}
       </footer>
     </section>
@@ -1185,7 +873,6 @@ function MessageBubble({
   reactFor,
   onPickReaction,
   onUnsend,
-  onCopy,
   toxicFilter,
 }: {
   message: Message;
@@ -1195,36 +882,26 @@ function MessageBubble({
   reactFor: string | null;
   onPickReaction: (emoji: string) => void;
   onUnsend: () => void;
-  onCopy: (text: string) => void;
   toxicFilter: boolean;
 }) {
   const mine = message.fromMe;
   const open = reactFor === message.id;
+  void toxicFilter;
 
   return (
-    <div className={cx("flex flex-col", mine ? "items-end" : "items-start")}>
-      <div className="relative max-w-[85%] sm:max-w-[78%]">
-        {/* quoted reply */}
+    <div className={cx("group flex flex-col", mine ? "items-end" : "items-start")}>
+      <div className="relative max-w-[70%]">
         {message.replyTo ? (
-          <div
-            className={cx(
-              "mb-1 rounded-xl border-l-2 bg-zinc-950/50 px-2.5 py-1.5 text-[11px]",
-              mine ? "border-[var(--accent-2)]" : "border-[var(--accent)]",
-            )}
-          >
-            <p className="font-bold text-[var(--accent-2)]">
-              {message.replyTo.senderId === partner.id ? `@${partner.username}` : "You"}
-            </p>
-            <p className="truncate text-zinc-400">{message.replyTo.content || "📷 Photo"}</p>
+          <div className={cx("mb-1 border-l-2 pl-2.5 text-xs text-zinc-400", mine ? "border-zinc-500" : "border-zinc-500")}>
+            <p className="font-semibold">{message.replyTo.senderId === partner.id ? `@${partner.username}` : "You"}</p>
+            <p className="truncate">{message.replyTo.content || "Photo"}</p>
           </div>
         ) : null}
 
         <div
           className={cx(
-            "rounded-2xl px-3.5 py-2 text-sm shadow-sm",
-            mine
-              ? "bg-indigo-600 text-white"
-              : "border border-zinc-800/80 bg-zinc-950/70 text-zinc-100",
+            "rounded-[20px] px-4 py-2.5 text-[15px]",
+            mine ? "bg-[#4f46e5] text-white" : "bg-[#18181b] text-[#f5f5f5]",
           )}
         >
           {message.mediaUrl ? (
@@ -1232,38 +909,28 @@ function MessageBubble({
               <VoiceNote url={message.mediaUrl} mine={mine} />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={message.mediaUrl}
-                alt="Shared media"
-                className="mb-1.5 max-h-64 w-full rounded-xl object-cover"
-              />
+              <img src={message.mediaUrl} alt="Shared media" className="mb-1.5 max-h-64 w-full rounded-xl object-cover" />
             )
           ) : null}
-          {message.content ? (
-            <p className="whitespace-pre-wrap break-words">{toxicFilter ? message.content : message.content}</p>
-          ) : null}
+          {message.content ? <p className="whitespace-pre-wrap break-words">{message.content}</p> : null}
         </div>
 
-        {/* reaction chips */}
         {message.reactions.length > 0 ? (
           <div className={cx("mt-1 flex flex-wrap gap-1", mine ? "justify-end" : "justify-start")}>
             {message.reactions.map((r) => (
               <span
                 key={r.emoji}
                 className={cx(
-                  "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold",
-                  r.mine
-                    ? "border-[var(--accent)] bg-[var(--accent-soft)] text-zinc-100"
-                    : "border-zinc-800 bg-zinc-900 text-zinc-300",
+                  "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                  r.mine ? "bg-[#ff3040]/15 text-[#ff3040]" : "bg-[#18181b] text-zinc-300",
                 )}
               >
-                {r.emoji} {r.count}
+                <span className={cx(r.mine && "text-[#ff3040]")}>{r.emoji}</span> {r.count}
               </span>
             ))}
           </div>
         ) : null}
 
-        {/* action popover */}
         {open ? (
           <>
             <button
@@ -1274,11 +941,11 @@ function MessageBubble({
             />
             <div
               className={cx(
-                "cliq-pop absolute z-20 w-max rounded-2xl border border-zinc-800/80 bg-[#121317]/98 p-1 shadow-2xl backdrop-blur-xl",
+                "cliq-pop absolute z-20 w-max rounded-xl border border-zinc-800/80 bg-[#121317] p-1 shadow-2xl",
                 mine ? "right-0 top-full mt-1" : "left-0 top-full mt-1",
               )}
             >
-              <div className="flex gap-0.5 border-b border-zinc-800/70 pb-1">
+              <div className="flex gap-0.5 border-b border-zinc-800/80 pb-1">
                 {MESSAGE_REACTIONS.map((emoji) => (
                   <button
                     key={emoji}
@@ -1294,26 +961,17 @@ function MessageBubble({
                 <button
                   type="button"
                   onClick={onReply}
-                  className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-semibold text-zinc-300 hover:bg-zinc-800"
+                  className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
                 >
-                  <CornerUpLeft size={12} /> Reply
+                  <CornerUpLeft size={13} strokeWidth={1.75} /> Reply
                 </button>
-                {message.content ? (
-                  <button
-                    type="button"
-                    onClick={() => onCopy(message.content)}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-semibold text-zinc-300 hover:bg-zinc-800"
-                  >
-                    <Copy size={12} /> Copy text
-                  </button>
-                ) : null}
                 {mine ? (
                   <button
                     type="button"
                     onClick={onUnsend}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[11px] font-semibold text-rose-300 hover:bg-zinc-800"
+                    className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-left text-xs font-semibold text-[#ff3040] hover:bg-zinc-800"
                   >
-                    <Trash2 size={12} /> Unsend
+                    <Trash2 size={13} strokeWidth={1.75} /> Unsend
                   </button>
                 ) : null}
               </div>
@@ -1322,16 +980,11 @@ function MessageBubble({
         ) : null}
       </div>
 
-      {/* meta row: timestamp + delivery state */}
       <div className={cx("mt-0.5 flex items-center gap-1 px-1 text-[10px] text-zinc-600", mine && "flex-row-reverse")}>
-        <span>
-          {mine ? "You · " : ""}
-          {clockTime(message.createdAt)}
-        </span>
+        <span>{clockTime(message.createdAt)}</span>
         {mine ? (
-          <span className={cx("inline-flex items-center gap-0.5", message.isRead ? "text-[var(--accent-2)]" : "")}>
-            {message.isRead ? <CheckCheck size={11} /> : <Check size={11} />}
-            {message.isRead ? "Seen" : "Sent"}
+          <span className={cx("inline-flex items-center gap-0.5", message.isRead ? "text-[#4f46e5]" : "")}>
+            {message.isRead ? <CheckCheck size={11} strokeWidth={1.75} /> : <Check size={11} strokeWidth={1.75} />}
           </span>
         ) : null}
       </div>
@@ -1341,7 +994,7 @@ function MessageBubble({
           type="button"
           onClick={() => onReact(message.id)}
           aria-label="Message actions"
-          className="mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold text-zinc-500 opacity-0 transition hover:text-zinc-200 focus:opacity-100 group-hover:opacity-100 lg:opacity-0"
+          className="mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold text-zinc-600 opacity-0 transition hover:text-zinc-300 group-hover:opacity-100 focus:opacity-100"
         >
           React · Reply
         </button>
@@ -1381,7 +1034,7 @@ function VoiceNote({ url, mine }: { url: string; mine: boolean }) {
         aria-label={playing ? "Pause voice note" : "Play voice note"}
         className={cx(
           "grid h-8 w-8 shrink-0 place-items-center rounded-full transition active:scale-90",
-          mine ? "bg-white/25 text-white" : "bg-indigo-600 text-white",
+          mine ? "bg-white/25 text-white" : "bg-[#4f46e5] text-white",
         )}
       >
         {playing ? <Pause size={14} className="fill-current" /> : <Play size={14} className="ml-0.5 fill-current" />}
@@ -1395,7 +1048,7 @@ function VoiceNote({ url, mine }: { url: string; mine: boolean }) {
               key={i}
               className={cx(
                 "w-[3px] rounded-full transition-colors",
-                active ? (mine ? "bg-white" : "bg-indigo-400") : mine ? "bg-white/40" : "bg-zinc-600",
+                active ? (mine ? "bg-white" : "bg-[#4f46e5]") : mine ? "bg-white/40" : "bg-zinc-600",
               )}
               style={{ height }}
             />
@@ -1423,4 +1076,3 @@ function VoiceNote({ url, mine }: { url: string; mine: boolean }) {
     </div>
   );
 }
-

@@ -179,5 +179,10 @@ export function usePostActions() {
     [apiError],
   );
 
-  return { react, votePoll, remove, comment, feedKey };
+  /** Replace a post everywhere it is cached (used after edit / pin). */
+  const replacePost = useCallback(async (post: Post) => {
+    await patchPostEverywhere(post.id, () => post);
+  }, []);
+
+  return { react, votePoll, remove, comment, replacePost, feedKey };
 }

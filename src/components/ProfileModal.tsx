@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import useSWR from "swr";
-import { BadgeCheck, MessageSquare, UserPlus, Check } from "lucide-react";
+import { Heart, MessageCircle, Send } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { api, swrFetcher } from "@/lib/api-client";
 import { Avatar, Modal, Spinner } from "@/components/ui/Primitives";
-import { PostCardMini } from "@/components/tabs/PostCardMini";
 import type { Post, ProfileStats, PublicUser } from "@/types/cliq";
-import { cx, timeAgo } from "@/lib/utils";
+import { cx, formatCount, meshGradient } from "@/lib/utils";
 
 /**
  * Read-only public profile for any user, opened by tapping an avatar or
@@ -23,8 +22,7 @@ export function ProfileModal({
   onClose: () => void;
   onMessage?: (user: PublicUser) => void;
 }) {
-  const { user: me, toast, apiError } = useCliq();
-  const [requested, setRequested] = useState(false);
+  const { user: me, toast, apiError, followingIds, toggleFollow } = useCliq();
   const [busy, setBusy] = useState(false);
 
   const { data, isLoading } = useSWR<{ user: PublicUser; stats: ProfileStats }>(
@@ -33,25 +31,29 @@ export function ProfileModal({
     { revalidateOnFocus: false },
   );
 
-  const { data: feed } = useSWR<{ posts: Post[] }>(
-    userId ? [`/api/posts?type=photo`, undefined] : null,
-    swrFetcher,
-    { revalidateOnFocus: false },
-  );
+  const { data: videoFeed } = useSWR<{ posts: Post[] }>(userId ? [`/api/posts?type=video`, undefined] : null, swrFetcher, {
+    revalidateOnFocus: false,
+  });
+  const { data: photoFeed } = useSWR<{ posts: Post[] }>(userId ? [`/api/posts?type=photo`, undefined] : null, swrFetcher, {
+    revalidateOnFocus: false,
+  });
 
   const profile = data?.user;
   const stats = data?.stats;
   const isMe = profile?.id === me?.id;
+  const following = profile ? followingIds.includes(profile.id) : false;
 
-  const theirPosts = (feed?.posts ?? []).filter((p) => p.userId === userId).slice(0, 4);
+  const theirMedia = [...(videoFeed?.posts ?? []), ...(photoFeed?.posts ?? [])]
+    .filter((p) => p.userId === userId)
+    .slice(0, 9);
 
-  async function cliqUp() {
+  async function follow() {
     if (!profile || busy) return;
     setBusy(true);
     try {
       await api.requestFriend(profile.id);
-      setRequested(true);
-      toast(`Cliq Up sent to @${profile.username} ⚡`, "success");
+      toast(`Follow request sent to @${profile.username}`, "success");
+      void toggleFollow(profile.id);
     } catch (error) {
       apiError(error);
     } finally {
@@ -60,13 +62,7 @@ export function ProfileModal({
   }
 
   return (
-    <Modal
-      open={Boolean(userId)}
-      onClose={onClose}
-      title={profile ? profile.displayName : "Profile"}
-      subtitle={profile ? `@${profile.username}` : undefined}
-      maxWidth="max-w-lg"
-    >
+    <Modal open={Boolean(userId)} onClose={onClose} title={profile ? profile.username : "Profile"} maxWidth="max-w-lg">
       {isLoading && !profile ? (
         <div className="flex items-center justify-center py-12 text-zinc-500">
           <Spinner /> <span className="ml-2 text-xs">Loading profile...</span>
@@ -75,46 +71,41 @@ export function ProfileModal({
         <p className="py-10 text-center text-sm text-zinc-500">That profile is unavailable.</p>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-start gap-4">
-            <Avatar user={profile} size={72} ring />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <p className="truncate text-base font-bold text-zinc-50">{profile.displayName}</p>
-                <BadgeCheck size={16} className="text-[var(--accent-2)]" />
-              </div>
-              <p className="truncate text-xs text-zinc-500">
-                @{profile.username}
-                {profile.age ? ` · ${profile.age}` : ""}
-              </p>
-              <p className="mt-0.5 text-[11px] text-zinc-600">Joined {timeAgo(profile.createdAt)}</p>
+          <div className="h-24 w-full overflow-hidden rounded-lg">
+            {profile.bannerUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.bannerUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full" style={{ backgroundImage: meshGradient(profile.username || profile.id) }} />
+            )}
+          </div>
+
+          <div className="-mt-12 flex items-end gap-4 px-1">
+            <span className="rounded-full ring-4 ring-[#121317]">
+              <Avatar user={profile} size={80} />
+            </span>
+            <div className="min-w-0 flex-1 pb-1">
+              <p className="truncate text-base font-semibold text-white">{profile.username}</p>
+              <p className="truncate text-xs text-zinc-500">{profile.displayName}</p>
             </div>
           </div>
 
-          {profile.bio ? <p className="text-sm leading-relaxed text-zinc-300">{profile.bio}</p> : null}
+          {profile.bio ? <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-300">{profile.bio}</p> : null}
 
           {profile.interests.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {profile.interests.map((interest) => (
-                <span
-                  key={interest}
-                  className="rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent-2)]"
-                >
-                  #{interest}
-                </span>
-              ))}
-            </div>
+            <p className="text-xs text-zinc-400">{profile.interests.map((i) => `#${i}`).join("  ")}</p>
           ) : null}
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
             {[
-              { label: "Posts", value: stats ? `${stats.posts}` : "—" },
-              { label: "Cliq Friends", value: stats ? `${stats.friends}` : "—" },
-              { label: "Following", value: stats ? `${stats.following}` : "—" },
+              { label: "posts", value: stats ? `${stats.posts}` : "0" },
+              { label: "followers", value: stats ? `${stats.friends}` : "0" },
+              { label: "following", value: stats ? `${stats.following}` : "0" },
             ].map(({ label, value }) => (
-              <div key={label} className="rounded-2xl border border-zinc-800/70 bg-zinc-950/50 px-2 py-2.5 text-center">
-                <p className="text-base font-black text-zinc-50">{value}</p>
-                <p className="text-[10px] text-zinc-500">{label}</p>
-              </div>
+              <span key={label} className="inline-flex items-center gap-1">
+                <span className="font-semibold text-white">{value}</span>
+                <span className="text-zinc-400">{label}</span>
+              </span>
             ))}
           </div>
 
@@ -122,26 +113,14 @@ export function ProfileModal({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => void cliqUp()}
-                disabled={busy || requested}
+                onClick={() => void follow()}
+                disabled={busy || following}
                 className={cx(
-                  "inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-xs font-bold transition disabled:opacity-70",
-                  requested
-                    ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                    : "bg-indigo-600 text-white hover:bg-indigo-500",
+                  "flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition disabled:opacity-70",
+                  following ? "bg-[#18181b] text-zinc-400" : "bg-[#4f46e5] text-white hover:bg-[#6366f1]",
                 )}
               >
-                {requested ? (
-                  <>
-                    <Check size={13} /> Cliq Up Sent
-                  </>
-                ) : busy ? (
-                  <Spinner />
-                ) : (
-                  <>
-                    <UserPlus size={13} /> Cliq Up ⚡
-                  </>
-                )}
+                {busy ? <Spinner className="h-4 w-4" /> : following ? "Following" : "Follow"}
               </button>
               {onMessage ? (
                 <button
@@ -150,27 +129,37 @@ export function ProfileModal({
                     onMessage(profile);
                     onClose();
                   }}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 px-3 py-2.5 text-xs font-bold text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100"
+                  className="flex-1 rounded-lg bg-[#18181b] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#27272a]"
                 >
-                  <MessageSquare size={13} /> Message
+                  Message
                 </button>
               ) : null}
             </div>
           ) : null}
 
-          {theirPosts.length > 0 ? (
-            <div>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-zinc-500">Recent posts</p>
-              <div className="grid grid-cols-2 gap-2">
-                {theirPosts.map((post) => (
-                  <PostCardMini key={post.id} post={post} viewerId={me?.id ?? ""} />
-                ))}
-              </div>
+          {theirMedia.length > 0 ? (
+            <div className="grid grid-cols-3 gap-1">
+              {theirMedia.map((post) => (
+                <div key={post.id} className="relative aspect-square overflow-hidden bg-[#121317]">
+                  {post.mediaUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={post.mediaUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="grid h-full w-full place-items-center text-zinc-700">
+                      <Send size={18} strokeWidth={1.5} />
+                    </span>
+                  )}
+                  <span className="absolute bottom-1 left-1 flex items-center gap-1 text-[10px] font-semibold text-white">
+                    <Heart size={11} className="fill-current" /> {formatCount(post.likesCount)}
+                  </span>
+                  <span className="absolute bottom-1 right-1 flex items-center gap-1 text-[10px] font-semibold text-white">
+                    <MessageCircle size={11} strokeWidth={1.75} /> {formatCount(post.commentCount)}
+                  </span>
+                </div>
+              ))}
             </div>
           ) : (
-            <p className="rounded-2xl border border-dashed border-zinc-800 px-4 py-6 text-center text-xs text-zinc-500">
-              No posts yet.
-            </p>
+            <p className="py-6 text-center text-xs text-zinc-500">No posts yet.</p>
           )}
         </div>
       )}

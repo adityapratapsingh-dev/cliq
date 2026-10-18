@@ -1,13 +1,19 @@
 import type { AccentKey, MessageScope, PostType, ReactionType } from "@/types/cliq";
 
+/**
+ * Topic flairs for chat posts.
+ *
+ * Labels are preserved from the original schema (posts store the flair string),
+ * but the UI renders them as subtle monochrome pills — no colour emoji chrome.
+ */
 export const FLAIRS: { label: string; color: string }[] = [
-  { label: "#AskCliq", color: "#6366f1" },
-  { label: "#SchoolLife", color: "#38bdf8" },
-  { label: "#Gaming", color: "#22c55e" },
-  { label: "#Music", color: "#f472b6" },
-  { label: "#Memes", color: "#f59e0b" },
-  { label: "#Coding", color: "#8b5cf6" },
-  { label: "#LateNightThoughts", color: "#a78bfa" },
+  { label: "#AskCliq", color: "#a8a8a8" },
+  { label: "#SchoolLife", color: "#a8a8a8" },
+  { label: "#Gaming", color: "#a8a8a8" },
+  { label: "#Music", color: "#a8a8a8" },
+  { label: "#Memes", color: "#a8a8a8" },
+  { label: "#Coding", color: "#a8a8a8" },
+  { label: "#LateNightThoughts", color: "#a8a8a8" },
 ];
 
 export const INTEREST_OPTIONS = [
@@ -23,9 +29,13 @@ export const INTEREST_OPTIONS = [
 
 export const INTEREST_FILTERS = ["All Vibes", ...INTEREST_OPTIONS];
 
-export const MESSAGE_REACTIONS = ["❤️", "🔥", "😂", "⚡", "👍", "👎"];
-
-export const EMOJI_QUICKBAR = ["😂", "🔥", "❤️", "⚡", "👍", "🎧", "🎮", "✨"];
+/**
+ * Direct-message reactions.
+ *
+ * The API stores a short emoji key per reaction; the UI renders a heart glyph so
+ * the message chrome stays emoji-free.
+ */
+export const MESSAGE_REACTIONS = ["❤️"];
 
 export const ACCENT_KEYS: AccentKey[] = ["violet", "cyan", "rose", "emerald"];
 
@@ -35,15 +45,16 @@ export const MESSAGE_SCOPES: { key: MessageScope; label: string }[] = [
   { key: "friends", label: "Cliq Friends Only" },
 ];
 
+/** Flair chips use a single neutral tone — no per-topic rainbow. */
 export function flairColor(label: string | null | undefined): string {
-  if (!label) return "#8b5cf6";
-  return FLAIRS.find((f) => f.label === label)?.color ?? "#8b5cf6";
+  void label;
+  return "#a1a1aa";
 }
 
 export function postTypeLabel(type: PostType): string {
   if (type === "video") return "Video";
   if (type === "photo") return "Photo";
-  return "Chat Post";
+  return "Post";
 }
 
 export const POST_TYPES: PostType[] = ["video", "photo", "chat"];

@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -36,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-[#09090b] antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-black antialiased`}>
         <Providers>
           <CliqProvider>{children}</CliqProvider>
         </Providers>

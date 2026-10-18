@@ -1,26 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
-  BadgeCheck,
+  ArrowLeft,
   Bell,
   Bookmark,
+  Check,
   Database,
   Film,
   Heart,
   Image as ImageIcon,
   LogOut,
+  MessageCircle,
   MessageSquare,
   Palette,
-  Pencil,
   Play,
   Settings as SettingsIcon,
   Shield,
-  Sparkles,
   UploadCloud,
   User,
-  X,
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { api } from "@/lib/api-client";
@@ -32,46 +31,34 @@ import {
 import { Avatar, EmptyState, Modal, SectionCard, Toggle } from "@/components/ui/Primitives";
 import { ACCENT_LIST } from "@/lib/theme";
 import { INTEREST_OPTIONS, MESSAGE_SCOPES } from "@/lib/constants";
-import { PostCardMini } from "@/components/tabs/PostCardMini";
 import { UserListModal } from "@/components/UserListModal";
 import { useFeed, useStats } from "@/components/tabs/useFeed";
-import type { AccentKey, Post, SessionUser, UserBadges } from "@/types/cliq";
+import { usePostActions } from "@/components/tabs/usePostActions";
+import type { AccentKey, Post, SessionUser } from "@/types/cliq";
 import { cx, formatCount, meshGradient } from "@/lib/utils";
 
 export function ProfileTab() {
   const { user, apiError, fallbackMode, dbError, savedIds, settingsOpen, closeSettings, openSettings } = useCliq();
   const [editOpen, setEditOpen] = useState(false);
-  const [profileTab, setProfileTab] = useState<"posts" | "videos" | "photos" | "saved">("posts");
-  const [listModal, setListModal] = useState<"friends" | "following" | null>(null);
-  const [connections, setConnections] = useState<{ friends: string[]; following: string[] }>({
-    friends: [],
+  const [profileTab, setProfileTab] = useState<"posts" | "photos" | "videos" | "saved">("posts");
+  const [listModal, setListModal] = useState<"followers" | "following" | null>(null);
+  const [connections, setConnections] = useState<{ followers: string[]; following: string[] }>({
+    followers: [],
     following: [],
   });
-  const [badges, setBadges] = useState<UserBadges | null>(null);
 
   const { posts: videoPosts } = useFeed("video");
   const { posts: photoPosts } = useFeed("photo");
   const { posts: chatPosts } = useFeed("chat");
-  // Real counters from the friendships / posts tables.
   const { data: stats } = useStats();
 
-  // Achievement badges for the profile header.
-  useEffect(() => {
-    if (!user) return;
-    void api
-      .getBadges(user.id)
-      .then(setBadges)
-      .catch(() => undefined);
-  }, [user]);
-
-  // The id lists behind the Friends / Following counters, for the modal lists.
   useEffect(() => {
     if (!user) return;
     void api
       .getFriends()
       .then((graph) =>
         setConnections({
-          friends: graph.friends.map((f) => f.id),
+          followers: graph.friends.map((f) => f.id),
           following: [...graph.friends.map((f) => f.id), ...graph.outgoing.map((o) => o.user.id)],
         }),
       )
@@ -81,14 +68,7 @@ export function ProfileTab() {
   if (!user) return null;
 
   if (settingsOpen) {
-    return (
-      <SettingsPanel
-        user={user}
-        onBack={closeSettings}
-        fallbackMode={fallbackMode}
-        dbError={dbError}
-      />
-    );
+    return <SettingsPanel user={user} onBack={closeSettings} fallbackMode={fallbackMode} dbError={dbError} />;
   }
 
   const mineVideos = videoPosts.filter((p) => p.userId === user.id);
@@ -102,28 +82,30 @@ export function ProfileTab() {
     0,
   );
 
+  const followers = stats?.friends ?? connections.followers.length;
+  const following = stats?.following ?? connections.following.length;
+
   return (
-    <div className="mx-auto w-full max-w-[620px] space-y-4 px-3 py-4 sm:px-4">
+    <div className="mx-auto w-full max-w-[935px] px-4 py-8 md:px-8">
       <ProfileHeader
         user={user}
         postCount={stats?.posts ?? allPosts.length}
+        followers={followers}
+        following={following}
         cliqScore={cliqScore}
-        friends={stats?.friends ?? connections.friends.length}
-        following={stats?.following ?? 0}
-        badges={badges}
         onEdit={() => setEditOpen(true)}
         onSettings={openSettings}
-        onOpenFriends={() => setListModal("friends")}
+        onOpenFollowers={() => setListModal("followers")}
         onOpenFollowing={() => setListModal("following")}
       />
 
-      <div className="grid grid-cols-4 gap-1 rounded-2xl border border-zinc-800/80 bg-[#121317] p-1">
+      <div className="flex justify-center gap-12 border-b border-zinc-800">
         {(
           [
-            { key: "videos", label: "Videos", icon: Film },
-            { key: "photos", label: "Photos", icon: ImageIcon },
-            { key: "posts", label: "Posts", icon: MessageSquare },
-            { key: "saved", label: "Saved", icon: Bookmark },
+            { key: "posts", label: "POSTS", icon: MessageSquare },
+            { key: "photos", label: "PHOTOS", icon: ImageIcon },
+            { key: "videos", label: "VIDEOS", icon: Film },
+            { key: "saved", label: "SAVED", icon: Bookmark },
           ] as const
         ).map(({ key, label, icon: Icon }) => (
           <button
@@ -131,34 +113,29 @@ export function ProfileTab() {
             type="button"
             onClick={() => setProfileTab(key)}
             className={cx(
-              "inline-flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition",
-              profileTab === key ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-zinc-400 hover:text-zinc-100",
+              "-mb-px inline-flex items-center gap-1.5 border-t-2 py-3.5 text-xs font-semibold uppercase tracking-widest transition",
+              profileTab === key ? "border-white text-white" : "border-transparent text-zinc-500 hover:text-zinc-300",
             )}
           >
-            <Icon size={14} /> <span className="hidden sm:inline">{label}</span>
+            <Icon size={13} strokeWidth={1.75} /> <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
       </div>
 
-      {profileTab === "videos" || profileTab === "photos" ? (
-        <MediaGrid
-          posts={profileTab === "videos" ? mineVideos : minePhotos}
-          emptyLabel={profileTab === "videos" ? "videos" : "photos"}
-        />
-      ) : (
-        <PostList
-          posts={profileTab === "posts" ? mineChats : saved}
-          viewerId={user.id}
-          emptyKind={profileTab}
-        />
-      )}
+      <div className="pt-4">
+        {profileTab === "videos" || profileTab === "photos" ? (
+          <MediaGrid posts={profileTab === "videos" ? mineVideos : minePhotos} />
+        ) : (
+          <PostList posts={profileTab === "posts" ? mineChats : saved} emptyKind={profileTab} />
+        )}
+      </div>
 
       <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} user={user} onError={apiError} />
 
       <UserListModal
         open={listModal !== null}
-        title={listModal === "friends" ? "Cliq Friends" : "Following"}
-        userIds={listModal === "following" ? connections.following : connections.friends}
+        title={listModal === "followers" ? "Followers" : "Following"}
+        userIds={listModal === "following" ? connections.following : connections.followers}
         onClose={() => setListModal(null)}
         onOpenProfile={() => setListModal(null)}
       />
@@ -166,18 +143,12 @@ export function ProfileTab() {
   );
 }
 
-/** A clean 3-column media grid used for the Videos and Photos sub-tabs. */
-function MediaGrid({ posts, emptyLabel }: { posts: Post[]; emptyLabel: string }) {
+/** A clean 3-column media grid for the Videos and Photos sub-tabs. */
+function MediaGrid({ posts }: { posts: Post[] }) {
   const [preview, setPreview] = useState<Post | null>(null);
 
   if (posts.length === 0) {
-    return (
-      <EmptyState
-        icon={<ImageIcon size={24} />}
-        title={`No ${emptyLabel} yet`}
-        hint="Anything you post on Cliq shows up here."
-      />
-    );
+    return <EmptyState icon={<ImageIcon size={26} strokeWidth={1.75} />} title="Nothing here yet" hint="Your posts show up here." />;
   }
 
   return (
@@ -188,53 +159,44 @@ function MediaGrid({ posts, emptyLabel }: { posts: Post[]; emptyLabel: string })
             key={post.id}
             type="button"
             onClick={() => setPreview(post)}
-            className="group relative aspect-[3/4] overflow-hidden rounded-lg bg-zinc-950"
+            className="group relative aspect-square overflow-hidden bg-[#121317]"
           >
             {post.mediaUrl ? (
               post.type === "video" ? (
-                <video
-                  src={post.mediaUrl}
-                  className="h-full w-full object-cover"
-                  muted
-                  loop
-                  playsInline
-                  preload="metadata"
-                />
+                <video src={post.mediaUrl} className="h-full w-full object-cover" muted loop playsInline preload="metadata" />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={post.mediaUrl} alt={post.content || "media"} className="h-full w-full object-cover" />
               )
             ) : (
-              <span className="grid h-full w-full place-items-center bg-zinc-900 text-zinc-600">
-                {post.type === "video" ? <Film size={20} /> : <ImageIcon size={20} />}
+              <span className="grid h-full w-full place-items-center text-zinc-700">
+                {post.type === "video" ? <Film size={22} strokeWidth={1.5} /> : <ImageIcon size={22} strokeWidth={1.5} />}
               </span>
             )}
 
-            {/* hover / always-on overlay with counts */}
-            <span className="absolute inset-0 flex items-center justify-center gap-3 bg-black/45 text-[11px] font-bold text-white opacity-0 transition group-hover:opacity-100">
+            <span className="absolute inset-0 flex items-center justify-center gap-3 bg-black/50 text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100">
               <span className="inline-flex items-center gap-1">
-                <Heart size={13} className="fill-current" /> {formatCount(post.likesCount)}
+                <Heart size={14} className="fill-current" /> {formatCount(post.likesCount)}
               </span>
               <span className="inline-flex items-center gap-1">
-                <MessageSquare size={13} /> {formatCount(post.commentCount)}
+                <MessageCircle size={14} strokeWidth={1.75} /> {formatCount(post.commentCount)}
               </span>
             </span>
             {post.type === "video" ? (
-              <span className="pointer-events-none absolute bottom-1.5 right-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white backdrop-blur">
-                <Play size={12} className="ml-0.5" />
+              <span className="pointer-events-none absolute right-1.5 top-1.5 text-white">
+                <Play size={14} className="fill-current" />
               </span>
             ) : null}
           </button>
         ))}
       </div>
 
-      {preview ? <PostPreviewModal post={preview} onClose={() => setPreview(null)} /> : null}
+      {preview ? <MediaModal post={preview} onClose={() => setPreview(null)} /> : null}
     </>
   );
 }
 
-/** Full-post modal opened from a media thumbnail. */
-function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }) {
+function MediaModal({ post, onClose }: { post: Post; onClose: () => void }) {
   const { user } = useCliq();
   return (
     <Modal
@@ -245,7 +207,7 @@ function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }
       maxWidth="max-w-lg"
     >
       <div className="space-y-3">
-        <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-black">
+        <div className="overflow-hidden rounded-lg border border-zinc-800/80 bg-black">
           {post.mediaUrl ? (
             post.type === "video" ? (
               <video src={post.mediaUrl} className="max-h-[60vh] w-full object-contain" controls playsInline />
@@ -260,10 +222,10 @@ function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }
         {post.content ? <p className="text-sm leading-relaxed text-zinc-200">{post.content}</p> : null}
         <div className="flex items-center gap-4 text-xs text-zinc-400">
           <span className="inline-flex items-center gap-1">
-            <Heart size={13} className="fill-rose-500 text-rose-500" /> {formatCount(post.likesCount)}
+            <Heart size={14} className="fill-[#ff3040] text-[#ff3040]" /> {formatCount(post.likesCount)}
           </span>
           <span className="inline-flex items-center gap-1">
-            <MessageSquare size={13} /> {formatCount(post.commentCount)}
+            <MessageCircle size={14} strokeWidth={1.75} /> {formatCount(post.commentCount)}
           </span>
           <span className="ml-auto text-zinc-600">@{post.author?.username ?? user?.username}</span>
         </div>
@@ -273,32 +235,53 @@ function PostPreviewModal({ post, onClose }: { post: Post; onClose: () => void }
 }
 
 /** Thread list for Chat Posts and Saved. */
-function PostList({
-  posts,
-  viewerId,
-  emptyKind,
-}: {
-  posts: Post[];
-  viewerId: string;
-  emptyKind: "posts" | "saved";
-}) {
-  if (posts.length === 0) {
+function PostList({ posts, emptyKind }: { posts: Post[]; emptyKind: "posts" | "saved" }) {
+  const { user } = useCliq();
+  const { remove } = usePostActions();
+  const [gone, setGone] = useState<string[]>([]);
+
+  const visible = posts.filter((p) => !gone.includes(p.id));
+
+  if (visible.length === 0) {
     return (
       <EmptyState
-        icon={<Sparkles size={24} />}
-        title={emptyKind === "saved" ? "Nothing saved yet" : "No chat posts yet"}
-        hint={
-          emptyKind === "saved"
-            ? "Tap the bookmark icon on any post to save it here."
-            : "Anything you post on Cliq shows up here."
-        }
+        icon={<MessageSquare size={26} strokeWidth={1.75} />}
+        title={emptyKind === "saved" ? "Nothing saved yet" : "No posts yet"}
+        hint={emptyKind === "saved" ? "Tap the bookmark icon on any post to save it." : "Your posts show up here."}
       />
     );
   }
   return (
-    <div className="grid gap-3">
-      {posts.map((post) => (
-        <PostCardMini key={post.id} post={post} viewerId={viewerId} />
+    <div className="border-t border-zinc-800">
+      {visible.map((post) => (
+        <article key={post.id} className="flex gap-3 border-b border-zinc-800/80 px-1 py-4">
+          {user ? <Avatar user={user} size={40} /> : null}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[15px] font-semibold text-white">{user?.displayName ?? "You"}</span>
+              <span className="text-sm text-zinc-500">@{user?.username ?? "you"}</span>
+            </div>
+            {post.content ? <p className="mt-1 text-[15px] leading-snug text-[#f5f5f5]">{post.content}</p> : null}
+            <div className="mt-3 flex max-w-[420px] items-center gap-5 text-xs text-zinc-500">
+              <span className="inline-flex items-center gap-1">
+                <Heart size={15} strokeWidth={1.75} /> {formatCount(post.likesCount)}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <MessageCircle size={15} strokeWidth={1.75} /> {formatCount(post.commentCount)}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setGone((prev) => [...prev, post.id]);
+                  void remove(post.id);
+                }}
+                className="ml-auto text-[#ff3040] transition hover:underline"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </article>
       ))}
     </div>
   );
@@ -307,131 +290,95 @@ function PostList({
 function ProfileHeader({
   user,
   postCount,
-  cliqScore,
-  friends,
+  followers,
   following,
-  badges,
+  cliqScore,
   onEdit,
   onSettings,
-  onOpenFriends,
+  onOpenFollowers,
   onOpenFollowing,
 }: {
   user: SessionUser;
   postCount: number;
-  cliqScore: number;
-  friends: number;
+  followers: number;
   following: number;
-  badges: UserBadges | null;
+  cliqScore: number;
   onEdit: () => void;
   onSettings: () => void;
-  onOpenFriends: () => void;
+  onOpenFollowers: () => void;
   onOpenFollowing: () => void;
 }) {
   const [bannerBroken, setBannerBroken] = useState(false);
   const banner = user.bannerUrl && !bannerBroken ? user.bannerUrl : null;
-  const mesh = useMemo(() => meshGradient(user.username || user.id), [user.username, user.id]);
 
   const stats = [
-    { label: "Posts", value: `${postCount}`, onClick: undefined as undefined | (() => void) },
-    { label: "Cliq Score", value: `${cliqScore}`, onClick: undefined as undefined | (() => void) },
-    { label: "Friends", value: `${friends}`, onClick: onOpenFriends },
-    { label: "Following", value: `${following}`, onClick: onOpenFollowing },
+    { label: "Posts", value: postCount, onClick: undefined as undefined | (() => void) },
+    { label: "Cliq Score", value: cliqScore, onClick: undefined },
+    { label: "Friends", value: followers, onClick: onOpenFollowers },
+    { label: "Following", value: following, onClick: onOpenFollowing },
   ];
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-zinc-800/80 bg-[#121317]">
-      {/* Cover banner — custom image, or a per-user mesh gradient. */}
-      <div className="relative h-32 w-full sm:h-40">
+    <div className="pb-8">
+      {/* Cover banner */}
+      <div className="relative h-32 w-full overflow-hidden rounded-xl sm:h-44">
         {banner ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={banner} alt="" className="h-full w-full object-cover" onError={() => setBannerBroken(true)} />
         ) : (
-          <div className="h-full w-full" style={{ backgroundImage: mesh, backgroundColor: "#121317" }} />
+          <div className="h-full w-full" style={{ backgroundImage: meshGradient(user.username || user.id), backgroundColor: "#121317" }} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#121317] via-transparent to-transparent" />
       </div>
 
-      <div className="relative px-4 pb-4">
-        <div className="-mt-9 flex items-end justify-between gap-3">
-          <div className="rounded-full ring-2 ring-[#121317]">
-            <Avatar user={user} size={78} />
-          </div>
-          <div className="flex gap-2">
+      <div className="flex flex-col gap-6 pt-5 md:flex-row md:items-center md:gap-12">
+        <div className="flex justify-center md:justify-start">
+          <Avatar user={user} size={120} />
+        </div>
+
+        <div className="flex-1 space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-xl font-normal text-white">{user.username}</h1>
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-500 active:scale-95"
+              className="rounded-lg bg-[#18181b] px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#27272a]"
             >
-              <Pencil size={13} /> Edit Profile
+              Edit profile
             </button>
             <button
               type="button"
               onClick={onSettings}
-              className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 px-3.5 py-2 text-xs font-bold text-zinc-300 transition hover:border-indigo-500 hover:text-zinc-100"
+              aria-label="Settings"
+              className="rounded-lg bg-[#18181b] p-2 text-white transition hover:bg-[#27272a]"
             >
-              <SettingsIcon size={13} /> Settings
+              <SettingsIcon size={18} strokeWidth={1.75} />
             </button>
           </div>
-        </div>
 
-        <div className="mt-3">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-lg font-black text-zinc-50">{user.displayName}</h1>
-            <BadgeCheck size={17} className="text-indigo-400" />
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-zinc-300">
+            {stats.map(({ label, value, onClick }) => (
+              <span key={label} className="inline-flex items-center gap-1">
+                <span className="font-semibold text-white">{value}</span>
+                {onClick ? (
+                  <button type="button" onClick={onClick} className="text-zinc-300 transition hover:text-white">
+                    {label}
+                  </button>
+                ) : (
+                  <span className="text-zinc-300">{label}</span>
+                )}
+              </span>
+            ))}
           </div>
-          <p className="text-xs text-zinc-500">
-            @{user.username}
-            {user.age ? ` · ${user.age}` : ""}
-          </p>
-          {user.bio ? <p className="mt-2 text-sm leading-relaxed text-zinc-300">{user.bio}</p> : null}
-          {(user.interests ?? []).length > 0 ? (
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {(user.interests ?? []).map((interest) => (
-                <span
-                  key={interest}
-                  className="rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-300"
-                >
-                  #{interest}
-                </span>
-              ))}
-            </div>
-          ) : null}
 
-          {/* Achievement badges */}
-          {badges && badges.badges.some((b) => b.earned) ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {badges.badges
-                .filter((b) => b.earned)
-                .map((badge) => (
-                  <span
-                    key={badge.id}
-                    title={badge.description}
-                    className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold text-amber-200"
-                  >
-                    <span>{badge.emoji}</span> {badge.label}
-                  </span>
-                ))}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Compact inline stats bar */}
-        <div className="mt-4 flex items-center divide-x divide-zinc-800/80 rounded-2xl border border-zinc-800/70 bg-[#0c0d10] py-2.5">
-          {stats.map(({ label, value, onClick }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={onClick}
-              disabled={!onClick}
-              className={cx(
-                "flex flex-1 flex-col items-center gap-0.5 px-1 transition",
-                onClick ? "hover:opacity-80" : "cursor-default",
-              )}
-            >
-              <span className="text-base font-black tabular-nums text-zinc-50">{value}</span>
-              <span className="text-[10px] font-medium text-zinc-500">{label}</span>
-            </button>
-          ))}
+          <div>
+            <p className="text-sm font-semibold text-white">{user.displayName}</p>
+            {user.bio ? <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-200">{user.bio}</p> : null}
+            {(user.interests ?? []).length > 0 ? (
+              <p className="mt-1 text-xs text-zinc-400">
+                {(user.interests ?? []).map((i) => `#${i}`).join("  ")}
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
@@ -452,17 +399,16 @@ function EditProfileModal({
   const { refreshUser, toast } = useCliq();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [bio, setBio] = useState(user.bio);
-  const [age, setAge] = useState(user.age ? `${user.age}` : "");
+  const [age, setAge] = useState(user.age ? String(user.age) : "");
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "");
   const [bannerUrl, setBannerUrl] = useState(user.bannerUrl ?? "");
-  const [interests, setInterests] = useState<string[]>(user.interests ?? []);
+  const [interests, setInterests] = useState<string[]>(user.interests);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
     setDisplayName(user.displayName);
     setBio(user.bio);
-    setAge(user.age ? `${user.age}` : "");
+    setAge(user.age ? String(user.age) : "");
     setAvatarUrl(user.avatarUrl ?? "");
     setBannerUrl(user.bannerUrl ?? "");
     setInterests(user.interests);
@@ -480,7 +426,7 @@ function EditProfileModal({
         interests,
       });
       await refreshUser();
-      toast("Profile updated ✨", "success");
+      toast("Profile updated", "success");
       onClose();
     } catch (error) {
       onError(error);
@@ -495,20 +441,23 @@ function EditProfileModal({
     reader.readAsDataURL(file);
   }
 
+  const inputClass =
+    "w-full rounded-lg border border-zinc-800/80 bg-[#121317] px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-600";
+
   return (
-    <Modal open={open} onClose={onClose} title="Edit Profile" subtitle="Keep it real — your vibe, your rules.">
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 rounded-2xl border border-zinc-800/80 bg-[#0c0d10] p-3">
+    <Modal open={open} onClose={onClose} title="Edit profile">
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 rounded-lg border border-zinc-800/80 bg-[#121317] p-3">
           <Avatar
             user={{ id: user.id, username: user.username, displayName: displayName || user.displayName, avatarUrl: avatarUrl || null }}
             size={52}
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-zinc-100">{displayName || user.displayName}</p>
-            <p className="truncate text-[11px] text-zinc-500">@{user.username}</p>
+            <p className="truncate text-sm font-semibold text-white">{displayName || user.displayName}</p>
+            <p className="truncate text-xs text-zinc-500">@{user.username}</p>
           </div>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition hover:border-indigo-500 hover:text-zinc-100">
-            <ImageIcon size={13} /> Avatar
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#18181b] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]">
+            <ImageIcon size={13} strokeWidth={1.75} /> Avatar
             <input
               type="file"
               accept="image/*"
@@ -522,48 +471,41 @@ function EditProfileModal({
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-zinc-400">Display name</span>
-          <input
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            maxLength={60}
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500"
-          />
+          <span className="mb-1 block text-xs font-medium text-zinc-400">Display name</span>
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={60} className={inputClass} />
         </label>
 
         <div className="grid gap-3 sm:grid-cols-[7rem_1fr]">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-zinc-400">Age</span>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">Age</span>
             <input
               value={age}
               onChange={(e) => setAge(e.target.value.replace(/\D/g, "").slice(0, 3))}
               inputMode="numeric"
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+              className={inputClass}
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-zinc-400">Avatar image URL</span>
+            <span className="mb-1 block text-xs font-medium text-zinc-400">Avatar image URL</span>
             <input
               value={avatarUrl.startsWith("data:") ? "" : avatarUrl}
               onChange={(e) => setAvatarUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+              className={inputClass}
             />
           </label>
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-zinc-800/80 bg-[#0c0d10] p-3">
-          <span className="h-12 w-20 shrink-0 overflow-hidden rounded-lg" style={{ backgroundImage: bannerUrl ? undefined : meshGradient(user.username) }}>
+        <div className="flex items-center gap-3 rounded-lg border border-zinc-800/80 bg-[#121317] p-3">
+          <span className="h-12 w-20 shrink-0 overflow-hidden rounded-md" style={{ backgroundImage: bannerUrl ? undefined : meshGradient(user.username) }}>
             {bannerUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
             ) : null}
           </span>
-          <span className="min-w-0 flex-1 text-[11px] text-zinc-500">
-            Cover banner — leave empty for an auto mesh gradient
-          </span>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition hover:border-indigo-500 hover:text-zinc-100">
-            <UploadCloud size={13} /> Banner
+          <span className="min-w-0 flex-1 text-xs text-zinc-500">Cover banner — leave empty for an auto gradient</span>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-[#18181b] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]">
+            <UploadCloud size={13} strokeWidth={1.75} /> Banner
             <input
               type="file"
               accept="image/*"
@@ -577,18 +519,12 @@ function EditProfileModal({
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-zinc-400">Bio</span>
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={3}
-            maxLength={300}
-            className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500"
-          />
+          <span className="mb-1 block text-xs font-medium text-zinc-400">Bio</span>
+          <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={300} className={cx(inputClass, "resize-none")} />
         </label>
 
         <div>
-          <span className="mb-1.5 block text-xs font-semibold text-zinc-400">Interests</span>
+          <span className="mb-1.5 block text-xs font-medium text-zinc-400">Interests</span>
           <div className="flex flex-wrap gap-1.5">
             {INTEREST_OPTIONS.map((interest) => {
               const active = interests.includes(interest);
@@ -598,11 +534,11 @@ function EditProfileModal({
                   type="button"
                   onClick={() => setInterests((prev) => (active ? prev.filter((i) => i !== interest) : [...prev, interest]))}
                   className={cx(
-                    "rounded-full border px-3 py-1 text-xs font-semibold transition",
-                    active ? "border-transparent bg-indigo-600 text-white" : "border-zinc-800 text-zinc-400 hover:text-zinc-200",
+                    "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition",
+                    active ? "bg-white text-black" : "bg-[#121317] text-zinc-400 hover:text-zinc-200",
                   )}
                 >
-                  {active ? "✓ " : ""}
+                  {active ? <Check size={12} strokeWidth={2.5} /> : null}
                   {interest}
                 </button>
               );
@@ -614,9 +550,9 @@ function EditProfileModal({
           type="button"
           onClick={() => void save()}
           disabled={busy}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-50"
         >
-          {busy ? "Saving..." : "Save changes"}
+          {busy ? "Saving..." : "Save"}
         </button>
       </div>
     </Modal>
@@ -642,86 +578,80 @@ function SettingsPanel({
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-[620px] space-y-4 px-3 py-4 sm:px-4">
-      <div className="flex items-center gap-3">
+    <div className="mx-auto w-full max-w-[620px] px-4 py-6">
+      <div className="mb-4 flex items-center gap-3">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-indigo-500 hover:text-zinc-100"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#18181b] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#27272a]"
         >
-          <X size={13} /> Back to profile
+          <ArrowLeft size={14} strokeWidth={1.75} /> Back
         </button>
-        <h2 className="text-sm font-bold text-zinc-100">Settings</h2>
+        <h2 className="text-base font-semibold text-white">Settings</h2>
       </div>
 
       {fallbackMode ? (
-        <div className="flex items-start gap-3 rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4">
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
           <div className="text-xs leading-relaxed text-amber-100">
-            <p className="font-bold">Storage is running in fallback mode</p>
+            <p className="font-semibold">Storage is running in fallback mode</p>
             <p className="mt-1 text-amber-200/80">
-              Cliq is using a temporary in-memory store, so data may disappear when the server
-              restarts. Set <code className="rounded bg-zinc-950/60 px-1">DATABASE_URL</code> and{" "}
-              <code className="rounded bg-zinc-950/60 px-1">CLIQ_SESSION_SECRET</code>, then redeploy.
-              Tables are created automatically on the next request.
+              Cliq is using a temporary in-memory store, so data may disappear when the server restarts. Set{" "}
+              <code className="rounded bg-black/40 px-1">DATABASE_URL</code> and{" "}
+              <code className="rounded bg-black/40 px-1">CLIQ_SESSION_SECRET</code>, then redeploy.
             </p>
             {dbError ? (
-              <p className="mt-2 break-words rounded-xl bg-zinc-950/50 px-2.5 py-2 font-mono text-[11px] text-amber-200/90">
-                {dbError}
-              </p>
+              <p className="mt-2 break-words rounded-lg bg-black/40 px-2.5 py-2 font-mono text-[11px] text-amber-200/90">{dbError}</p>
             ) : null}
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-200">
-          <Database size={14} /> Connected to your database — your data is persisted.
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-[#10b981]/30 bg-[#10b981]/10 px-4 py-3 text-xs font-medium text-[#10b981]">
+          <Database size={14} strokeWidth={1.75} /> Connected to your database — your data is persisted.
         </div>
       )}
 
       {mediaUnconfigured ? (
-        <div className="flex items-start gap-3 rounded-3xl border border-amber-500/40 bg-amber-500/10 p-4">
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
           <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
           <div className="text-xs leading-relaxed text-amber-100">
-            <p className="font-bold">Direct media uploads are off</p>
+            <p className="font-semibold">Direct media uploads are off</p>
             <p className="mt-1 text-amber-200/80">
-              Set <code className="rounded bg-zinc-950/60 px-1">NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME</code> and{" "}
-              <code className="rounded bg-zinc-950/60 px-1">NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET</code> (an
-              unsigned preset) in Vercel, then redeploy. Until then you can still paste image and video URLs.
+              Set <code className="rounded bg-black/40 px-1">NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME</code> and{" "}
+              <code className="rounded bg-black/40 px-1">NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET</code> in Vercel, then
+              redeploy. Until then you can still paste image and video URLs.
             </p>
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 rounded-3xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-200">
-          <UploadCloud size={14} /> Cloudinary direct uploads are enabled — media never touches Vercel.
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-[#10b981]/30 bg-[#10b981]/10 px-4 py-3 text-xs font-medium text-[#10b981]">
+          <UploadCloud size={14} strokeWidth={1.75} /> Media uploads are enabled.
         </div>
       )}
 
-      <SectionCard>
-        <SectionTitle icon={<User size={15} />} title="Account & Profile" />
+      <SectionCard className="mb-4">
+        <SectionTitle icon={<User size={15} strokeWidth={1.75} />} title="Account" />
         <div className="mt-3 space-y-2 text-sm">
           <Row label="Username" value={`@${user.username}`} />
           <Row label="Email" value={user.email || "Not set"} />
-          <Row label="Age tier" value="Teen Verified 13–19" badge />
-          <Row label="Account status" value="Active · In good standing" />
         </div>
       </SectionCard>
 
-      <SectionCard>
-        <SectionTitle icon={<Shield size={15} />} title="Teen Safety & Privacy" />
-        <div className="mt-3 space-y-2">
+      <SectionCard className="mb-4">
+        <SectionTitle icon={<Shield size={15} strokeWidth={1.75} />} title="Privacy" />
+        <div className="mt-3">
           <Toggle
             checked={settings.privateProfile}
             onChange={(v) => {
               void updateSettings({ privateProfile: v });
-              toast(v ? "Profile is now private 🔒" : "Profile is public again", v ? "success" : "default");
+              toast(v ? "Profile is now private" : "Profile is public", v ? "success" : "default");
             }}
-            label="Private Cliq Profile"
-            hint="Only approved Cliq friends can see your posts"
+            label="Private profile"
+            hint="Only approved followers can see your posts"
           />
-          <div className="rounded-2xl border border-zinc-800/80 bg-[#121317] px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-100">Who Can Message Me</p>
-            <p className="mb-2 mt-0.5 text-xs text-zinc-500">Control who can start a direct chat with you</p>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="border-b border-zinc-800/80 py-3.5">
+            <p className="text-sm font-medium text-zinc-100">Who can message me</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {MESSAGE_SCOPES.map((scope) => (
                 <button
                   key={scope.key}
@@ -731,10 +661,8 @@ function SettingsPanel({
                     toast(`Messages: ${scope.label}`, "success");
                   }}
                   className={cx(
-                    "rounded-full border px-3 py-1 text-xs font-semibold transition",
-                    settings.whoCanMessage === scope.key
-                      ? "border-transparent bg-indigo-600 text-white"
-                      : "border-zinc-800 text-zinc-400 hover:text-zinc-200",
+                    "rounded-full px-3 py-1 text-xs font-medium transition",
+                    settings.whoCanMessage === scope.key ? "bg-white text-black" : "bg-[#121317] text-zinc-400 hover:text-zinc-200",
                   )}
                 >
                   {scope.label}
@@ -745,69 +673,64 @@ function SettingsPanel({
           <Toggle
             checked={settings.showOnline}
             onChange={(v) => void updateSettings({ showOnline: v })}
-            label="Show Online Activity Status"
+            label="Show activity status"
             hint="Let friends see when you're active"
           />
           <Toggle
             checked={settings.hideDislikes}
             onChange={(v) => {
               void updateSettings({ hideDislikes: v });
-              toast(v ? "Dislike counts hidden on your posts" : "Dislike counts visible", "success");
+              toast(v ? "Dislike counts hidden" : "Dislike counts visible", "success");
             }}
-            label="Hide Dislike & Downgrade Counts on My Posts"
-            hint="Feed rendering updates instantly"
+            label="Hide dislike counts on my posts"
           />
           <Toggle
             checked={settings.toxicFilter}
             onChange={(v) => void updateSettings({ toxicFilter: v })}
-            label="Safe-Chat Toxic Word Filter"
+            label="Word filter"
             hint="Softens unkind words in content you view"
           />
         </div>
       </SectionCard>
 
-      <SectionCard>
-        <SectionTitle icon={<Palette size={15} />} title="Appearance & Theme Vibe" />
-        <div className="mt-3 space-y-2">
-          <div className="rounded-2xl border border-zinc-800/80 bg-[#121317] px-4 py-3">
-            <p className="text-sm font-semibold text-zinc-100">Accent color</p>
-            <p className="mb-2 mt-0.5 text-xs text-zinc-500">Changes highlights across the whole app</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {ACCENT_LIST.map((accent) => (
-                <button
-                  key={accent.key}
-                  type="button"
-                  onClick={() => {
-                    void updateSettings({ accent: accent.key as AccentKey });
-                    toast(`${accent.label} applied 🎨`, "success");
-                  }}
-                  className={cx(
-                    "relative overflow-hidden rounded-2xl border px-3 py-2.5 text-left transition",
-                    settings.accent === accent.key ? "border-zinc-100" : "border-zinc-800 hover:border-zinc-600",
-                  )}
-                  style={{ background: accent.soft }}
-                >
-                  <span className="block h-2 w-full rounded-full" style={{ background: accent.gradient }} />
-                  <span className="mt-1.5 block text-[11px] font-bold text-zinc-100">{accent.label}</span>
-                </button>
-              ))}
-            </div>
+      <SectionCard className="mb-4">
+        <SectionTitle icon={<Palette size={15} strokeWidth={1.75} />} title="Appearance" />
+        <div className="mt-3">
+          <p className="text-sm font-medium text-zinc-100">Accent color</p>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {ACCENT_LIST.map((accent) => (
+              <button
+                key={accent.key}
+                type="button"
+                onClick={() => {
+                  void updateSettings({ accent: accent.key as AccentKey });
+                  toast(`${accent.label} applied`, "success");
+                }}
+                className={cx(
+                  "rounded-lg border px-3 py-2 text-left transition",
+                  settings.accent === accent.key ? "border-white" : "border-zinc-800/80 hover:border-zinc-600",
+                )}
+              >
+                <span className="block h-2 w-full rounded-full" style={{ background: accent.gradient }} />
+                <span className="mt-1.5 block text-xs font-medium text-zinc-100">{accent.label}</span>
+              </button>
+            ))}
           </div>
           <Toggle
             checked={settings.autoplay}
             onChange={(v) => void updateSettings({ autoplay: v })}
-            label="Auto-Play Videos"
+            label="Autoplay videos"
             hint="Videos start playing as you scroll the feed"
           />
         </div>
       </SectionCard>
 
-      <SectionCard>
-        <SectionTitle icon={<Bell size={15} />} title="Notifications" />
-        <div className="mt-3 space-y-2">
-          <Toggle checked={settings.notifCliqUp} onChange={(v) => void updateSettings({ notifCliqUp: v })} label='"Cliq Up" Friend Requests' />
-          <Toggle checked={settings.notifMessages} onChange={(v) => void updateSettings({ notifMessages: v })} label="Direct Messages" />
-          <Toggle checked={settings.notifVotes} onChange={(v) => void updateSettings({ notifVotes: v })} label="Post Upgrades & Likes" />
+      <SectionCard className="mb-4">
+        <SectionTitle icon={<Bell size={15} strokeWidth={1.75} />} title="Notifications" />
+        <div className="mt-3">
+          <Toggle checked={settings.notifCliqUp} onChange={(v) => void updateSettings({ notifCliqUp: v })} label="Follow requests" />
+          <Toggle checked={settings.notifMessages} onChange={(v) => void updateSettings({ notifMessages: v })} label="Direct messages" />
+          <Toggle checked={settings.notifVotes} onChange={(v) => void updateSettings({ notifVotes: v })} label="Likes & upgrades" />
           <Toggle checked={settings.notifComments} onChange={(v) => void updateSettings({ notifComments: v })} label="Comments" />
           <Toggle
             checked={pushEnabled}
@@ -815,33 +738,30 @@ function SettingsPanel({
               if (!v) {
                 disableBrowserNotifications();
                 setPushEnabled(false);
-                toast("Browser notifications turned off", "default");
+                toast("Notifications turned off", "default");
                 return;
               }
               void enableBrowserNotifications().then((granted) => {
                 setPushEnabled(granted);
-                toast(
-                  granted ? "Browser notifications enabled 🔔" : "Your browser blocked notifications",
-                  granted ? "success" : "danger",
-                );
+                toast(granted ? "Notifications enabled" : "Your browser blocked notifications", granted ? "success" : "danger");
               });
             }}
-            label="Browser Notifications"
-            hint="Get native device alerts for new messages and activity"
+            label="Browser notifications"
+            hint="Get native device alerts for new activity"
           />
         </div>
       </SectionCard>
 
       <SectionCard className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <Shield size={13} /> Passwords are hashed. Session cookies are httpOnly.
+          <Shield size={13} strokeWidth={1.75} /> Passwords are hashed. Sessions are httpOnly.
         </div>
         <button
           type="button"
           onClick={() => void logOut()}
-          className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/50 px-3.5 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-[#18181b] px-3.5 py-1.5 text-xs font-semibold text-[#ff3040] transition hover:bg-[#27272a]"
         >
-          <LogOut size={13} /> Log Out
+          <LogOut size={13} strokeWidth={1.75} /> Log out
         </button>
       </SectionCard>
     </div>
@@ -851,26 +771,17 @@ function SettingsPanel({
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300">
-        {icon}
-      </span>
-      <h3 className="text-sm font-bold text-zinc-100">{title}</h3>
+      <span className="text-zinc-400">{icon}</span>
+      <h3 className="text-sm font-semibold text-white">{title}</h3>
     </div>
   );
 }
 
-function Row({ label, value, badge }: { label: string; value: string; badge?: boolean }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-zinc-950/50 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-[#0a0a0a] px-3 py-2">
       <span className="text-xs text-zinc-500">{label}</span>
-      <span
-        className={cx(
-          "truncate text-xs font-semibold",
-          badge ? "rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-emerald-300" : "text-zinc-200",
-        )}
-      >
-        {value}
-      </span>
+      <span className="truncate text-xs font-medium text-zinc-200">{value}</span>
     </div>
   );
 }
