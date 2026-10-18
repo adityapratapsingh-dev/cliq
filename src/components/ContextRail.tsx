@@ -2,156 +2,147 @@
 
 import { useMemo } from "react";
 import useSWR from "swr";
-import { Check, Flame, MessageCircle, UserPlus } from "lucide-react";
+import { MessageSquare, Search, TrendingUp } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { swrFetcher } from "@/lib/api-client";
 import { Avatar } from "@/components/ui/Primitives";
 import { FLAIRS } from "@/lib/constants";
-import { conversationsKey, feedKey } from "@/components/tabs/useFeed";
-import type { ConversationSummary, FriendGraph, Post, PublicUser } from "@/types/cliq";
+import { feedKey } from "@/components/tabs/useFeed";
+import type { Post, PublicUser } from "@/types/cliq";
 import { cx } from "@/lib/utils";
 
 /**
- * Right-hand contextual rail (xl and up).
+ * Right contextual sidebar (`xl` and up).
  *
- * Three cards: people worth Cliq-ing, trending flairs with live counts, and
- * online friends for one-tap DMs. Hidden below `xl` so the centre column keeps
- * the full width on tablets.
+ * Three stacked cards: people to cliq with, trending topics (which filter the
+ * feed), and quick-access friends to jump straight into a DM.
  */
-export function ContextRail({
+export function RightSidebar({
   onOpenProfile,
-  onOpenChats,
-  onFilterFlair,
+  onOpenSearch,
 }: {
   onOpenProfile: (id: string) => void;
-  onOpenChats: () => void;
-  onFilterFlair: (flair: string) => void;
+  onOpenSearch: () => void;
 }) {
-  const { user, followingIds, toggleFollow } = useCliq();
+  const { user, followingIds, toggleFollow, openChat, setSearch } = useCliq();
 
-  const { data: people } = useSWR<{ users: PublicUser[] }>(
-    user ? ["/api/users", undefined] : null,
-    swrFetcher,
-    { revalidateOnFocus: false },
-  );
-  const { data: chatFeed } = useSWR<{ posts: Post[] }>(user ? feedKey("chat") : null, swrFetcher, {
+  const { data } = useSWR<{ users: PublicUser[] }>(user ? ["/api/users", undefined] : null, swrFetcher, {
     revalidateOnFocus: false,
   });
-  const { data: friends } = useSWR<FriendGraph>(user ? "/api/friends" : null, swrFetcher, {
+  const { data: chatData } = useSWR<{ posts: Post[] }>(feedKey("chat"), swrFetcher, {
     revalidateOnFocus: false,
   });
-  const { data: conversations } = useSWR<{ conversations: ConversationSummary[] }>(
-    user ? conversationsKey : null,
-    swrFetcher,
-    { revalidateOnFocus: false },
-  );
 
-  /** People sharing the most interests with the signed-in user. */
-  const suggested = useMemo(() => {
+  const people = useMemo(() => {
     const mine = new Set(user?.interests ?? []);
-    return (people?.users ?? [])
+    return (data?.users ?? [])
+      .filter((p) => p.id !== user?.id)
       .map((p) => ({ person: p, shared: p.interests.filter((i) => mine.has(i)).length }))
       .sort((a, b) => b.shared - a.shared || a.person.username.localeCompare(b.person.username))
       .slice(0, 4);
-  }, [people, user]);
+  }, [data, user]);
 
-  /** Live post counts per flair. */
-  const flairCounts = useMemo(() => {
+  // Live flair counts, derived from the chat feed.
+  const trends = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const post of chatFeed?.posts ?? []) {
-      if (!post.flair) continue;
-      counts.set(post.flair, (counts.get(post.flair) ?? 0) + 1);
+    for (const post of chatData?.posts ?? []) {
+      if (post.flair) counts.set(post.flair, (counts.get(post.flair) ?? 0) + 1);
     }
-    return counts;
-  }, [chatFeed]);
+    return FLAIRS.map((f) => ({ label: f.label, count: counts.get(f.label) ?? 0 })).sort(
+      (a, b) => b.count - a.count,
+    );
+  }, [chatData]);
 
-  const onlineFriends = useMemo(
-    () => (friends?.friends ?? []).slice(0, 8),
-    [friends],
+  // Friends you can message right now (mutual follows).
+  const friends = useMemo(
+    () => (data?.users ?? []).filter((p) => p.id !== user?.id && followingIds.includes(p.id)).slice(0, 8),
+    [data, user, followingIds],
   );
 
-  const unreadByPartner = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const c of conversations?.conversations ?? []) map.set(c.partner.id, c.unreadCount);
-    return map;
-  }, [conversations]);
-
   return (
-    <aside className="hidden w-80 shrink-0 flex-col gap-4 py-4 xl:flex">
+    <aside className="hidden w-[320px] shrink-0 flex-col gap-4 px-6 pt-6 xl:flex">
+      <button
+        type="button"
+        onClick={onOpenSearch}
+        className="flex w-full items-center gap-2 rounded-full border border-zinc-800/80 bg-[#121317] px-4 py-2 text-sm text-zinc-500 transition hover:border-zinc-700"
+      >
+        <Search size={16} strokeWidth={1.75} />
+        <span>Search</span>
+      </button>
+
       {/* People to Cliq With */}
       <section className="rounded-2xl border border-zinc-800/80 bg-[#121317] p-4">
-        <header className="mb-3 flex items-center gap-2">
-          <UserPlus size={14} className="text-[var(--accent-2)]" />
-          <h2 className="text-sm font-bold text-zinc-100">People to Cliq With</h2>
-        </header>
-        {suggested.length === 0 ? (
-          <p className="py-4 text-center text-[11px] text-zinc-500">
-            No suggestions yet — invite a friend to Cliq.
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {suggested.map(({ person, shared }) => {
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-zinc-100">People to Cliq With</h2>
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="text-xs font-semibold text-zinc-500 transition hover:text-zinc-200"
+          >
+            See all
+          </button>
+        </div>
+        <ul className="mt-3">
+          {people.length === 0 ? (
+            <li className="py-3 text-xs text-zinc-500">No suggestions yet — invite a friend to Cliq.</li>
+          ) : (
+            people.map(({ person, shared }) => {
               const following = followingIds.includes(person.id);
               return (
-                <li key={person.id} className="flex items-center gap-3 rounded-xl p-2 transition hover:bg-zinc-800/50">
+                <li key={person.id} className="flex items-center gap-3 py-2">
                   <button
                     type="button"
                     onClick={() => onOpenProfile(person.id)}
-                    className="shrink-0 rounded-full transition hover:brightness-110"
+                    className="shrink-0 rounded-full transition hover:opacity-90"
                     aria-label={`Open ${person.displayName}'s profile`}
                   >
-                    <Avatar user={person} size={38} />
+                    <Avatar user={person} size={40} />
                   </button>
                   <button
                     type="button"
                     onClick={() => onOpenProfile(person.id)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <span className="block truncate text-xs font-bold text-zinc-100">{person.displayName}</span>
+                    <span className="block truncate text-sm font-semibold text-zinc-100">{person.username}</span>
                     <span className="block truncate text-[11px] text-zinc-500">
-                      @{person.username}
-                      {shared > 0 ? ` · ${shared} shared` : ""}
+                      {shared > 0 ? `${shared} shared interest${shared > 1 ? "s" : ""}` : person.displayName}
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => toggleFollow(person.id)}
-                    aria-label={following ? "In Cliq" : "Cliq Up"}
                     className={cx(
-                      "grid h-8 w-8 shrink-0 place-items-center rounded-full transition",
+                      "shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition",
                       following
-                        ? "bg-emerald-500/15 text-emerald-400"
-                        : "bg-indigo-600 text-white hover:bg-indigo-500",
+                        ? "border border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                        : "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20 hover:bg-indigo-500",
                     )}
                   >
-                    {following ? <Check size={14} strokeWidth={3} /> : <UserPlus size={14} />}
+                    {following ? "Following" : "Cliq Up"}
                   </button>
                 </li>
               );
-            })}
-          </ul>
-        )}
+            })
+          )}
+        </ul>
       </section>
 
       {/* Trending on Cliq */}
       <section className="rounded-2xl border border-zinc-800/80 bg-[#121317] p-4">
-        <header className="mb-3 flex items-center gap-2">
-          <Flame size={14} className="text-orange-400" />
-          <h2 className="text-sm font-bold text-zinc-100">Trending on Cliq</h2>
-        </header>
-        <ul className="space-y-1">
-          {FLAIRS.map((flair) => (
-            <li key={flair.label}>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+          <TrendingUp size={15} strokeWidth={2} className="text-indigo-400" /> Trending on Cliq
+        </h2>
+        <ul className="mt-2">
+          {trends.map((trend) => (
+            <li key={trend.label}>
               <button
                 type="button"
-                onClick={() => onFilterFlair(flair.label)}
-                className="flex w-full items-center justify-between rounded-xl px-2 py-2 text-left transition hover:bg-zinc-800/50"
+                onClick={() => setSearch(trend.label)}
+                className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-zinc-800/60"
               >
-                <span className="text-xs font-bold" style={{ color: flair.color }}>
-                  {flair.label}
-                </span>
-                <span className="text-[11px] font-semibold tabular-nums text-zinc-500">
-                  {flairCounts.get(flair.label) ?? 0} posts
+                <span className="text-sm font-semibold text-zinc-200">{trend.label}</span>
+                <span className="text-[11px] tabular-nums text-zinc-500">
+                  {trend.count} {trend.count === 1 ? "post" : "posts"}
                 </span>
               </button>
             </li>
@@ -161,45 +152,36 @@ export function ContextRail({
 
       {/* Online in Your Cliq */}
       <section className="rounded-2xl border border-zinc-800/80 bg-[#121317] p-4">
-        <header className="mb-3 flex items-center gap-2">
-          <MessageCircle size={14} className="text-emerald-400" />
-          <h2 className="text-sm font-bold text-zinc-100">Online in Your Cliq</h2>
-        </header>
-        {onlineFriends.length === 0 ? (
-          <p className="py-4 text-center text-[11px] text-zinc-500">
-            No friends yet — Cliq Up someone above.
-          </p>
+        <h2 className="text-sm font-semibold text-zinc-100">Online in Your Cliq</h2>
+        {friends.length === 0 ? (
+          <p className="mt-2 text-xs text-zinc-500">Follow people to see them here for quick chats.</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {onlineFriends.map((friend) => {
-              const unread = unreadByPartner.get(friend.id) ?? 0;
-              return (
-                <button
-                  key={friend.id}
-                  type="button"
-                  onClick={onOpenChats}
-                  title={`Message @${friend.username}`}
-                  className="relative rounded-full transition hover:brightness-110"
-                >
-                  <Avatar user={friend} size={40} />
-                  {unread > 0 ? (
-                    <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-lg shadow-rose-500/40">
-                      {unread > 9 ? "9+" : unread}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
+          <div className="mt-3 flex flex-wrap gap-3">
+            {friends.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                onClick={() => openChat(person)}
+                title={`Message @${person.username}`}
+                className="group flex flex-col items-center gap-1"
+              >
+                <span className="relative">
+                  <Avatar user={person} size={44} online />
+                  <span className="absolute -bottom-1 left-1/2 hidden -translate-x-1/2 items-center gap-0.5 rounded-full bg-zinc-900 px-1.5 py-0.5 text-[9px] font-bold text-zinc-200 ring-1 ring-zinc-700 group-hover:flex">
+                    <MessageSquare size={9} /> DM
+                  </span>
+                </span>
+                <span className="w-12 truncate text-center text-[10px] text-zinc-500">{person.username}</span>
+              </button>
+            ))}
           </div>
         )}
-        <button
-          type="button"
-          onClick={onOpenChats}
-          className="mt-3 w-full rounded-xl border border-zinc-800 py-2 text-[11px] font-bold text-zinc-300 transition hover:border-indigo-500 hover:text-zinc-100"
-        >
-          Open Direct Chats
-        </button>
       </section>
+
+      <p className="px-1 text-[11px] leading-relaxed text-zinc-600">
+        About · Help · Press · API · Jobs · Privacy · Terms
+      </p>
+      <p className="px-1 pb-6 text-[11px] text-zinc-600">© 2026 Cliq</p>
     </aside>
   );
 }

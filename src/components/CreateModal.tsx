@@ -80,7 +80,7 @@ export function CreateModal() {
   /** Upload straight to Cloudinary so Vercel never sees the bytes. */
   async function handleFile(file: File) {
     if (mediaUnconfigured) {
-      toast("Media uploads need Cloudinary env vars set. You can paste a URL instead.", "danger");
+   toast("Media uploads need Cloudinary env vars set. You can paste a URL instead.","danger");
       return;
     }
 
@@ -118,18 +118,18 @@ export function CreateModal() {
           ? { ...prev, progress: 100, phase: "done", compressedBytes: result.bytes ?? null }
           : prev,
       );
-      toast("Upload complete ✅", "success");
+   toast("Upload complete","success");
     } catch (error) {
       setUpload((prev) => {
         if (prev) URL.revokeObjectURL(prev.localUrl);
         return null;
       });
       if (error instanceof CloudinaryNotConfiguredError) {
-        toast("Media uploads are not configured — paste a URL instead.", "danger");
+    toast("Media uploads are not configured — paste a URL instead.","danger");
       } else if (error instanceof FileTooLargeError) {
-        toast(error.message, "danger");
+    toast(error.message,"danger");
       } else if (error instanceof Error && /cancel/i.test(error.message)) {
-        toast("Upload cancelled", "default");
+    toast("Upload cancelled","default");
       } else {
         apiError(error);
       }
@@ -160,7 +160,7 @@ export function CreateModal() {
       // Show it in the feed immediately, then let SWR reconcile.
       await prependPost(type, post);
       bump();
-      toast("Published to Cliq ⚡", "success");
+   toast("Published to Cliq","success");
       close();
     } catch (error) {
       apiError(error);
@@ -180,7 +180,7 @@ export function CreateModal() {
       open={createOpen}
       onClose={close}
       title="Create on Cliq"
-      subtitle="Uploads go straight to Cloudinary — fast, even on mobile data ✨"
+   subtitle="Uploads go straight to Cloudinary — fast, even on mobile data"
       maxWidth="max-w-xl"
     >
       <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-1">
@@ -200,7 +200,7 @@ export function CreateModal() {
       </div>
 
       {typeForTab && typeForTab !== type ? (
-        <p className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[11px] text-zinc-400">
+        <p className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-2 text-[11px] text-zinc-400">
           You&apos;re on the {tab === "videos" ? "Videos" : tab === "photos" ? "Photos" : "Chat Posts"} tab — this
           will post there.
         </p>
@@ -211,7 +211,7 @@ export function CreateModal() {
           <div>
             {/* live preview */}
             {upload || mediaUrl ? (
-              <div className="relative mb-2 overflow-hidden rounded-2xl border border-zinc-800 bg-black">
+              <div className="relative mb-2 overflow-hidden rounded-2xl border border-zinc-800/80 bg-black">
                 {upload?.kind === "video" && upload.localUrl ? (
                   <video src={upload.localUrl} className="max-h-64 w-full object-contain" controls muted playsInline />
                 ) : mediaUrl || upload?.localUrl ? (
@@ -328,7 +328,7 @@ export function CreateModal() {
                   value={mediaUrl.startsWith("blob:") ? "" : mediaUrl}
                   onChange={(e) => setMediaUrl(e.target.value)}
                   placeholder={type === "video" ? "https://.../clip.mp4" : "https://.../photo.jpg"}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-zinc-800/80 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
                 />
               </div>
             ) : null}
@@ -351,7 +351,7 @@ export function CreateModal() {
                           "rounded-xl border px-2 py-1.5 text-left transition",
                           active
                             ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                            : "border-zinc-800 hover:border-zinc-700",
+                            : "border-zinc-800/80 hover:border-zinc-700",
                         )}
                       >
                         <span className="block text-[11px] font-bold text-zinc-100">{option.label}</span>
@@ -401,7 +401,7 @@ export function CreateModal() {
                 "mt-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition",
                 pollMode
                   ? "border-[var(--accent)] bg-[var(--accent-soft)] text-zinc-100"
-                  : "border-zinc-800 text-zinc-400 hover:text-zinc-200",
+                  : "border-zinc-800/80 text-zinc-400 hover:text-zinc-200",
               )}
             >
               <Sparkles size={12} /> {pollMode ? "Poll added" : "Add a quick poll"}
@@ -414,7 +414,7 @@ export function CreateModal() {
                     value={opt}
                     onChange={(e) => setPollOptions((prev) => prev.map((p, idx) => (idx === i ? e.target.value : p)))}
                     placeholder={`Option ${i + 1}`}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+                    className="w-full rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
                   />
                 ))}
                 {pollOptions.length < 4 ? (
@@ -443,11 +443,11 @@ export function CreateModal() {
                 ? "Write a caption for your video... #hashtags welcome"
                 : "Write a caption for your photo... #hashtags welcome"
           }
-          className="w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+          className="w-full resize-none rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
         />
         <div className="flex items-center justify-between text-[11px] text-zinc-500">
           <span>{content.length}/500 characters</span>
-          <span>{user ? `Posting as @${user.username}` : "Safe-chat filter keeps Cliq kind 🛡️"}</span>
+          <span>{user ? `Posting as @${user.username}` : "Safe-chat filter keeps Cliq kind"}</span>
         </div>
 
         <button

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Heart, MessageCircle, Send, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Heart, MessageCircle, Send, ThumbsDown } from "lucide-react";
 import type { Comment, PublicUser } from "@/types/cliq";
 import { Avatar, IconButton, Spinner } from "@/components/ui/Primitives";
 import { cx, formatCount, censor, timeAgo } from "@/lib/utils";
@@ -12,7 +12,7 @@ export function HashtagText({ text }: { text: string }) {
     <span>
       {parts.map((part, i) =>
         part.startsWith("#") ? (
-          <span key={i} className="cursor-pointer font-semibold text-[var(--accent-2)] hover:underline">
+          <span key={i} className="cursor-pointer font-medium text-[#4f46e5] hover:underline">
             {part}
           </span>
         ) : (
@@ -49,7 +49,7 @@ export function CommentThread({
   }
 
   if (comments.length === 0) {
-    return <p className="px-1 py-3 text-xs text-zinc-500">No comments yet — start the conversation 💬</p>;
+    return <p className="px-1 py-3 text-xs text-zinc-500">No comments yet. Start the conversation.</p>;
   }
 
   async function submitReply(parentId: string) {
@@ -65,7 +65,7 @@ export function CommentThread({
   }
 
   const renderComment = (comment: Comment, depth = 0): ReactNode => (
-    <div key={comment.id} className={cx("space-y-2", depth > 0 && "ml-6 border-l border-zinc-800 pl-3")}>
+    <div key={comment.id} className={cx("space-y-2", depth > 0 && "ml-6 border-l border-zinc-800/80 pl-3")}>
       <div className="flex items-start gap-2.5">
         {comment.author ? (
           <Avatar user={comment.author} size={depth > 0 ? 26 : 30} />
@@ -101,13 +101,13 @@ export function CommentThread({
                   if (e.key === "Enter") void submitReply(comment.id);
                 }}
                 placeholder="Write a reply..."
-                className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/60 px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-[var(--accent)]"
+                className="min-w-0 flex-1 rounded-lg border border-zinc-800/80 bg-black px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-zinc-600"
               />
               <button
                 type="button"
                 onClick={() => void submitReply(comment.id)}
                 disabled={sending || !replyText.trim()}
-                className="rounded-full bg-indigo-600 p-1.5 text-white disabled:opacity-40"
+                className="rounded-lg bg-[#4f46e5] p-1.5 text-white disabled:opacity-40"
                 aria-label="Send reply"
               >
                 {sending ? <Spinner /> : <Send size={13} />}
@@ -123,6 +123,7 @@ export function CommentThread({
   return <div className="space-y-3.5">{comments.map((c) => renderComment(c))}</div>;
 }
 
+/** Upgrade / downgrade pill: up arrow, net score, down arrow. */
 export function VoteBar({
   score,
   vote,
@@ -138,29 +139,25 @@ export function VoteBar({
   disabled?: boolean;
   size?: "sm" | "md";
 }) {
-  const pad = size === "sm" ? "px-2.5 py-1 text-xs gap-1" : "px-3 py-1.5 text-sm gap-1.5";
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-zinc-800/80 bg-zinc-950/60 p-0.5">
+    <div className="inline-flex items-center rounded-full border border-zinc-800/80 bg-[#121317]">
       <button
         type="button"
         onClick={onUp}
         disabled={disabled}
+        aria-label="Upgrade"
         className={cx(
-          "inline-flex items-center rounded-full font-bold transition disabled:opacity-40",
-          pad,
-          vote === "up"
-            ? "bg-emerald-500/20 text-emerald-300"
-            : "text-zinc-400 hover:bg-zinc-800 hover:text-emerald-300",
+          "grid place-items-center rounded-full p-1.5 transition disabled:opacity-40",
+          vote === "up" ? "text-[#10b981]" : "text-zinc-500 hover:text-[#10b981]",
         )}
       >
-        <ThumbsUp size={size === "sm" ? 12 : 14} className={vote === "up" ? "fill-current" : ""} />
-        {size === "md" ? "Upgrade" : null}
+        <ArrowUp size={size === "sm" ? 14 : 16} className={vote === "up" ? "fill-current" : ""} />
       </button>
       <span
         className={cx(
-          "min-w-9 text-center font-bold tabular-nums",
+          "min-w-6 text-center font-semibold tabular-nums",
           size === "sm" ? "text-xs" : "text-sm",
-          score > 0 ? "text-emerald-300" : score < 0 ? "text-amber-300" : "text-zinc-400",
+          vote === "up" ? "text-[#10b981]" : vote === "down" ? "text-[#f59e0b]" : "text-zinc-300",
         )}
       >
         {formatCount(score)}
@@ -169,14 +166,13 @@ export function VoteBar({
         type="button"
         onClick={onDown}
         disabled={disabled}
+        aria-label="Downgrade"
         className={cx(
-          "inline-flex items-center rounded-full font-bold transition disabled:opacity-40",
-          pad,
-          vote === "down" ? "bg-amber-500/20 text-amber-300" : "text-zinc-400 hover:bg-zinc-800 hover:text-amber-300",
+          "grid place-items-center rounded-full p-1.5 transition disabled:opacity-40",
+          vote === "down" ? "text-[#f59e0b]" : "text-zinc-500 hover:text-[#f59e0b]",
         )}
       >
-        <ThumbsDown size={size === "sm" ? 12 : 14} className={vote === "down" ? "fill-current" : ""} />
-        {size === "md" ? "Downgrade" : null}
+        <ArrowDown size={size === "sm" ? 14 : 16} className={vote === "down" ? "fill-current" : ""} />
       </button>
     </div>
   );
@@ -204,7 +200,7 @@ export function LikePair({
   return (
     <>
       <IconButton
-        icon={<Heart size={19} className={liked ? "fill-current" : ""} />}
+        icon={<Heart size={22} className={liked ? "fill-current" : ""} />}
         count={formatCount(likes)}
         active={liked}
         activeColor="#ff3040"
@@ -213,10 +209,10 @@ export function LikePair({
         title="Like"
       />
       <IconButton
-        icon={disliked ? <ThumbsDown size={19} className="fill-current" /> : <ThumbsUp size={19} />}
+        icon={<ThumbsDown size={22} className={disliked ? "fill-current" : ""} />}
         count={hideDislikes ? "—" : formatCount(dislikes)}
         active={disliked}
-        activeColor="#fb923c"
+        activeColor="#f59e0b"
         onClick={onDislike}
         disabled={disabled}
         title="Dislike"
@@ -229,10 +225,10 @@ export function AuthorLine({ user, meta }: { user: PublicUser | null; meta: stri
   return (
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-1.5">
-        <span className="truncate text-sm font-bold text-zinc-100">{user?.displayName ?? "Cliq User"}</span>
-        <span className="truncate text-[11px] text-zinc-500">@{user?.username ?? "unknown"}</span>
+        <span className="truncate text-sm font-semibold text-zinc-100">{user?.displayName ?? "Cliq User"}</span>
+        <span className="truncate text-xs text-zinc-500">@{user?.username ?? "unknown"}</span>
       </div>
-      <p className="truncate text-[11px] text-zinc-500">{meta}</p>
+      <p className="truncate text-xs text-zinc-500">{meta}</p>
     </div>
   );
 }

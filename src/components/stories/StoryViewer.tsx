@@ -122,7 +122,7 @@ export function StoryViewer({
         mediaUrl: story?.mediaUrl ?? null,
       });
       setReplyText("");
-      toast("Reply sent to their DMs 💬", "success");
+   toast("Reply sent to their DMs","success");
       onReplied?.(group.author.id);
       onClose();
     } catch (error) {
@@ -136,7 +136,7 @@ export function StoryViewer({
     if (!story) return;
     try {
       await api.deleteStory(story.id);
-      toast("Story deleted", "default");
+   toast("Story deleted","default");
       onClose();
     } catch (error) {
       apiError(error);

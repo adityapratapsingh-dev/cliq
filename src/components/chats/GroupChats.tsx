@@ -1,19 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  Image as ImageIcon,
-  Plus,
-  Search,
-  Send,
-  Smile,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, Check, Heart, Image as ImageIcon, Plus, Search, Users } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { Avatar, EmptyState, Modal, Skeleton, Spinner } from "@/components/ui/Primitives";
-import { EMOJI_QUICKBAR, MESSAGE_REACTIONS } from "@/lib/constants";
+import { MESSAGE_REACTIONS } from "@/lib/constants";
 import { uploadMedia } from "@/lib/cloudinary";
 import { api } from "@/lib/api-client";
 import type { Group, GroupMessage, PublicUser } from "@/types/cliq";
@@ -22,10 +13,10 @@ import { clockTime, cx, timeAgo } from "@/lib/utils";
 const POLL_INTERVAL_MS = 3500;
 
 /**
- * Cliq Group Lounges.
+ * Group lounges.
  *
  * A list of public interest lounges plus any private groups you're in, and a
- * room view with live-polled group messages, emoji reactions and media sharing.
+ * room view with live-polled group messages, reactions and media sharing.
  */
 export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => void }) {
   const { user, toast, apiError } = useCliq();
@@ -64,12 +55,7 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
 
   if (open) {
     return (
-      <GroupRoom
-        group={open}
-        onBack={() => setOpen(null)}
-        onOpenProfile={onOpenProfile}
-        onChanged={() => void load(true)}
-      />
+      <GroupRoom group={open} onBack={() => setOpen(null)} onOpenProfile={onOpenProfile} onChanged={() => void load(true)} />
     );
   }
 
@@ -77,28 +63,28 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search group lounges..."
-            className="h-10 w-full rounded-full border border-zinc-800 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+            placeholder="Search groups"
+            className="h-10 w-full rounded-lg border border-zinc-800/80 bg-[#121317] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
           />
         </div>
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          className="inline-flex h-10 items-center gap-1.5 rounded-full bg-indigo-600 px-4 text-xs font-bold text-white shadow-lg shadow-indigo-500/20 transition hover:bg-indigo-500"
+          className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-white px-4 text-xs font-semibold text-black transition hover:bg-zinc-200"
         >
-          <Plus size={14} /> New
+          <Plus size={15} strokeWidth={2} /> New
         </button>
       </div>
 
       {loading ? (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3 rounded-2xl border border-zinc-800/80 bg-[#121317] p-3">
-              <Skeleton className="h-11 w-11 rounded-2xl" />
+            <div key={i} className="flex items-center gap-3 border-b border-zinc-800/80 py-3">
+              <Skeleton className="h-11 w-11 rounded-lg" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-3 w-32" />
                 <Skeleton className="h-2.5 w-48" />
@@ -108,40 +94,38 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={<Users size={26} />}
-          title="No group lounges found"
+          icon={<Users size={26} strokeWidth={1.75} />}
+          title="No groups found"
           hint="Try another search, or start your own group with friends."
           actionLabel="Start a group"
           onAction={() => setCreateOpen(true)}
         />
       ) : (
-        <div className="space-y-2">
+        <div>
           {filtered.map((group) => (
             <button
               key={group.id}
               type="button"
               onClick={() => setOpen(group)}
-              className="cliq-rise flex w-full items-center gap-3 rounded-2xl border border-zinc-800/80 bg-[#121317] p-3 text-left transition hover:border-zinc-700"
+              className="flex w-full items-center gap-3 border-b border-zinc-800/80 py-3 text-left transition hover:bg-[#121317]"
             >
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-xl">
-                {group.icon}
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#121317] text-zinc-300">
+                <Users size={20} strokeWidth={1.75} />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-sm font-bold text-zinc-100">{group.name}</span>
+                  <span className="truncate text-sm font-semibold text-white">{group.name}</span>
                   {group.isPublic ? (
-                    <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-300">
+                    <span className="rounded bg-[#121317] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
                       Lounge
                     </span>
                   ) : null}
                 </div>
-                <p className="truncate text-[11px] text-zinc-500">{group.description || "Group chat"}</p>
+                <p className="truncate text-xs text-zinc-500">{group.description || "Group chat"}</p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-[11px] font-semibold text-zinc-400">{group.memberCount} members</p>
-                {group.lastMessageAt ? (
-                  <p className="text-[10px] text-zinc-600">{timeAgo(group.lastMessageAt)}</p>
-                ) : null}
+                <p className="text-xs text-zinc-400">{group.memberCount} members</p>
+                {group.lastMessageAt ? <p className="text-[10px] text-zinc-600">{timeAgo(group.lastMessageAt)}</p> : null}
               </div>
             </button>
           ))}
@@ -156,7 +140,7 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
             setCreateOpen(false);
             setOpen(group);
             void load(true);
-            toast(`Created "${group.name}" 🎉`, "success");
+            toast(`Created "${group.name}"`, "success");
           }}
         />
       ) : null}
@@ -176,11 +160,8 @@ function CreateGroupModal({
   const { apiError } = useCliq();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [icon, setIcon] = useState("💬");
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
-
-  const ICONS = ["💬", "🎮", "🎵", "📚", "😂", "🌙", "⚡", "🔥", "🏀", "🎨"];
 
   function toggle(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -190,12 +171,7 @@ function CreateGroupModal({
     if (!name.trim() || busy) return;
     setBusy(true);
     try {
-      const { group } = await api.createGroup({
-        name: name.trim(),
-        description: description.trim(),
-        icon,
-        memberIds: selected,
-      });
+      const { group } = await api.createGroup({ name: name.trim(), description: description.trim(), memberIds: selected });
       onCreated(group);
     } catch (error) {
       apiError(error);
@@ -204,51 +180,35 @@ function CreateGroupModal({
     }
   }
 
-  return (
-    <Modal open onClose={onClose} title="Start a Group Cliq" subtitle="Bring your friends into one room 💬">
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-2xl">{icon}</span>
-          <input
-            value={name}
-            autoFocus
-            maxLength={60}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Group name"
-            className="h-11 min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 text-sm font-semibold text-zinc-100 outline-none focus:border-indigo-500"
-          />
-        </div>
+  const inputClass =
+    "w-full rounded-lg border border-zinc-800/80 bg-[#121317] px-3 text-sm text-white outline-none focus:border-zinc-600";
 
-        <div className="flex flex-wrap gap-1.5">
-          {ICONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => setIcon(option)}
-              className={cx(
-                "grid h-9 w-9 place-items-center rounded-xl text-lg transition",
-                icon === option ? "bg-indigo-600/30 ring-1 ring-indigo-500" : "hover:bg-zinc-800",
-              )}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+  return (
+    <Modal open onClose={onClose} title="New group">
+      <div className="space-y-4">
+        <input
+          value={name}
+          autoFocus
+          maxLength={60}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Group name"
+          className={cx(inputClass, "h-11 font-semibold")}
+        />
 
         <input
           value={description}
           maxLength={200}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What's this group about? (optional)"
-          className="h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+          className={cx(inputClass, "h-11")}
         />
 
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-zinc-500">
+          <p className="mb-2 text-xs font-medium text-zinc-500">
             Invite friends {selected.length > 0 ? `· ${selected.length}` : ""}
           </p>
           {friends.length === 0 ? (
-            <p className="text-xs text-zinc-500">Add some Cliq friends first, then invite them here.</p>
+            <p className="text-xs text-zinc-500">Add some friends first, then invite them here.</p>
           ) : (
             <div className="cliq-scroll max-h-56 space-y-1 overflow-y-auto">
               {friends.map((friend) => {
@@ -258,17 +218,14 @@ function CreateGroupModal({
                     key={friend.id}
                     type="button"
                     onClick={() => toggle(friend.id)}
-                    className={cx(
-                      "flex w-full items-center gap-3 rounded-xl p-2 text-left transition",
-                      on ? "bg-[var(--accent-soft)]" : "hover:bg-zinc-800/60",
-                    )}
+                    className={cx("flex w-full items-center gap-3 rounded-lg p-2 text-left transition", on ? "bg-[#121317]" : "hover:bg-[#121317]")}
                   >
                     <Avatar user={friend} size={36} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-zinc-200">{friend.displayName}</p>
-                      <p className="truncate text-[11px] text-zinc-500">@{friend.username}</p>
+                      <p className="truncate text-sm font-medium text-zinc-200">{friend.displayName}</p>
+                      <p className="truncate text-xs text-zinc-500">@{friend.username}</p>
                     </div>
-                    {on ? <Check size={16} className="text-[var(--accent-2)]" /> : null}
+                    {on ? <Check size={16} className="text-[#4f46e5]" strokeWidth={2.5} /> : null}
                   </button>
                 );
               })}
@@ -280,9 +237,9 @@ function CreateGroupModal({
           type="button"
           onClick={() => void create()}
           disabled={!name.trim() || busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:opacity-40"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:opacity-40"
         >
-          {busy ? "Creating..." : <><Users size={16} /> Create group</>}
+          {busy ? "Creating..." : "Create group"}
         </button>
       </div>
     </Modal>
@@ -300,12 +257,11 @@ function GroupRoom({
   onOpenProfile: (id: string) => void;
   onChanged: () => void;
 }) {
-  const { user, toast, apiError } = useCliq();
+  const { user, apiError } = useCliq();
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [showEmoji, setShowEmoji] = useState(false);
   const [reactFor, setReactFor] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
@@ -328,7 +284,6 @@ function GroupRoom({
 
   useEffect(() => {
     void load();
-    // Public lounges: joining is implicit on first message, but show membership.
     if (group.isPublic) void api.joinGroup(group.id).catch(() => undefined);
   }, [load, group.id, group.isPublic]);
 
@@ -359,11 +314,10 @@ function GroupRoom({
   }
 
   async function attach(file: File) {
-    if (!user) return;
     setUploading(true);
     try {
       const result = await uploadMedia(file);
-      const { message } = await api.sendGroupMessage({ groupId: group.id, mediaUrl: result.secureUrl });
+      const { message } = await api.sendGroupMessage({ groupId: group.id, content: "", mediaUrl: result.secureUrl });
       setMessages((prev) => [...prev, message]);
       onChanged();
     } catch (error) {
@@ -384,42 +338,31 @@ function GroupRoom({
   }
 
   return (
-    <div className="flex h-[32rem] flex-col overflow-hidden rounded-3xl border border-zinc-800/80 bg-[#121317] lg:h-[34rem]">
-      <header className="flex items-center gap-3 border-b border-zinc-800/80 px-4 py-3">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to groups"
-          className="grid h-8 w-8 place-items-center rounded-full text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
-        >
-          <ArrowLeft size={18} />
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex h-[60px] items-center gap-3 border-b border-zinc-800/80 px-4">
+        <button type="button" onClick={onBack} aria-label="Back" className="text-zinc-300 transition hover:text-white">
+          <ArrowLeft size={20} strokeWidth={1.75} />
         </button>
-        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-[var(--accent-soft)] text-xl">{group.icon}</span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#121317] text-zinc-300">
+          <Users size={20} strokeWidth={1.75} />
+        </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-zinc-100">{group.name}</p>
-          <p className="truncate text-[11px] text-zinc-500">
+          <p className="truncate text-sm font-semibold text-white">{group.name}</p>
+          <p className="truncate text-xs text-zinc-500">
             {group.memberCount} members · {group.isPublic ? "Public lounge" : "Private group"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => toast("Invites arrive soon ✉️", "default")}
-          className="grid h-9 w-9 place-items-center rounded-full border border-zinc-800 text-zinc-300 transition hover:border-[var(--accent)] hover:text-zinc-100"
-          aria-label="Invite"
-        >
-          <Plus size={16} />
-        </button>
       </header>
 
-      <div ref={feedRef} className="cliq-scroll flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:px-4">
+      <div ref={feedRef} className="cliq-scroll flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-xs text-zinc-500">
             <Spinner /> <span className="ml-2">Loading the room...</span>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <span className="text-3xl">{group.icon}</span>
-            <p className="text-xs text-zinc-400">Be the first to say something in {group.name}.</p>
+            <Users size={28} strokeWidth={1.5} className="text-zinc-700" />
+            <p className="text-sm text-zinc-500">Be the first to say something in {group.name}.</p>
           </div>
         ) : (
           messages.map((msg) => {
@@ -433,14 +376,12 @@ function GroupRoom({
                 ) : null}
                 <div className={cx("max-w-[78%]", mine && "items-end")}>
                   {!mine && msg.sender ? (
-                    <p className="mb-0.5 ml-1 text-[10px] font-semibold text-zinc-500">@{msg.sender.username}</p>
+                    <p className="mb-0.5 ml-1 text-[10px] font-medium text-zinc-500">@{msg.sender.username}</p>
                   ) : null}
                   <div
                     className={cx(
-                      "group relative rounded-2xl px-3 py-2 text-sm",
-                      mine
-                        ? "bg-indigo-600 text-white"
-                        : "border border-zinc-800/80 bg-zinc-950/70 text-zinc-200",
+                      "group relative rounded-[20px] px-4 py-2.5 text-sm",
+                      mine ? "bg-[#4f46e5] text-white" : "bg-[#18181b] text-[#f5f5f5]",
                     )}
                   >
                     {msg.mediaUrl ? (
@@ -448,7 +389,7 @@ function GroupRoom({
                       <img src={msg.mediaUrl} alt="" className="mb-1.5 max-h-56 rounded-xl object-cover" />
                     ) : null}
                     {msg.content ? <p className="whitespace-pre-wrap break-words">{msg.content}</p> : null}
-                    <span className={cx("mt-0.5 block text-[9px]", mine ? "text-white/60" : "text-zinc-600")}>
+                    <span className={cx("mt-0.5 block text-[9px]", mine ? "text-white/60" : "text-zinc-500")}>
                       {clockTime(msg.createdAt)}
                     </span>
 
@@ -457,15 +398,17 @@ function GroupRoom({
                       onClick={() => setReactFor((prev) => (prev === msg.id ? null : msg.id))}
                       aria-label="React"
                       className={cx(
-                        "absolute top-1 opacity-0 transition group-hover:opacity-100",
+                        "absolute -top-3 opacity-0 transition group-hover:opacity-100",
                         mine ? "left-1" : "right-1",
                       )}
                     >
-                      <Smile size={13} className="text-white/70" />
+                      <span className="grid h-6 w-6 place-items-center rounded-full border border-zinc-700 bg-[#121317] text-zinc-300">
+                        <Heart size={12} strokeWidth={1.75} />
+                      </span>
                     </button>
 
                     {reactFor === msg.id ? (
-                      <div className={cx("absolute -top-9 z-10 flex gap-0.5 rounded-full border border-zinc-700 bg-zinc-900 p-1 shadow-xl", mine ? "right-0" : "left-0")}>
+                      <div className={cx("absolute -top-10 z-10 flex gap-0.5 rounded-full border border-zinc-700 bg-[#121317] p-1 shadow-xl", mine ? "right-0" : "left-0")}>
                         {MESSAGE_REACTIONS.map((emoji) => (
                           <button
                             key={emoji}
@@ -488,10 +431,8 @@ function GroupRoom({
                           type="button"
                           onClick={() => void react(msg.id, r.emoji)}
                           className={cx(
-                            "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition",
-                            r.mine
-                              ? "border-[var(--accent)] bg-[var(--accent-soft)] text-zinc-100"
-                              : "border-zinc-800 text-zinc-400 hover:border-zinc-700",
+                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition",
+                            r.mine ? "bg-[#ff3040]/15 text-[#ff3040]" : "bg-[#18181b] text-zinc-400",
                           )}
                         >
                           {r.emoji} {r.count}
@@ -506,22 +447,7 @@ function GroupRoom({
         )}
       </div>
 
-      {showEmoji ? (
-        <div className="flex flex-wrap gap-1 border-t border-zinc-800/80 px-3 py-2">
-          {EMOJI_QUICKBAR.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => setDraft((d) => d + emoji)}
-              className="grid h-8 w-8 place-items-center rounded-lg text-lg transition hover:bg-zinc-800"
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="flex items-center gap-2 border-t border-zinc-800/80 px-3 py-3">
+      <div className="flex items-center gap-3 border-t border-zinc-800/80 p-4">
         <input
           ref={fileRef}
           type="file"
@@ -538,39 +464,35 @@ function GroupRoom({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           aria-label="Attach photo"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100 disabled:opacity-40"
+          className="shrink-0 text-zinc-400 transition hover:text-white disabled:opacity-40"
         >
-          {uploading ? <Spinner className="h-4 w-4" /> : <ImageIcon size={18} />}
+          {uploading ? <Spinner className="h-4 w-4" /> : <ImageIcon size={20} strokeWidth={1.75} />}
         </button>
-        <button
-          type="button"
-          onClick={() => setShowEmoji((v) => !v)}
-          aria-label="Emoji"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
-        >
-          <Smile size={18} />
-        </button>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send();
-            }
-          }}
-          placeholder={`Message ${group.name}...`}
-          className="min-w-0 flex-1 rounded-full border border-zinc-800 bg-zinc-950/60 px-4 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
-        />
-        <button
-          type="button"
-          onClick={() => void send()}
-          disabled={!draft.trim() || sending}
-          aria-label="Send"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:opacity-40"
-        >
-          <Send size={16} />
-        </button>
+        <div className="flex flex-1 items-center gap-3 rounded-full border border-zinc-700 bg-black px-4 py-2.5">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            placeholder={`Message ${group.name}...`}
+            className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
+          />
+          {draft.trim() ? (
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={sending}
+              aria-label="Send"
+              className="text-sm font-semibold text-[#4f46e5] transition hover:text-white disabled:opacity-40"
+            >
+              Send
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

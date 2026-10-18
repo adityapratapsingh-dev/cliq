@@ -3,16 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Bookmark,
-  Check,
   Heart,
   MessageCircle,
-  Music2,
+  MoreHorizontal,
   Pause,
   Play,
-  Plus,
   Send,
-
-  Trash2,
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { Avatar } from "@/components/ui/Primitives";
@@ -60,6 +56,7 @@ export function Reel({
   const [expanded, setExpanded] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [gesture, setGesture] = useState<"play" | "pause" | null>(null);
   const [bursts, setBursts] = useState<Burst[]>([]);
 
@@ -67,7 +64,7 @@ export function Reel({
   const saved = savedIds.includes(post.id);
   const following = followingIds.includes(post.userId);
   const isOwner = post.userId === user?.id;
-  const canFollow = post.author && !isOwner;
+  const canFollow = Boolean(post.author) && !isOwner;
 
   const play = useCallback(() => {
     const el = videoRef.current;
@@ -82,7 +79,6 @@ export function Reel({
     if (!el) return;
     el.pause();
     setPlaying(false);
-    // Rewind so a reel that scrolls away restarts from the beginning.
     if (reset) {
       try {
         el.currentTime = 0;
@@ -93,13 +89,6 @@ export function Reel({
     }
   }, []);
 
-  /**
-   * Autoplay the snapped reel, pause everything else.
-   *
-   * An IntersectionObserver at 0.65 is what drives this, so only one video is
-   * ever audible. The `active` prop is a fallback for browsers/tests where the
-   * observer has not fired yet.
-   */
   useEffect(() => {
     const slide = slideRef.current;
     if (!slide || broken) return;
@@ -107,11 +96,8 @@ export function Reel({
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= PLAY_THRESHOLD) {
-            play();
-          } else {
-            pause(true);
-          }
+          if (entry.isIntersecting && entry.intersectionRatio >= PLAY_THRESHOLD) play();
+          else pause(true);
         }
       },
       { threshold: [0, PLAY_THRESHOLD, 1] },
@@ -120,14 +106,12 @@ export function Reel({
     return () => observer.disconnect();
   }, [play, pause, broken]);
 
-  // Belt-and-braces: follow the container's active index too.
   useEffect(() => {
     if (broken) return;
     if (active) play();
     else pause(true);
   }, [active, play, pause, broken]);
 
-  // React to the global mute toggle.
   useEffect(() => {
     const el = videoRef.current;
     if (el) el.muted = muted;
@@ -147,7 +131,6 @@ export function Reel({
     const y = event.clientY - rect.top;
 
     if (now - lastTap.current < DOUBLE_TAP_MS) {
-      // Double tap: heart burst at the tap point + like.
       lastTap.current = 0;
       addBurst(x, y);
       if (!liked) void react(post.id, "like", post);
@@ -155,7 +138,6 @@ export function Reel({
     }
 
     lastTap.current = now;
-    // Single tap: toggle playback. Delayed so a double tap can cancel it.
     setTimeout(() => {
       if (lastTap.current !== now) return;
       const el = videoRef.current;
@@ -171,7 +153,6 @@ export function Reel({
     }, DOUBLE_TAP_MS);
   }
 
-  /** Tap/click anywhere on the progress bar to seek. */
   function seek(event: React.MouseEvent<HTMLDivElement>) {
     const el = videoRef.current;
     if (!el || !el.duration || !Number.isFinite(el.duration)) return;
@@ -185,18 +166,8 @@ export function Reel({
     }
   }
 
-  async function handleDelete() {
-    if (!isOwner) return;
-    await remove(post.id);
-  }
-
   return (
-    <div
-      ref={slideRef}
-      data-testid="reel-slide"
-      className="relative h-full w-full"
-      onClick={handleTap}
-    >
+    <div ref={slideRef} data-testid="reel-slide" className="relative h-full w-full" onClick={handleTap}>
       {post.mediaUrl && !broken ? (
         <video
           ref={videoRef}
@@ -213,77 +184,41 @@ export function Reel({
           }}
         />
       ) : (
-        <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-violet-950 via-fuchsia-950/60 to-cyan-950">
+        <div className="absolute inset-0 grid place-items-center bg-[#0a0a0a]">
           <div className="flex flex-col items-center gap-2 text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur">
-              <Play size={24} className="ml-0.5" />
+            <span className="grid h-14 w-14 place-items-center rounded-full border border-white/15 text-white">
+              <Play size={24} className="ml-0.5" strokeWidth={1.75} />
             </span>
-            <p className="text-xs text-zinc-400">
-              {post.mediaUrl ? "This reel can't play here" : "No video attached"}
+            <p className="text-xs text-zinc-500">
+              {post.mediaUrl ? "This video can't play here" : "No video attached"}
             </p>
           </div>
         </div>
       )}
 
-      {/* Heart bursts */}
       {bursts.map((b) => (
         <Heart
           key={b.id}
           size={96}
-          className="cliq-reel-heart pointer-events-none absolute z-30 fill-rose-500 text-rose-500 drop-shadow-[0_0_28px_rgba(244,63,94,0.85)]"
+          className="cliq-reel-heart pointer-events-none absolute z-30 fill-[#ff3040] text-[#ff3040]"
           style={{ left: b.x, top: b.y }}
         />
       ))}
 
-      {/* Centre play/pause feedback */}
       {gesture ? (
-        <span className="cliq-reel-playpause pointer-events-none absolute left-1/2 top-1/2 z-30 grid h-20 w-20 place-items-center rounded-full bg-black/45 text-white backdrop-blur-md">
+        <span className="cliq-reel-playpause pointer-events-none absolute left-1/2 top-1/2 z-30 grid h-20 w-20 place-items-center rounded-full bg-black/50 text-white">
           {gesture === "play" ? <Play size={34} className="ml-1" fill="currentColor" /> : <Pause size={34} fill="currentColor" />}
         </span>
       ) : null}
 
-      {/* Paused indicator (so the state is visible without a gesture) */}
       {!playing && !gesture && !broken ? (
-        <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white/90 backdrop-blur-sm">
+        <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/35 text-white/90">
           <Play size={26} className="ml-1" fill="currentColor" />
         </span>
       ) : null}
 
-      {/* Right action column */}
-      <div className="absolute bottom-20 right-3 z-20 flex flex-col items-center gap-5">
-        {post.author ? (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenProfile(post.author!.id);
-              }}
-              aria-label={`Open ${post.author.displayName}'s profile`}
-              className="block rounded-full transition hover:brightness-110"
-            >
-              <Avatar user={post.author} size={44} />
-              <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-white/90" />
-            </button>
-            {canFollow ? (
-              <button
-                type="button"
-                aria-label={following ? "In Cliq" : "Cliq Up"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFollow(post.userId);
-                }}
-                className={cx(
-                  "absolute -bottom-1.5 left-1/2 grid h-6 w-6 -translate-x-1/2 place-items-center rounded-full border border-black/60 text-white transition",
-                  following ? "bg-emerald-500" : "bg-[var(--accent)]",
-                )}
-              >
-                {following ? <Check size={13} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
+      {/* Right action rail */}
+      <div className="absolute bottom-6 right-3 z-20 flex flex-col items-center gap-5">
         <ActionButton
           label={formatCount(post.likesCount)}
           aria="Like"
@@ -292,12 +227,7 @@ export function Reel({
             void react(post.id, "like", post);
           }}
           active={liked}
-          icon={
-            <Heart
-              size={28}
-              className={cx(liked && "fill-rose-500 text-rose-500 scale-110")}
-            />
-          }
+          icon={<Heart size={28} strokeWidth={1.75} className={cx(liked && "fill-[#ff3040] text-[#ff3040]")} />}
         />
 
         <ActionButton
@@ -307,7 +237,7 @@ export function Reel({
             e.stopPropagation();
             setCommentsOpen(true);
           }}
-          icon={<MessageCircle size={28} />}
+          icon={<MessageCircle size={28} strokeWidth={1.75} />}
         />
 
         <ActionButton
@@ -317,7 +247,7 @@ export function Reel({
             e.stopPropagation();
             setShareOpen(true);
           }}
-          icon={<Send size={27} />}
+          icon={<Send size={27} strokeWidth={1.75} />}
         />
 
         <ActionButton
@@ -327,106 +257,132 @@ export function Reel({
           onClick={(e) => {
             e.stopPropagation();
             toggleSaved(post.id);
-            toast(saved ? "Removed from Saved" : "Saved to your profile 🔖", saved ? "default" : "success");
+            toast(saved ? "Removed from Saved" : "Saved", saved ? "default" : "success");
           }}
-          icon={<Bookmark size={25} className={cx(saved && "fill-current")} />}
+          icon={<Bookmark size={25} strokeWidth={1.75} className={cx(saved && "fill-current")} />}
         />
 
-        {isOwner ? (
+        <div className="relative">
           <ActionButton
-            label="Delete"
-            aria="Delete Reel"
-            tone="danger"
+            label="More"
+            aria="More"
             onClick={(e) => {
               e.stopPropagation();
-              void handleDelete();
+              setMenuOpen((v) => !v);
             }}
-            icon={<Trash2 size={23} />}
+            icon={<MoreHorizontal size={25} strokeWidth={1.75} />}
           />
-        ) : null}
-
-        {/* Spinning audio disc */}
-        <div className="relative mt-1 grid h-11 w-11 place-items-center">
-          <span className="absolute inset-0 animate-spin rounded-full border border-white/20 bg-black/60 [animation-duration:4s]">
-            <span className="absolute left-1/2 top-1 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-white/40" />
-          </span>
-          {post.author ? (
-            <span className="relative grid h-7 w-7 place-items-center overflow-hidden rounded-full ring-1 ring-white/30">
-              <Avatar user={post.author} size={28} />
-            </span>
+          {menuOpen ? (
+            <>
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                }}
+                className="fixed inset-0 z-10 cursor-default"
+              />
+              {isOwner ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    void remove(post.id);
+                  }}
+                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-zinc-800/80 bg-[#121317] px-3 py-2 text-left text-xs font-semibold text-[#ff3040] shadow-2xl"
+                >
+                  Delete
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpen(false);
+                    if (post.author) onOpenProfile(post.author.id);
+                  }}
+                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-zinc-800/80 bg-[#121317] px-3 py-2 text-left text-xs font-semibold text-zinc-200 shadow-2xl"
+                >
+                  View profile
+                </button>
+              )}
+            </>
           ) : null}
         </div>
       </div>
 
       {/* Bottom-left creator + caption */}
-      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-5 pt-16">
-        <div className="pr-20">
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="absolute inset-x-0 bottom-0 z-10 w-full bg-gradient-to-t from-black/80 via-black/30 to-transparent px-4 pb-5 pt-16 pr-16">
+        <div className="flex items-center gap-2.5">
+          {post.author ? (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                if (post.author) onOpenProfile(post.author.id);
+                onOpenProfile(post.author!.id);
               }}
-              className="text-sm font-bold text-white transition hover:text-[var(--accent-2)]"
+              aria-label="Open profile"
+              className="shrink-0 rounded-full"
             >
-              @{post.author?.username ?? "unknown"}
+              <Avatar user={post.author} size={32} />
             </button>
-            {post.author?.age ? (
-              <span className="rounded-full border border-white/20 bg-black/40 px-2 py-0.5 text-[10px] font-semibold text-zinc-200 backdrop-blur">
-                {post.author.age}
-                {post.author.bio ? ` • ${post.author.bio.slice(0, 18)}` : ""}
-              </span>
-            ) : null}
-            {canFollow && !following ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFollow(post.userId);
-                }}
-                className="rounded-full border border-white/25 bg-black/40 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur transition hover:bg-black/60"
-              >
-                Cliq Up
-              </button>
-            ) : null}
-          </div>
-
-          {post.content ? (
-            <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-100">
-              <HashtagText text={expanded || post.content.length <= 90 ? post.content : `${post.content.slice(0, 90)}...`} />
-              {post.content.length > 90 ? (
-                <>
-                  {" "}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setExpanded((v) => !v);
-                    }}
-                    className="font-semibold text-zinc-400 transition hover:text-white"
-                  >
-                    {expanded ? "less" : "more"}
-                  </button>
-                </>
-              ) : null}
-            </p>
           ) : null}
-
-          {/* Marquee audio pill */}
-          <div className="mt-2 inline-flex max-w-full items-center gap-2 overflow-hidden rounded-full border border-white/15 bg-black/40 px-3 py-1.5 backdrop-blur">
-            <Music2 size={12} className="shrink-0 text-zinc-300" />
-            <div className="no-scrollbar relative w-40 overflow-hidden">
-              <div className="cliq-marquee flex w-max gap-6 whitespace-nowrap text-[11px] text-zinc-200">
-                <span>🎵 Original Audio • @{post.author?.username ?? "unknown"}</span>
-                <span>🎵 Original Audio • @{post.author?.username ?? "unknown"}</span>
-              </div>
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (post.author) onOpenProfile(post.author.id);
+            }}
+            className="text-sm font-semibold text-white"
+          >
+            {post.author?.username ?? "unknown"}
+          </button>
+          {canFollow ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFollow(post.userId);
+              }}
+              className={cx(
+                "rounded-md border px-2.5 py-1 text-xs font-semibold transition",
+                following
+                  ? "border-white/30 text-white/70 hover:text-white"
+                  : "border-white/60 text-white hover:bg-white/10",
+              )}
+            >
+              {following ? "Following" : "Follow"}
+            </button>
+          ) : null}
         </div>
+
+        {post.content ? (
+          <p className="mt-2 text-sm leading-snug text-white">
+            <HashtagText
+              text={expanded || post.content.length <= 90 ? post.content : `${post.content.slice(0, 90)}...`}
+            />
+            {post.content.length > 90 ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded((v) => !v);
+                  }}
+                  className="font-medium text-zinc-400 transition hover:text-white"
+                >
+                  {expanded ? "less" : "more"}
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
       </div>
 
-      {/* Scrubbing progress bar, fixed to the very bottom edge */}
+      {/* Scrubbing progress bar */}
       <div
         role="slider"
         aria-label="Seek"
@@ -444,16 +400,12 @@ export function Reel({
           if (e.key === "ArrowRight") el.currentTime = Math.min(el.duration, el.currentTime + 5);
           if (e.key === "ArrowLeft") el.currentTime = Math.max(0, el.currentTime - 5);
         }}
-        className="absolute inset-x-0 bottom-0 z-30 h-1 cursor-pointer bg-white/20"
+        className="absolute inset-x-0 bottom-0 z-30 h-[2px] cursor-pointer bg-white/25"
       >
-        <div
-          className="h-full bg-indigo-600 transition-[width] duration-150"
-          style={{ width: `${progress}%` }}
-        />
+        <div className="h-full bg-white transition-[width] duration-150" style={{ width: `${progress}%` }} />
       </div>
 
       <ReelCommentsSheet post={post} open={commentsOpen} onClose={() => setCommentsOpen(false)} />
-
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} post={post} />
     </div>
   );
@@ -465,14 +417,12 @@ function ActionButton({
   aria,
   onClick,
   active,
-  tone,
 }: {
   icon: React.ReactNode;
   label: string;
   aria: string;
   onClick: (e: React.MouseEvent) => void;
   active?: boolean;
-  tone?: "danger";
 }) {
   return (
     <button
@@ -481,17 +431,10 @@ function ActionButton({
       onClick={onClick}
       className="flex flex-col items-center gap-1 transition active:scale-90"
     >
-      <span
-        className={cx(
-          "grid h-11 w-11 place-items-center rounded-full transition",
-          tone === "danger" ? "text-zinc-300 hover:text-rose-400" : "text-white",
-          active && tone !== "danger" && "bg-white/10",
-        )}
-      >
+      <span className={cx("grid h-11 w-11 place-items-center rounded-full text-white drop-shadow", active && "bg-white/10")}>
         {icon}
       </span>
       <span className="text-[11px] font-semibold text-white drop-shadow">{label}</span>
     </button>
   );
 }
-

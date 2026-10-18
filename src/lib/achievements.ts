@@ -72,25 +72,25 @@ export const BADGE_DEFS: Omit<AchievementBadge, "earned">[] = [
   {
     id: "founding",
     label: "Founding Cliq",
-    emoji: "⚡",
+    emoji: "",
     description: "Joined Cliq in the early days",
   },
   {
     id: "streak",
     label: "Active Streak",
-    emoji: "🔥",
+    emoji: "",
     description: "Has an active daily chat streak",
   },
   {
     id: "creator",
     label: "Rising Creator",
-    emoji: "🚀",
+    emoji: "",
     description: "Earned 5+ likes and upgrades",
   },
   {
     id: "legend",
     label: "Cliq Legend",
-    emoji: "👑",
+    emoji: "",
     description: "Earned a Cliq Score of 25+",
   },
 ];

@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { useCliq } from "@/components/CliqProvider";
 import { AuthScreen } from "@/components/AuthScreen";
-import { BottomNav, Header, Sidebar } from "@/components/Shell";
+import { BottomNav, LeftRail } from "@/components/Shell";
 import { CreateModal } from "@/components/CreateModal";
 import { ToastHost } from "@/components/ToastHost";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { NotificationBanner } from "@/components/notifications/NotificationBanner";
-import { ContextRail } from "@/components/ContextRail";
-import { SearchDropdown } from "@/components/SearchDropdown";
+import { RightSidebar } from "@/components/ContextRail";
+import { SearchPanel } from "@/components/SearchPanel";
 import { ProfileModal } from "@/components/ProfileModal";
 import { VideosTab } from "@/components/tabs/VideosTab";
 import { PhotosTab } from "@/components/tabs/PhotosTab";
@@ -18,27 +18,35 @@ import { FriendsTab } from "@/components/tabs/FriendsTab";
 import { ProfileTab } from "@/components/tabs/ProfileTab";
 import { accentVars } from "@/lib/theme";
 import { Spinner } from "@/components/ui/Primitives";
+import { cx } from "@/lib/utils";
+
+/** Center column width per tab, matching each section's natural content width. */
+const CENTER_WIDTH: Record<string, string> = {
+  chatposts: "max-w-[620px] border-x border-zinc-800/80",
+  photos: "max-w-[620px]",
+  videos: "max-w-[620px]",
+  friends: "max-w-[900px]",
+  profile: "max-w-[935px]",
+};
 
 export function CliqApp() {
-  const { user, loading, settings, tab, setTab, refreshUser, bump, markTabSeen } = useCliq();
-  const [search, setSearch] = useState("");
+  const { user, loading, settings, tab, setTab, refreshUser, bump, markTabSeen, search } = useCliq();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   // Which user's public profile is open, if any.
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
   const openProfile = (id: string) => setProfileUserId(id);
 
   useEffect(() => {
-    if (tab !== "friends") setBellOpen(false);
-    // Opening a tab clears its "new posts" red dot.
     markTabSeen(tab);
   }, [tab, markTabSeen]);
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-zinc-950">
+      <div className="flex min-h-dvh items-center justify-center bg-black">
         <div className="flex flex-col items-center gap-3">
           <Spinner className="h-6 w-6" />
-          <p className="text-xs text-zinc-500">Warming up Cliq...</p>
+          <p className="text-xs text-zinc-500">Loading Cliq...</p>
         </div>
       </div>
     );
@@ -50,7 +58,7 @@ export function CliqApp() {
         <AuthScreen
           onAuthed={() => {
             void refreshUser();
-            setTab("videos");
+            setTab("chatposts");
           }}
         />
         <ToastHost />
@@ -58,62 +66,38 @@ export function CliqApp() {
     );
   }
 
+  const centerWidth = CENTER_WIDTH[tab] ?? "max-w-[600px]";
+
   return (
-    <div style={accentVars(settings.accent)} className="min-h-dvh bg-zinc-950 text-zinc-100">
-      <div className="relative">
-        <Header
-          search={search}
-          onSearch={setSearch}
-          onBell={() => setBellOpen((v) => !v)}
-          onProfile={() => setTab("profile")}
-          searchSlot={
-            search.trim() ? (
-              <SearchDropdown
-                query={search}
-                onClose={() => setSearch("")}
-                onOpenProfile={openProfile}
-                onSearch={setSearch}
-              />
-            ) : null
-          }
-        />
-        {bellOpen ? (
-          <NotificationCenter onClose={() => setBellOpen(false)} onNavigate={(next) => setTab(next)} />
-        ) : null}
-        <div className="mx-auto flex w-full max-w-[1400px] justify-center gap-6 px-0 lg:px-4">
-          <Sidebar />
-          <main className="cliq-scroll min-w-0 w-full max-w-[620px] pb-24 lg:pb-8">
-            {tab === "videos" ? (
-              <VideosTab search={search} onOpenProfile={openProfile} />
-            ) : tab === "photos" ? (
-              <PhotosTab search={search} onOpenProfile={openProfile} />
-            ) : tab === "chatposts" ? (
-              <ChatPostsTab search={search} onOpenProfile={openProfile} />
-            ) : tab === "friends" ? (
-              <FriendsTab search={search} onDataChanged={bump} onOpenProfile={openProfile} />
-            ) : (
-              <ProfileTab />
-            )}
-          </main>
-          <ContextRail
-            onOpenProfile={openProfile}
-            onOpenChats={() => setTab("friends")}
-            onFilterFlair={(flair) => {
-              setSearch(flair);
-              setTab("chatposts");
-            }}
-          />
-        </div>
+    <div style={accentVars(settings.accent)} className="min-h-dvh bg-black text-zinc-100">
+      <LeftRail onOpenSearch={() => setSearchOpen(true)} onOpenNotifications={() => setBellOpen(true)} />
+
+      <div className="flex w-full justify-center lg:pl-[72px] xl:pl-[244px]">
+        <main className={cx("cliq-scroll min-w-0 w-full pb-16 lg:pb-0", centerWidth)}>
+          {tab === "videos" ? (
+            <VideosTab search={search} onOpenProfile={openProfile} />
+          ) : tab === "photos" ? (
+            <PhotosTab search={search} onOpenProfile={openProfile} />
+          ) : tab === "chatposts" ? (
+            <ChatPostsTab search={search} onOpenProfile={openProfile} />
+          ) : tab === "friends" ? (
+            <FriendsTab search={search} onDataChanged={bump} onOpenProfile={openProfile} />
+          ) : (
+            <ProfileTab />
+          )}
+        </main>
+
+        {tab !== "friends" ? <RightSidebar onOpenProfile={openProfile} onOpenSearch={() => setSearchOpen(true)} /> : null}
       </div>
 
-      <BottomNav />
+      <BottomNav onOpenSearch={() => setSearchOpen(true)} />
       <NotificationBanner onOpenCenter={() => setBellOpen(true)} />
       <CreateModal />
-      <ProfileModal
-        userId={profileUserId}
-        onClose={() => setProfileUserId(null)}
-        onMessage={() => setTab("friends")}
-      />
+      {searchOpen ? <SearchPanel onClose={() => setSearchOpen(false)} onOpenProfile={openProfile} /> : null}
+      {bellOpen ? (
+        <NotificationCenter onClose={() => setBellOpen(false)} onNavigate={(next) => setTab(next)} />
+      ) : null}
+      <ProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} onMessage={() => setTab("friends")} />
       <ToastHost />
     </div>
   );

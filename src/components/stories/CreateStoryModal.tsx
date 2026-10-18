@@ -46,11 +46,11 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
 
   async function handleFile(file: File) {
     if (mediaUnconfigured) {
-      toast("Media uploads need Cloudinary env vars. Paste a URL instead.", "danger");
+   toast("Media uploads need Cloudinary env vars. Paste a URL instead.","danger");
       return;
     }
     if (!file.type.startsWith("image/")) {
-      toast("Stories take a photo or a text card.", "danger");
+   toast("Stories take a photo or a text card.","danger");
       return;
     }
     if (localUrl) URL.revokeObjectURL(localUrl);
@@ -59,12 +59,12 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
     try {
       const result = await uploadMedia(file);
       setMediaUrl(result.secureUrl);
-      toast("Photo ready ✅", "success");
+   toast("Photo ready","success");
     } catch (error) {
       if (error instanceof CloudinaryNotConfiguredError) {
-        toast("Media uploads are not configured — paste a URL instead.", "danger");
+    toast("Media uploads are not configured — paste a URL instead.","danger");
       } else if (error instanceof FileTooLargeError) {
-        toast(error.message, "danger");
+    toast(error.message,"danger");
       } else {
         apiError(error);
       }
@@ -78,11 +78,11 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
     if (busy) return;
     const hasMedia = mode === "photo" && (mediaUrl.trim() || localUrl);
     if (mode === "photo" && !hasMedia) {
-      toast("Add a photo for your story.", "danger");
+   toast("Add a photo for your story.","danger");
       return;
     }
     if (mode === "text" && !caption.trim()) {
-      toast("Write something for your story.", "danger");
+   toast("Write something for your story.","danger");
       return;
     }
     setBusy(true);
@@ -92,7 +92,7 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
         caption: caption.trim(),
         bgStyle,
       });
-      toast("Story shared — live for 24h ⚡", "success");
+   toast("Story shared — live for 24h","success");
       onCreated();
       close();
     } catch (error) {
@@ -103,7 +103,7 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
   }
 
   return (
-    <Modal open={open} onClose={close} title="New Cliq Story" subtitle="Live for 24 hours · then it's gone ✨">
+  <Modal open={open} onClose={close} title="New Cliq Story" subtitle="Live for 24 hours · then it's gone">
       <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-1">
         {(
           [
@@ -215,7 +215,7 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
                     value={mediaUrl}
                     onChange={(e) => setMediaUrl(e.target.value)}
                     placeholder="https://.../photo.jpg"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-zinc-800/80 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
                   />
                 </div>
               ) : (
@@ -256,7 +256,7 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
           rows={2}
           maxLength={CAPTION_MAX}
           placeholder={mode === "text" ? "What's the story? #vibes" : "Add a caption... (optional)"}
-          className="w-full resize-none rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+          className="w-full resize-none rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
         />
         <div className="flex items-center justify-between text-[11px] text-zinc-500">
           <span>

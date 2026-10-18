@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageCircle, X } from "lucide-react";
+import { Heart, MessageCircle, Rocket, UserPlus, X } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
 import { Avatar } from "@/components/ui/Primitives";
 import { useNotificationCenter } from "@/components/notifications/useNotificationCenter";
@@ -9,19 +9,23 @@ import { showBrowserNotification } from "@/lib/browser-notify";
 import type { CliqNotification, NotificationKind } from "@/types/cliq";
 import { cx } from "@/lib/utils";
 
-const ICON: Record<string, string> = {
-  like: "❤️",
-  dislike: "❤️",
-  upgrade: "🚀",
-  downgrade: "🚀",
-  comment: "💬",
-  reply: "💬",
-  poll_vote: "📊",
-  friend_request: "⚡",
-  friend_accept: "⚡",
-  cliqup: "⚡",
-  message: "💬",
-};
+/** Icon glyph for each notification kind (no emoji). */
+function bannerIcon(kind: NotificationKind) {
+  switch (kind) {
+    case "like":
+    case "dislike":
+      return <Heart size={14} className="fill-current text-[#ff3040]" />;
+    case "upgrade":
+    case "downgrade":
+      return <Rocket size={14} className="text-[#10b981]" />;
+    case "friend_request":
+    case "friend_accept":
+    case "cliqup":
+      return <UserPlus size={14} className="text-[#4f46e5]" />;
+    default:
+      return <MessageCircle size={14} className="text-[#4f46e5]" />;
+  }
+}
 
 /**
  * Instagram-style drop-down in-app banner.
@@ -55,8 +59,6 @@ export function NotificationBanner({ onOpenCenter }: { onOpenCenter: () => void 
 
   if (!current) return null;
 
-  const emoji = ICON[current.kind as NotificationKind] ?? "🔔";
-
   async function open() {
     if (!current) return;
     void markRead(current.id);
@@ -83,7 +85,9 @@ export function NotificationBanner({ onOpenCenter }: { onOpenCenter: () => void 
           {current.actor ? <Avatar user={current.actor} size={40} /> : <span className="h-10 w-10 rounded-full bg-zinc-800" />}
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
-              <span className="text-sm">{emoji}</span>
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-[#121317]">
+                {bannerIcon(current.kind)}
+              </span>
               <span className="truncate text-xs font-bold text-zinc-50">
                 @{current.actor?.username ?? "someone"}
               </span>

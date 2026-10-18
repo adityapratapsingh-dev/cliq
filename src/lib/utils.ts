@@ -67,17 +67,17 @@ export function censor(text: string, enabled: boolean): string {
   return out;
 }
 
-/** Deterministic gradient for a user without an avatar image. */
+/** Deterministic, muted gradient for a user without an avatar image. */
 export function avatarGradient(seed: string): [string, string] {
   const palettes: [string, string][] = [
-    ["#7c3aed", "#22d3ee"],
-    ["#e11d48", "#f472b6"],
-    ["#0891b2", "#a855f7"],
-    ["#f59e0b", "#fb7185"],
-    ["#059669", "#a3e635"],
-    ["#6366f1", "#22d3ee"],
-    ["#d946ef", "#38bdf8"],
-    ["#14b8a6", "#6366f1"],
+    ["#3f3f46", "#52525b"],
+    ["#4b5563", "#6b7280"],
+    ["#475569", "#64748b"],
+    ["#525252", "#737373"],
+    ["#5b5b66", "#71717a"],
+    ["#404040", "#57534e"],
+    ["#4c4f5e", "#62636f"],
+    ["#3f4650", "#55606b"],
   ];
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
@@ -88,22 +88,21 @@ export function avatarGradient(seed: string): [string, string] {
  * A deterministic mesh-gradient cover for a user, derived from their username.
  *
  * Used when no custom banner image has been uploaded, so a profile never shows
- * an empty black box. Hue is anchored to the Cliq indigo-violet family with a
- * small per-user rotation so covers feel personal but stay on-brand.
+ * an empty black box. Kept dark and low-saturation so it reads as a tasteful
+ * cover rather than a neon blob.
  */
 export function meshGradient(seed: string): string {
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  const rot = hash % 40; // 0-39deg of drift
-  const hue = 245 + rot; // indigo (245) -> violet (285)
-  const hue2 = (hue + 70) % 360;
+  const rot = hash % 40;
+  const hue = 245 + rot;
+  const hue2 = (hue + 55) % 360;
   const hue3 = (hue + 190) % 360;
   return [
-    `radial-gradient(at 16% 18%, hsl(${hue} 82% 58% / 0.62) 0px, transparent 55%)`,
-    `radial-gradient(at 84% 14%, hsl(${hue2} 78% 60% / 0.5) 0px, transparent 50%)`,
-    `radial-gradient(at 74% 88%, hsl(${hue3} 72% 58% / 0.34) 0px, transparent 52%)`,
-    `radial-gradient(at 10% 90%, hsl(${hue} 70% 46% / 0.4) 0px, transparent 50%)`,
-    "linear-gradient(135deg, #14151a 0%, #101116 100%)",
+    `radial-gradient(at 18% 20%, hsl(${hue} 46% 30% / 0.9) 0px, transparent 55%)`,
+    `radial-gradient(at 82% 16%, hsl(${hue2} 42% 26% / 0.8) 0px, transparent 52%)`,
+    `radial-gradient(at 72% 86%, hsl(${hue3} 36% 24% / 0.7) 0px, transparent 55%)`,
+    "linear-gradient(135deg, #121317 0%, #09090b 100%)",
   ].join(", ");
 }
 
@@ -123,9 +122,9 @@ export const NOTE_TTL_MS = 24 * 60 * 60 * 1000;
 export const NOTE_MAX_CHARS = 60;
 
 /** True when a note exists and was set within the last 24 hours. */
-export function noteIsFresh(note: { updatedAt?: string | null } | null | undefined): boolean {
-  if (!note?.updatedAt) return false;
-  const then = new Date(note.updatedAt).getTime();
+export function noteIsFresh(note: { createdAt?: string | null } | null | undefined): boolean {
+  if (!note?.createdAt) return false;
+  const then = new Date(note.createdAt).getTime();
   if (Number.isNaN(then)) return false;
   return Date.now() - then < NOTE_TTL_MS;
 }

@@ -69,7 +69,7 @@ export function ShareSheet({
         mediaUrl: post.mediaUrl,
       });
       setSentTo((prev) => [...prev, friendId]);
-      toast(`Sent to @${username} ✅`, "success");
+   toast(`Sent to @${username}`,"success");
       onShared?.();
     } catch (error) {
       apiError(error);
@@ -84,9 +84,9 @@ export function ShareSheet({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      toast("Link copied to clipboard 🔗", "success");
+   toast("Link copied to clipboard","success");
     } catch {
-      toast("Couldn't access the clipboard — long-press the link to copy.", "danger");
+   toast("Couldn't access the clipboard — long-press the link to copy.","danger");
     }
   }
 
@@ -98,7 +98,7 @@ export function ShareSheet({
       open={open}
       onClose={onClose}
       title="Share"
-      subtitle={`Send this ${kind.toLowerCase()} to a Cliq friend`}
+   subtitle={`Send this ${kind.toLowerCase()} to a Cliq friend`}
       maxWidth="max-w-md"
     >
       <div className="space-y-3">
@@ -127,7 +127,7 @@ export function ShareSheet({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search friends..."
-            className="h-10 w-full rounded-full border border-zinc-800 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+            className="h-10 w-full rounded-full border border-zinc-800/80 bg-zinc-950/60 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
           />
         </div>
 

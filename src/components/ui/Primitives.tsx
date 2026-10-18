@@ -5,6 +5,12 @@ import { X } from "lucide-react";
 import type { PublicUser } from "@/types/cliq";
 import { avatarGradient, cx, initials } from "@/lib/utils";
 
+/**
+ * Circular avatar.
+ *
+ * Falls back to a muted monochrome gradient with initials when the user has no
+ * image, so the UI never shows a broken-image box.
+ */
 export function Avatar({
   user,
   size = 40,
@@ -24,8 +30,8 @@ export function Avatar({
     <span className="relative inline-flex shrink-0" style={{ width: size, height: size }}>
       <span
         className={cx(
-          "inline-flex h-full w-full items-center justify-center overflow-hidden rounded-full font-bold text-white",
-          ring && "ring-2 ring-[var(--accent)] ring-offset-2 ring-offset-zinc-950",
+          "inline-flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-zinc-800/80 font-semibold text-white",
+          ring && "ring-1 ring-zinc-600 ring-offset-2 ring-offset-black",
         )}
         style={{ background: `linear-gradient(135deg, ${gradient[0]}, ${gradient[1]})`, fontSize: size * 0.36 }}
       >
@@ -43,7 +49,7 @@ export function Avatar({
       </span>
       {online ? (
         <span
-          className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-zinc-950 bg-emerald-400"
+          className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-black bg-[#10b981]"
           style={{ width: Math.max(10, size * 0.28), height: Math.max(10, size * 0.28) }}
         />
       ) : null}
@@ -51,31 +57,32 @@ export function Avatar({
   );
 }
 
+/**
+ * Flat placeholder tile for media that has no image.
+ *
+ * Renders a dark neutral panel with an optional vector glyph — no gradients, no
+ * emoji — so it reads as an intentional empty state.
+ */
 export function ArtBlock({
-  seed,
   label,
-  emoji,
+  icon,
   className,
   children,
 }: {
-  seed: string;
   label?: string;
-  emoji?: string;
+  icon?: ReactNode;
   className?: string;
   children?: ReactNode;
 }) {
-  const [from, to] = avatarGradient(seed);
-  const background = `radial-gradient(120% 120% at 20% 10%, ${to}44 0%, transparent 55%), linear-gradient(140deg, ${from} 0%, ${to} 100%)`;
   return (
-    <div className={cx("relative overflow-hidden", className)} style={{ background }}>
-      <div className="cliq-grain pointer-events-none absolute inset-0 opacity-40" />
-      {emoji ? (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="text-5xl opacity-30 drop-shadow-[0_4px_18px_rgba(0,0,0,0.5)]">{emoji}</span>
+    <div className={cx("relative overflow-hidden bg-zinc-900", className)} style={{ background: "#121212" }}>
+      {icon ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-zinc-700">
+          {icon}
         </div>
       ) : null}
       {label ? (
-        <span className="absolute bottom-2 left-2 rounded-full bg-zinc-950/60 px-2.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
+        <span className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-medium text-zinc-300 backdrop-blur">
           {label}
         </span>
       ) : null}
@@ -104,21 +111,21 @@ export function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-4 rounded-2xl border border-zinc-800/80 bg-[#121317] px-4 py-3 text-left transition hover:border-zinc-700 hover:bg-zinc-900"
+      className="flex w-full items-center justify-between gap-4 border-b border-zinc-800/80 px-1 py-3.5 text-left transition hover:bg-zinc-900/60"
     >
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-zinc-100">{label}</span>
+        <span className="block text-sm font-medium text-zinc-100">{label}</span>
         {hint ? <span className="mt-0.5 block text-xs text-zinc-500">{hint}</span> : null}
       </span>
       <span
         className={cx(
-          "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-300",
-          checked ? (danger ? "bg-rose-500" : "bg-[var(--accent)]") : "bg-zinc-700",
+          "relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200",
+          checked ? (danger ? "bg-[#ff3040]" : "bg-[#4f46e5]") : "bg-zinc-700",
         )}
       >
         <span
           className={cx(
-            "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all duration-300",
+            "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all duration-200",
             checked ? "left-[22px]" : "left-0.5",
           )}
         />
@@ -149,26 +156,26 @@ export function Modal({
         type="button"
         aria-label="Close modal"
         onClick={onClose}
-        className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/80"
       />
       <div
         className={cx(
-          "cliq-pop relative w-full overflow-hidden rounded-t-3xl border border-zinc-800/80 bg-[#121317]/98 shadow-2xl backdrop-blur-xl sm:rounded-3xl",
+          "cliq-pop relative w-full overflow-hidden rounded-t-2xl border border-zinc-800/80 bg-[#121212] shadow-2xl sm:rounded-xl",
           maxWidth,
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 px-5 py-4">
           <div>
-            <h2 className="text-lg font-bold text-zinc-50">{title}</h2>
+            <h2 className="text-base font-semibold text-zinc-50">{title}</h2>
             {subtitle ? <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p> : null}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-full border border-zinc-800 bg-zinc-900 p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+            className="rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
         <div className="cliq-scroll max-h-[75vh] overflow-y-auto px-5 py-4">{children}</div>
@@ -179,9 +186,7 @@ export function Modal({
 
 export function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cx("rounded-3xl border border-zinc-800/80 bg-zinc-900/80 p-5 backdrop-blur-md", className)}>
-      {children}
-    </div>
+    <div className={cx("rounded-xl border border-zinc-800/80 bg-[#121212] p-4", className)}>{children}</div>
   );
 }
 
@@ -199,10 +204,8 @@ export function Pill({
   title?: string;
 }) {
   const style: CSSProperties | undefined = active
-    ? { background: color ?? "var(--accent-grad)", borderColor: "transparent", color: "#fff" }
-    : color
-      ? { borderColor: `${color}55`, color, backgroundColor: `${color}18` }
-      : undefined;
+    ? { background: color ?? "#4f46e5", borderColor: "transparent", color: "#fff" }
+    : undefined;
 
   if (onClick) {
     return (
@@ -211,8 +214,8 @@ export function Pill({
         title={title}
         onClick={onClick}
         className={cx(
-          "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold transition hover:scale-[1.03]",
-          active ? "border-transparent text-white" : "border-zinc-700/80 text-zinc-300",
+          "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition",
+          active ? "border-transparent text-white" : "border-zinc-800/80 text-zinc-300 hover:border-zinc-700",
         )}
         style={style}
       >
@@ -223,8 +226,8 @@ export function Pill({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold",
-        active ? "border-transparent text-white" : "border-zinc-700/80 text-zinc-300",
+        "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium",
+        active ? "border-transparent text-white" : "border-zinc-800/80 text-zinc-300",
       )}
       style={style}
     >
@@ -259,12 +262,12 @@ export function IconButton({
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-semibold transition disabled:opacity-40",
-        active ? "" : "text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-100",
+        "group inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-sm font-medium transition disabled:opacity-40",
+        active ? "" : "text-zinc-500 hover:text-zinc-200",
       )}
-      style={active ? { color: activeColor ?? "var(--accent)" } : undefined}
+      style={active ? { color: activeColor ?? "#4f46e5" } : undefined}
     >
-      <span className={cx(onClick && "group-active:scale-90")}>{icon}</span>
+      <span className={cx(onClick && "transition group-active:scale-90")}>{icon}</span>
       {count !== undefined ? <span className="tabular-nums">{count}</span> : null}
       {label ? <span className="hidden sm:inline">{label}</span> : null}
     </button>
@@ -285,17 +288,17 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="cliq-rise flex flex-col items-center justify-center gap-3 rounded-3xl border border-zinc-800/80 bg-[#121317] px-6 py-16 text-center backdrop-blur-md">
-      <span className="grid h-14 w-14 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-2)]">
+    <div className="cliq-rise flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+      <span className="grid h-14 w-14 place-items-center rounded-full border border-zinc-800/80 text-zinc-600">
         {icon}
       </span>
-      <p className="text-base font-bold text-zinc-100">{title}</p>
+      <p className="text-base font-semibold text-zinc-200">{title}</p>
       {hint ? <p className="max-w-sm text-xs leading-relaxed text-zinc-500">{hint}</p> : null}
       {actionLabel && onAction ? (
         <button
           type="button"
           onClick={onAction}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-500 active:scale-95"
+          className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-black transition hover:bg-zinc-200 active:scale-95"
         >
           {actionLabel}
         </button>
@@ -330,12 +333,12 @@ export function TypingDots() {
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cx("cliq-skeleton rounded-2xl bg-zinc-800/70", className)} />;
+  return <div className={cx("cliq-skeleton rounded-lg bg-zinc-900", className)} />;
 }
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-3xl border border-zinc-800/80 bg-[#121317] p-4">
+    <div className="border-b border-zinc-800/80 p-4">
       <div className="flex items-center gap-3">
         <Skeleton className="h-10 w-10 rounded-full" />
         <div className="flex-1 space-y-2">

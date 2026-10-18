@@ -19,8 +19,11 @@ const NOTE_EMOJI = ["🎮", "📚", "🎵", "🏀", "🎨", "💻", "😴", "�
  */
 export function CliqNotes({
   onOpenProfile,
+  bare = false,
 }: {
   onOpenProfile: (id: string) => void;
+  /** When true, renders without the card chrome (used inside a bordered section). */
+  bare?: boolean;
 }) {
   const { user, refreshUser, toast, apiError } = useCliq();
   const [composerOpen, setComposerOpen] = useState(false);
@@ -44,7 +47,7 @@ export function CliqNotes({
       await api.setNote(text.trim(), emoji);
       await refreshUser();
       await mutate();
-      toast("Note dropped for 24 hours ✨", "success");
+   toast("Note dropped for 24 hours","success");
       setComposerOpen(false);
       setText("");
     } catch (error) {
@@ -60,7 +63,7 @@ export function CliqNotes({
       await api.clearNote();
       await refreshUser();
       await mutate();
-      toast("Note removed", "default");
+   toast("Note removed","default");
       setComposerOpen(false);
     } catch (error) {
       apiError(error);
@@ -72,7 +75,7 @@ export function CliqNotes({
   if (!user) return null;
 
   return (
-    <div className="mb-3 rounded-2xl border border-zinc-800/80 bg-[#121317] px-3 py-3">
+    <div className={bare ? "" : "mb-3 rounded-2xl border border-zinc-800/80 bg-[#121317] px-3 py-3"}>
       <div className="no-scrollbar flex gap-3 overflow-x-auto">
         {/* Your own note */}
         <button
@@ -134,7 +137,7 @@ export function CliqNotes({
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
         title="Drop a Cliq Note"
-        subtitle="Shows for 24 hours at the top of Chats and Chat Posts"
+    subtitle="Shows for 24 hours at the top of Chats and Chat Posts"
         maxWidth="max-w-sm"
       >
         <div className="space-y-3">
@@ -160,7 +163,7 @@ export function CliqNotes({
               onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX_LENGTH))}
               autoFocus
               placeholder="🎮 Grinding ranked"
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 pr-14 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+              className="w-full rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-3 py-2.5 pr-14 text-sm text-zinc-100 outline-none focus:border-indigo-500"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-zinc-500">
               {text.length}/{NOTE_MAX_LENGTH}
@@ -181,7 +184,7 @@ export function CliqNotes({
                 type="button"
                 onClick={() => void clearNote()}
                 disabled={busy}
-                className="rounded-xl border border-zinc-800 px-3 py-2.5 text-sm font-semibold text-zinc-400 transition hover:text-rose-300"
+                className="rounded-xl border border-zinc-800/80 px-3 py-2.5 text-sm font-semibold text-zinc-400 transition hover:text-rose-300"
               >
                 Clear
               </button>
@@ -195,7 +198,7 @@ export function CliqNotes({
         open={Boolean(replyTo)}
         onClose={() => setReplyTo(null)}
         title={replyTo ? `Reply to @${replyTo.username}` : ""}
-        subtitle={replyTo?.note ? `${replyTo.note.emoji} ${replyTo.note.text}` : undefined}
+    subtitle={replyTo?.note ?`${replyTo.note.emoji} ${replyTo.note.text}` : undefined}
         maxWidth="max-w-sm"
       >
         <div className="space-y-3">
@@ -204,7 +207,7 @@ export function CliqNotes({
             onChange={(e) => setText(e.target.value.slice(0, 200))}
             autoFocus
             placeholder="Send a quick reply..."
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+            className="w-full rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-indigo-500"
           />
           <div className="flex gap-2">
             <button
@@ -214,7 +217,7 @@ export function CliqNotes({
                 if (!replyTo || !text.trim()) return;
                 try {
                   await api.sendMessage({ receiverId: replyTo.id, content: text.trim() });
-                  toast(`Reply sent to @${replyTo.username} 💬`, "success");
+         toast(`Reply sent to @${replyTo.username}`,"success");
                   setText("");
                   setReplyTo(null);
                 } catch (error) {
@@ -231,7 +234,7 @@ export function CliqNotes({
                 if (replyTo) onOpenProfile(replyTo.id);
                 setReplyTo(null);
               }}
-              className="rounded-xl border border-zinc-800 px-3 py-2.5 text-sm font-semibold text-zinc-300 transition hover:border-indigo-500"
+              className="rounded-xl border border-zinc-800/80 px-3 py-2.5 text-sm font-semibold text-zinc-300 transition hover:border-indigo-500"
             >
               View Profile
             </button>
