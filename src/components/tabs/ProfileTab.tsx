@@ -32,6 +32,8 @@ import { Avatar, EmptyState, Modal, SectionCard, Toggle } from "@/components/ui/
 import { ACCENT_LIST } from "@/lib/theme";
 import { INTEREST_OPTIONS, MESSAGE_SCOPES } from "@/lib/constants";
 import { UserListModal } from "@/components/UserListModal";
+import { ScoreBreakdownModal } from "@/components/ScoreBreakdownModal";
+import { computeScore } from "@/lib/cliq-score";
 import { useFeed, useStats } from "@/components/tabs/useFeed";
 import { usePostActions } from "@/components/tabs/usePostActions";
 import type { AccentKey, Post, SessionUser } from "@/types/cliq";
@@ -42,6 +44,7 @@ export function ProfileTab() {
   const [editOpen, setEditOpen] = useState(false);
   const [profileTab, setProfileTab] = useState<"posts" | "photos" | "videos" | "saved">("posts");
   const [listModal, setListModal] = useState<"followers" | "following" | null>(null);
+  const [scoreOpen, setScoreOpen] = useState(false);
   const [connections, setConnections] = useState<{ followers: string[]; following: string[] }>({
     followers: [],
     following: [],
@@ -77,10 +80,13 @@ export function ProfileTab() {
   const allPosts = [...mineVideos, ...minePhotos, ...mineChats];
   const saved = [...videoPosts, ...photoPosts, ...chatPosts].filter((p) => savedIds.includes(p.id));
 
-  const cliqScore = allPosts.reduce(
-    (sum, p) => sum + p.likesCount + p.upgradesCount - p.dislikesCount - p.downgradesCount,
-    0,
-  );
+  // Real, explainable score derived from posts + friends + engagement + note.
+  const scoreBreakdown = computeScore({
+    posts: allPosts,
+    friends: stats?.friends ?? 0,
+    hasNote: Boolean(user.settings.note?.text),
+  });
+  const cliqScore = scoreBreakdown.total;
 
   const followers = stats?.friends ?? connections.followers.length;
   const following = stats?.following ?? connections.following.length;
@@ -97,7 +103,10 @@ export function ProfileTab() {
         onSettings={openSettings}
         onOpenFollowers={() => setListModal("followers")}
         onOpenFollowing={() => setListModal("following")}
+        onOpenScore={() => setScoreOpen(true)}
       />
+
+      <ScoreBreakdownModal open={scoreOpen} onClose={() => setScoreOpen(false)} breakdown={scoreBreakdown} />
 
       <ProfileTabs active={profileTab} onChange={setProfileTab} />
 
@@ -316,6 +325,7 @@ function ProfileHeader({
   onSettings,
   onOpenFollowers,
   onOpenFollowing,
+  onOpenScore,
 }: {
   user: SessionUser;
   postCount: number;
@@ -326,13 +336,14 @@ function ProfileHeader({
   onSettings: () => void;
   onOpenFollowers: () => void;
   onOpenFollowing: () => void;
+  onOpenScore: () => void;
 }) {
   const [bannerBroken, setBannerBroken] = useState(false);
   const banner = user.bannerUrl && !bannerBroken ? user.bannerUrl : null;
 
   const stats = [
     { label: "Posts", value: postCount, onClick: undefined as undefined | (() => void), glow: false },
-    { label: "Cliq Score", value: cliqScore, onClick: undefined, glow: true },
+    { label: "Cliq Score", value: cliqScore, onClick: onOpenScore, glow: true },
     { label: "Friends", value: followers, onClick: onOpenFollowers, glow: false },
     { label: "Following", value: following, onClick: onOpenFollowing, glow: false },
   ];

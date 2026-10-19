@@ -22,6 +22,9 @@ import { useCliq } from "@/components/CliqProvider";
 import { StoryNotesBar } from "@/components/stories/StoryNotesBar";
 import { GroupChats } from "@/components/chats/GroupChats";
 import { api } from "@/lib/api-client";
+import { parseSharedPost } from "@/lib/shared-post";
+import { EmbeddedPostCard } from "@/components/chats/EmbeddedPostCard";
+import { SharedPostViewer } from "@/components/chats/SharedPostViewer";
 import { uploadMedia } from "@/lib/cloudinary";
 import { refreshNotifications } from "@/components/notifications/useNotificationCenter";
 import { Avatar, EmptyState, Skeleton, Spinner, TypingDots } from "@/components/ui/Primitives";
@@ -440,11 +443,7 @@ function Chats({
                       ) : null}
                     </div>
                     <p className={cx("truncate text-xs", c.unreadCount > 0 ? "text-zinc-200" : "text-zinc-500")}>
-                      {c.lastMessage
-                        ? `${c.lastMessage.senderId === c.partner.id ? "" : "You: "}${
-                            c.lastMessage.content || "Photo"
-                          }`
-                        : "No messages yet"}
+                      {previewFor(c.lastMessage)}
                     </p>
                   </div>
                   {c.unreadCount > 0 ? <span className="h-2 w-2 shrink-0 rounded-full bg-[#0095F6]" /> : null}
@@ -508,6 +507,8 @@ function ChatWindow({
   const [sending, setSending] = useState(false);
   const [reactFor, setReactFor] = useState<string | null>(null);
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [sharedPostId, setSharedPostId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const voice = useVoiceRecorder();
   const feedRef = useRef<HTMLDivElement>(null);
   const seenIds = useRef<Set<string>>(new Set());
@@ -725,6 +726,8 @@ function ChatWindow({
               onPickReaction={(emoji) => void react(msg.id, emoji)}
               onUnsend={() => void unsend(msg.id)}
               toxicFilter={settings.toxicFilter}
+              onViewPost={(postId) => setSharedPostId(postId)}
+              onViewMedia={(url) => setLightboxUrl(url)}
             />
           ))
         )}
@@ -860,8 +863,65 @@ function ChatWindow({
           </div>
         )}
       </footer>
+
+      {/* Zoomable image lightbox */}
+      {lightboxUrl ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95 p-4">
+          <button
+            type="button"
+            aria-label="Close image"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute inset-0 cursor-default"
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="Shared media"
+            className="relative z-10 max-h-full max-w-full rounded-2xl object-contain"
+          />
+          <div className="absolute right-4 top-4 z-20 flex gap-2">
+            <a
+              href={lightboxUrl}
+              download
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-md"
+            >
+              Download
+            </a>
+            <button
+              type="button"
+              onClick={() => setLightboxUrl(null)}
+              className="rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-md"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Full post viewer for a shared card */}
+      {sharedPostId ? (
+        <SharedPostViewer postId={sharedPostId} onClose={() => setSharedPostId(null)} />
+      ) : null}
     </section>
   );
+}
+
+/**
+ * Conversation-list preview text.
+ *
+ * Never leaks a raw post marker or URL — a shared post reads as a short label,
+ * which is what Instagram/WhatsApp do in the list.
+ */
+function previewFor(message: Message | null): string {
+  if (!message) return "No messages yet";
+  const prefix = message.fromMe ? "You: " : "";
+  if (parseSharedPost(message.content)) return prefix + "\u{1F517} Shared a post";
+  if (message.mediaUrl) {
+    return prefix + (isAudioUrl(message.mediaUrl) ? "\u{1F3A4} Voice note" : "\u{1F4F7} Photo");
+  }
+  return prefix + (message.content || "No messages yet");
 }
 
 function MessageBubble({
@@ -873,6 +933,8 @@ function MessageBubble({
   onPickReaction,
   onUnsend,
   toxicFilter,
+  onViewPost,
+  onViewMedia,
 }: {
   message: Message;
   partner: PublicUser;
@@ -882,9 +944,15 @@ function MessageBubble({
   onPickReaction: (emoji: string) => void;
   onUnsend: () => void;
   toxicFilter: boolean;
+  /** Open the referenced post from an embedded shared-post card. */
+  onViewPost: (postId: string) => void;
+  /** Open a chat image in the zoomable lightbox. */
+  onViewMedia: (url: string) => void;
 }) {
   const mine = message.fromMe;
   const open = reactFor === message.id;
+  // A shared post is encoded in the body; render it as a card instead of text.
+  const sharedRef = parseSharedPost(message.content);
   void toxicFilter;
 
   return (
@@ -903,15 +971,38 @@ function MessageBubble({
             mine ? "bg-[#4f46e5] text-white" : "bg-white/10 text-[#f5f5f5]",
           )}
         >
-          {message.mediaUrl ? (
+          {sharedRef ? (
+            /* A shared Cliq post renders as a rich card, never a raw URL. */
+            <EmbeddedPostCard postId={sharedRef.postId} mine={mine} onView={onViewPost} />
+          ) : message.mediaUrl ? (
             isAudioUrl(message.mediaUrl) ? (
               <VoiceNote url={message.mediaUrl} mine={mine} />
             ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={message.mediaUrl} alt="Shared media" className="mb-1.5 max-h-64 w-full rounded-xl object-cover" />
+              /* Sleek media container with a timestamp pill. */
+              <button
+                type="button"
+                onClick={() => onViewMedia?.(message.mediaUrl as string)}
+                className="relative mb-1.5 block overflow-hidden rounded-2xl border border-white/10 shadow-lg"
+                aria-label="Open image"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={message.mediaUrl}
+                  alt="Shared media"
+                  className="max-h-64 w-full max-w-xs object-cover sm:max-w-sm"
+                />
+                <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                  {clockTime(message.createdAt)}
+                </span>
+              </button>
             )
           ) : null}
-          {message.content ? <p className="whitespace-pre-wrap break-words">{message.content}</p> : null}
+          {message.content && !sharedRef ? (
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          ) : null}
+          {sharedRef?.note ? (
+            <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] opacity-90">{sharedRef.note}</p>
+          ) : null}
         </div>
 
         {message.reactions.length > 0 ? (

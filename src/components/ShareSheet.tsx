@@ -8,6 +8,7 @@ import { api, swrFetcher } from "@/lib/api-client";
 import { Avatar, Modal, Spinner } from "@/components/ui/Primitives";
 import type { Post } from "@/types/cliq";
 import { cx, timeAgo } from "@/lib/utils";
+import { encodeSharedPost } from "@/lib/shared-post";
 
 /** Build the link + preview text that gets sent into a DM. */
 export function sharePayload(post: Post, origin: string) {
@@ -38,6 +39,7 @@ export function ShareSheet({
   const { toast, apiError } = useCliq();
   const [query, setQuery] = useState("");
   const [sendingTo, setSendingTo] = useState<string | null>(null);
+  const [note, setNote] = useState("");
   const [sentTo, setSentTo] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
@@ -61,11 +63,11 @@ export function ShareSheet({
     if (!post || sendingTo) return;
     setSendingTo(friendId);
     try {
-      const { url, preview } = sharePayload(post, origin());
+      // Send a post reference rather than a raw URL, so the recipient's chat
+      // renders a rich embedded card instead of a link.
       await api.sendMessage({
         receiverId: friendId,
-        content: `${preview}\n${url}`,
-        // Attach the media so the DM renders the thumbnail too.
+        content: encodeSharedPost(post.id, note.trim() || undefined),
         mediaUrl: post.mediaUrl,
       });
       setSentTo((prev) => [...prev, friendId]);
@@ -120,6 +122,14 @@ export function ShareSheet({
             <p className="mt-0.5 text-[10px] text-zinc-600">{timeAgo(post.createdAt)}</p>
           </div>
         </div>
+
+        {/* Optional note that travels with the share. */}
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value.slice(0, 120))}
+          placeholder="Add a message (optional)"
+          className="w-full rounded-full border border-white/10 bg-zinc-950/60 px-4 py-2.5 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+        />
 
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
