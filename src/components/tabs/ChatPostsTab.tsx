@@ -43,7 +43,7 @@ export function ChatPostsTab({ search, onOpenProfile }: { search: string; onOpen
   return (
     <div className="min-h-[60dvh]">
       {/* Sticky header: For you / Following */}
-      <div className="sticky top-14 z-30 flex h-[53px] border-b border-white/10 bg-black/80 backdrop-blur-md md:top-0">
+      <div className="sticky top-14 z-30 flex h-[53px] border-b border-[#262626] bg-black md:top-0">
         {(
           [
             { key: "for-you", label: "For you" },
@@ -67,7 +67,7 @@ export function ChatPostsTab({ search, onOpenProfile }: { search: string; onOpen
       </div>
 
       {/* Cliq Notes — Instagram-style 24h status bubbles */}
-      <div className="border-b border-white/10 px-3 py-3">
+      <div className="border-b border-[#262626] px-3 py-3">
         <CliqNotes bare onOpenProfile={onOpenProfile} />
       </div>
 
@@ -106,6 +106,15 @@ function Composer() {
   const [pollMode, setPollMode] = useState(false);
   const [options, setOptions] = useState<string[]>(["", ""]);
   const [busy, setBusy] = useState(false);
+  /**
+   * Collapsed by default.
+   *
+   * Previously this row always rendered a six-pill hashtag cloud plus a poll
+   * builder, which dominated the top of the feed. Now it is a single prompt line
+   * that expands into the full composer on tap — one tap to write, and the feed
+   * gets its space back.
+   */
+  const [expanded, setExpanded] = useState(false);
 
   async function submit() {
     if (!text.trim() || busy) return;
@@ -120,6 +129,7 @@ function Composer() {
       setText("");
       setPollMode(false);
       setOptions(["", ""]);
+      setExpanded(false);
       await prependPost("chat", post);
       bump();
       toast("Post published", "success");
@@ -130,30 +140,47 @@ function Composer() {
     }
   }
 
+  // Collapsed: a single quiet prompt line. Tapping it reveals the composer.
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="flex w-full items-center gap-3 border-b border-[#262626] px-4 py-3 text-left transition active:bg-[#121212]"
+      >
+        {user ? <Avatar user={user} size={36} /> : null}
+        <span className="flex-1 text-[15px] text-zinc-500">What&apos;s on your mind?</span>
+        <span className="rounded-full bg-[#121212] px-3 py-1 text-xs font-semibold text-zinc-300">Post</span>
+      </button>
+    );
+  }
+
   return (
-    <div className="flex gap-3 border-b border-white/10 p-4">
+    <div className="flex gap-3 border-b border-[#262626] p-4">
       {user ? <Avatar user={user} size={40} /> : null}
       <div className="min-w-0 flex-1">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          rows={1}
+          rows={2}
           maxLength={500}
-          placeholder="What's happening?"
+          autoFocus
+          placeholder="What's on your mind?"
           className="w-full resize-none bg-transparent py-1.5 text-[15px] text-white outline-none placeholder:text-zinc-500"
         />
 
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        {/* Flairs only appear once the composer is open. */}
+        <div className="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto">
           {FLAIRS.map((f) => (
             <button
               key={f.label}
               type="button"
               onClick={() => setFlair(f)}
               className={cx(
-                "rounded-full px-2.5 py-0.5 text-xs transition",
+                "shrink-0 rounded-full px-2.5 py-1 text-xs transition",
                 flair.label === f.label
                   ? "bg-zinc-100 font-semibold text-black"
-                  : "bg-zinc-900 text-zinc-400 hover:text-zinc-200",
+                  : "bg-[#121212] text-zinc-400 hover:text-zinc-200",
               )}
             >
               {f.label}
@@ -169,7 +196,7 @@ function Composer() {
                 value={opt}
                 onChange={(e) => setOptions((prev) => prev.map((p, idx) => (idx === i ? e.target.value : p)))}
                 placeholder={`Option ${i + 1}`}
-                className="w-full rounded-lg border border-white/10 bg-[#121216] px-3 py-2 text-sm text-white outline-none focus:border-zinc-600"
+                className="w-full rounded-lg border border-[#262626] bg-[#121216] px-3 py-2 text-sm text-white outline-none focus:border-zinc-600"
               />
             ))}
             {options.length < 4 ? (
@@ -184,7 +211,7 @@ function Composer() {
           </div>
         ) : null}
 
-        <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3">
+        <div className="mt-3 flex items-center justify-between border-t border-[#262626] pt-3">
           <div className="flex items-center gap-1 text-zinc-500">
             <IconButton icon={<ImageIcon size={18} strokeWidth={1.75} />} title="Media" />
             <button
@@ -244,7 +271,7 @@ function PostRow({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: stri
   }
 
   return (
-    <article className="flex gap-3 border-b border-white/10 px-4 py-3.5 transition-colors hover:bg-[#080808]">
+    <article className="flex gap-3 border-b border-[#262626] px-4 py-3.5 transition-colors hover:bg-[#080808]">
       <button
         type="button"
         onClick={() => post.author && onOpenProfile(post.author.id)}
@@ -288,7 +315,7 @@ function PostRow({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: stri
                   onClick={() => setMenuOpen(false)}
                   className="fixed inset-0 z-10 cursor-default"
                 />
-                <div className="cliq-pop absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-white/10 bg-[#121216] py-1 shadow-2xl">
+                <div className="cliq-pop absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-[#262626] bg-[#121216] py-1 shadow-2xl">
                   <MenuItem
                     icon={<Quote size={15} strokeWidth={1.75} />}
                     label="Quote repost"
@@ -352,7 +379,7 @@ function PostRow({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: stri
                   onClick={() => void votePoll(post.id, opt.id, post)}
                   className={cx(
                     "relative w-full overflow-hidden rounded-lg border px-3 py-2 text-left transition",
-                    voted ? "border-[#4f46e5]" : "border-white/10 hover:border-zinc-700",
+                    voted ? "border-[#4f46e5]" : "border-[#262626] hover:border-zinc-700",
                   )}
                 >
                   <span className="absolute inset-y-0 left-0 bg-white/10 transition-[width] duration-500" style={{ width: `${pct}%` }} />
@@ -411,7 +438,7 @@ function PostRow({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: stri
         </div>
 
         {commentsOpen ? (
-          <div className="mt-3 border-t border-white/10 pt-3">
+          <div className="mt-3 border-t border-[#262626] pt-3">
             <CommentThread
               comments={comments}
               loading={loading}
@@ -430,7 +457,7 @@ function PostRow({ post, onOpenProfile }: { post: Post; onOpenProfile: (id: stri
                   }
                 }}
                 placeholder="Post your reply"
-                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#121216] px-3 py-2 text-sm text-white outline-none focus:border-zinc-600"
+                className="min-w-0 flex-1 rounded-lg border border-[#262626] bg-[#121216] px-3 py-2 text-sm text-white outline-none focus:border-zinc-600"
               />
               <button
                 type="button"
@@ -530,7 +557,7 @@ function EditPostModal({
         rows={3}
         maxLength={500}
         onChange={(e) => setText(e.target.value)}
-        className="w-full resize-none rounded-lg border border-white/10 bg-black p-3 text-sm text-white outline-none focus:border-zinc-600"
+        className="w-full resize-none rounded-lg border border-[#262626] bg-black p-3 text-sm text-white outline-none focus:border-zinc-600"
       />
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs text-zinc-500">{text.length}/500</span>
@@ -576,7 +603,7 @@ function QuoteRepostModal({
         maxLength={500}
         onChange={(e) => setText(e.target.value)}
         placeholder="Add a comment"
-        className="w-full resize-none rounded-lg border border-white/10 bg-black p-3 text-sm text-white outline-none focus:border-zinc-600"
+        className="w-full resize-none rounded-lg border border-[#262626] bg-black p-3 text-sm text-white outline-none focus:border-zinc-600"
       />
       <div className="mt-3">
         <QuotedPostEmbed

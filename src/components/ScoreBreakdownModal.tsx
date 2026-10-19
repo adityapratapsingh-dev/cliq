@@ -44,7 +44,7 @@ export function ScoreBreakdownModal({
     >
       <div className="space-y-4">
         {/* Rank badge + total */}
-        <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-600/20 to-transparent p-4">
+        <div className="flex items-center gap-4 rounded-2xl border border-[#262626] bg-gradient-to-br from-indigo-600/20 to-transparent p-4">
           <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-indigo-600/25 text-3xl">
             {breakdown.tier.emoji}
           </span>
@@ -59,7 +59,7 @@ export function ScoreBreakdownModal({
 
         {/* Progress to next tier */}
         {breakdown.nextTier ? (
-          <div className="rounded-2xl border border-white/10 bg-[#121216] p-3.5">
+          <div className="rounded-2xl border border-[#262626] bg-[#121216] p-3.5">
             <div className="mb-2 flex items-center justify-between text-[11px] font-semibold">
               <span className="text-zinc-300">
                 {breakdown.tier.emoji} {breakdown.tier.name}
@@ -90,7 +90,7 @@ export function ScoreBreakdownModal({
           {rows.map((row) => (
             <div
               key={row.label}
-              className="flex items-center justify-between rounded-xl border border-white/10 bg-[#121216] px-3.5 py-2.5"
+              className="flex items-center justify-between rounded-xl border border-[#262626] bg-[#121216] px-3.5 py-2.5"
             >
               <span className="min-w-0">
                 <span className="block text-xs font-semibold text-zinc-200">{row.label}</span>
@@ -116,7 +116,7 @@ export function ScoreBreakdownModal({
                     "rounded-full border px-2.5 py-1 text-[10px] font-bold",
                     reached
                       ? "border-indigo-500/50 bg-indigo-500/15 text-indigo-200"
-                      : "border-white/10 text-zinc-500",
+                      : "border-[#262626] text-zinc-500",
                   )}
                 >
                   {tier.emoji} {tier.name} · {tier.min}

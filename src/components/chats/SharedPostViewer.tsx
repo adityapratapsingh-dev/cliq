@@ -23,11 +23,11 @@ export function SharedPostViewer({ postId, onClose }: { postId: string; onClose:
   const post = data?.post;
 
   return (
-    <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/95 p-4">
+    <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black p-4">
       <button type="button" aria-label="Close post" onClick={onClose} className="absolute inset-0 cursor-default" />
 
-      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#121317]">
-        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-[#262626] bg-[#121317]">
+        <div className="flex items-center gap-3 border-b border-[#262626] px-4 py-3">
           {post?.author ? <Avatar user={post.author} size={38} /> : null}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-bold text-zinc-100">{post?.author?.displayName ?? "Post"}</p>
@@ -40,7 +40,7 @@ export function SharedPostViewer({ postId, onClose }: { postId: string; onClose:
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-zinc-400 transition hover:text-zinc-100"
+            className="grid h-9 w-9 place-items-center rounded-full border border-[#262626] text-zinc-400 transition hover:text-zinc-100"
           >
             <X size={16} />
           </button>
@@ -60,10 +60,10 @@ export function SharedPostViewer({ postId, onClose }: { postId: string; onClose:
                   <video src={post.mediaUrl} className="max-h-[60vh] w-full object-contain" controls autoPlay loop />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={post.mediaUrl} alt="" className="max-h-[60vh] w-full object-contain" />
+                  <img src={post.mediaUrl} alt="" className="max-h-[60vh] w-full object-contain"  loading="lazy" decoding="async" />
                 )}
                 {post.type === "video" ? (
-                  <span className="pointer-events-none absolute left-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white backdrop-blur">
+                  <span className="pointer-events-none absolute left-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white">
                     <Play size={14} className="ml-0.5" fill="currentColor" />
                   </span>
                 ) : null}

@@ -184,7 +184,7 @@ export function CreateModal() {
       maxWidth="max-w-xl"
       mobileFull
     >
-      <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-zinc-950/60 p-1">
+      <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border border-[#262626] bg-[#1a1a1a] p-1">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -201,7 +201,7 @@ export function CreateModal() {
       </div>
 
       {typeForTab && typeForTab !== type ? (
-        <p className="mb-3 rounded-xl border border-white/10 bg-zinc-950/50 px-3 py-2 text-[11px] text-zinc-400">
+        <p className="mb-3 rounded-xl border border-[#262626] bg-[#1a1a1a] px-3 py-2 text-[11px] text-zinc-400">
           You&apos;re on the {tab === "videos" ? "Videos" : tab === "photos" ? "Photos" : "Chat Posts"} tab — this
           will post there.
         </p>
@@ -212,7 +212,7 @@ export function CreateModal() {
           <div>
             {/* live preview */}
             {upload || mediaUrl ? (
-              <div className="relative mb-2 overflow-hidden rounded-2xl border border-white/10 bg-black">
+              <div className="relative mb-2 overflow-hidden rounded-2xl border border-[#262626] bg-black">
                 {upload?.kind === "video" && upload.localUrl ? (
                   <video src={upload.localUrl} className="max-h-64 w-full object-contain" controls muted playsInline />
                 ) : mediaUrl || upload?.localUrl ? (
@@ -221,11 +221,11 @@ export function CreateModal() {
                     src={upload?.localUrl ?? mediaUrl}
                     alt="Upload preview"
                     className="max-h-64 w-full object-contain"
-                  />
+                   loading="lazy" decoding="async" />
                 ) : null}
 
                 {uploading ? (
-                  <div className="absolute inset-x-0 bottom-0 bg-zinc-950/80 px-3 py-2 backdrop-blur">
+                  <div className="absolute inset-x-0 bottom-0 bg-[#121212] px-3 py-2">
                     <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-zinc-300">
                       <span className="truncate">
                         {upload?.phase === "compressing" ? "Optimising" : "Uploading"} · {upload?.name}
@@ -252,13 +252,13 @@ export function CreateModal() {
                     });
                   }}
                   aria-label="Remove media"
-                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-zinc-950/70 text-zinc-200 backdrop-blur transition hover:text-white"
+                  className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-[#1a1a1a] text-zinc-200 transition hover:text-white"
                 >
                   <X size={14} />
                 </button>
 
                 {upload?.phase === "done" && upload.compressedBytes && upload.compressedBytes < upload.originalBytes ? (
-                  <span className="absolute left-2 top-2 rounded-full bg-emerald-500/90 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
+                  <span className="absolute left-2 top-2 rounded-full bg-emerald-500/90 px-2.5 py-1 text-[10px] font-bold text-white">
                     {formatBytes(upload.originalBytes)} → {formatBytes(upload.compressedBytes)}
                   </span>
                 ) : null}
@@ -329,7 +329,7 @@ export function CreateModal() {
                   value={mediaUrl.startsWith("blob:") ? "" : mediaUrl}
                   onChange={(e) => setMediaUrl(e.target.value)}
                   placeholder={type === "video" ? "https://.../clip.mp4" : "https://.../photo.jpg"}
-                  className="w-full rounded-xl border border-white/10 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+                  className="w-full rounded-xl border border-[#262626] bg-[#1a1a1a] py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
                 />
               </div>
             ) : null}
@@ -352,7 +352,7 @@ export function CreateModal() {
                           "rounded-xl border px-2 py-1.5 text-left transition",
                           active
                             ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                            : "border-white/10 hover:border-zinc-700",
+                            : "border-[#262626] hover:border-zinc-700",
                         )}
                       >
                         <span className="block text-[11px] font-bold text-zinc-100">{option.label}</span>
@@ -402,7 +402,7 @@ export function CreateModal() {
                 "mt-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition",
                 pollMode
                   ? "border-[var(--accent)] bg-[var(--accent-soft)] text-zinc-100"
-                  : "border-white/10 text-zinc-400 hover:text-zinc-200",
+                  : "border-[#262626] text-zinc-400 hover:text-zinc-200",
               )}
             >
               <Sparkles size={12} /> {pollMode ? "Poll added" : "Add a quick poll"}
@@ -415,7 +415,7 @@ export function CreateModal() {
                     value={opt}
                     onChange={(e) => setPollOptions((prev) => prev.map((p, idx) => (idx === i ? e.target.value : p)))}
                     placeholder={`Option ${i + 1}`}
-                    className="w-full rounded-xl border border-white/10 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+                    className="w-full rounded-xl border border-[#262626] bg-[#1a1a1a] px-3 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
                   />
                 ))}
                 {pollOptions.length < 4 ? (
@@ -444,7 +444,7 @@ export function CreateModal() {
                 ? "Write a caption for your video... #hashtags welcome"
                 : "Write a caption for your photo... #hashtags welcome"
           }
-          className="w-full resize-none rounded-2xl border border-white/10 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+          className="w-full resize-none rounded-2xl border border-[#262626] bg-[#1a1a1a] p-3 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
         />
         <div className="flex items-center justify-between text-[11px] text-zinc-500">
           <span>{content.length}/500 characters</span>

@@ -140,13 +140,13 @@ export function NotificationCenter({
   ];
 
   return (
-    <div className="fixed inset-0 z-[85] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[85] flex justify-end bg-black/60" onClick={onClose}>
       <div
         data-testid="notification-center"
         onClick={(e) => e.stopPropagation()}
-        className="cliq-drawer flex h-dvh w-full flex-col border-white/10 bg-zinc-950/90 backdrop-blur-xl md:max-w-[400px] md:border-l"
+        className="cliq-drawer flex h-dvh w-full flex-col border-[#262626] bg-[#121212] md:max-w-[400px] md:border-l"
       >
-        <div className="flex h-[53px] shrink-0 items-center justify-between border-b border-white/10 px-4">
+        <div className="flex h-[53px] shrink-0 items-center justify-between border-b border-[#262626] px-4">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -190,7 +190,7 @@ export function NotificationCenter({
           </div>
         </div>
 
-        <div className="no-scrollbar flex shrink-0 gap-2 border-b border-white/10 px-3 py-2">
+        <div className="no-scrollbar flex shrink-0 gap-2 border-b border-[#262626] px-3 py-2">
           {tabs.map(({ key, label }) => (
             <button
               key={key}
@@ -286,9 +286,9 @@ export function NotificationCenter({
                           >
                             {n.post.mediaUrl && n.post.type !== "chat" ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={n.post.mediaUrl} alt="" className="h-11 w-11 rounded-md object-cover" />
+                              <img src={n.post.mediaUrl} alt="" className="h-11 w-11 rounded-md object-cover"  loading="lazy" decoding="async" />
                             ) : (
-                              <span className="grid h-11 w-11 place-items-center rounded-md border border-white/10 p-1">
+                              <span className="grid h-11 w-11 place-items-center rounded-md border border-[#262626] p-1">
                                 <span className="line-clamp-2 text-[8px] leading-tight text-zinc-500">
                                   {n.post.content || "post"}
                                 </span>

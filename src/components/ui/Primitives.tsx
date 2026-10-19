@@ -44,7 +44,7 @@ export function Avatar({
           <img
             src={user.avatarUrl as string}
             alt={user.displayName}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover" loading="lazy" decoding="async"
             onError={() => setBroken(true)}
           />
         ) : (
@@ -86,7 +86,7 @@ export function ArtBlock({
         </div>
       ) : null}
       {label ? (
-        <span className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-medium text-zinc-300 backdrop-blur">
+        <span className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-medium text-zinc-300">
           {label}
         </span>
       ) : null}
@@ -115,7 +115,7 @@ export function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-4 border-b border-white/10 px-1 py-3.5 text-left transition hover:bg-zinc-900/60"
+      className="flex w-full items-center justify-between gap-4 border-b border-[#262626] px-1 py-3.5 text-left transition hover:bg-zinc-900/60"
     >
       <span className="min-w-0">
         <span className="block text-sm font-medium text-zinc-100">{label}</span>
@@ -168,18 +168,18 @@ export function Modal({
         type="button"
         aria-label="Close modal"
         onClick={onClose}
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black"
       />
       <div
         className={cx(
-          "cliq-pop relative flex w-full flex-col overflow-hidden border border-white/10 bg-[#0d0d10] shadow-2xl",
+          "cliq-pop relative flex w-full flex-col overflow-hidden border border-[#262626] bg-[#0d0d10] shadow-2xl",
           mobileFull
             ? "h-full rounded-none sm:h-auto sm:max-h-[85vh] sm:rounded-2xl"
             : "max-h-[92dvh] rounded-t-2xl sm:rounded-2xl",
           maxWidth,
         )}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-[#262626] px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-zinc-50">{title}</h2>
             {subtitle ? <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p> : null}
@@ -201,7 +201,7 @@ export function Modal({
 
 export function SectionCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cx("rounded-xl border border-white/10 bg-[#121216] p-4", className)}>{children}</div>
+    <div className={cx("rounded-xl border border-[#262626] bg-[#121216] p-4", className)}>{children}</div>
   );
 }
 
@@ -230,7 +230,7 @@ export function Pill({
         onClick={onClick}
         className={cx(
           "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition",
-          active ? "border-transparent text-white" : "border-white/10 text-zinc-300 hover:border-zinc-700",
+          active ? "border-transparent text-white" : "border-[#262626] text-zinc-300 hover:border-zinc-700",
         )}
         style={style}
       >
@@ -242,7 +242,7 @@ export function Pill({
     <span
       className={cx(
         "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium",
-        active ? "border-transparent text-white" : "border-white/10 text-zinc-300",
+        active ? "border-transparent text-white" : "border-[#262626] text-zinc-300",
       )}
       style={style}
     >
@@ -310,7 +310,7 @@ export function EmptyState({
         className="pointer-events-none absolute top-0 h-40 w-64 -translate-y-6 rounded-full opacity-60 blur-3xl"
         style={{ background: "radial-gradient(50% 50% at 50% 50%, rgba(99,102,241,0.35), transparent 70%)" }}
       />
-      <span className="relative grid h-16 w-16 place-items-center rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-500/20 to-violet-500/10 text-indigo-300 shadow-inner">
+      <span className="relative grid h-16 w-16 place-items-center rounded-2xl border border-[#262626] bg-gradient-to-br from-indigo-500/20 to-violet-500/10 text-indigo-300 shadow-inner">
         {icon}
       </span>
       <p className="relative text-base font-semibold text-zinc-200">{title}</p>
@@ -359,7 +359,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function SkeletonCard() {
   return (
-    <div className="border-b border-white/10 p-4">
+    <div className="border-b border-[#262626] p-4">
       <div className="flex items-center gap-3">
         <Skeleton className="h-10 w-10 rounded-full" />
         <div className="flex-1 space-y-2">

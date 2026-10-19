@@ -104,7 +104,7 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
 
   return (
   <Modal open={open} onClose={close} title="New Cliq Story" subtitle="Live for 24 hours · then it's gone">
-      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-zinc-950/60 p-1">
+      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-[#262626] bg-[#1a1a1a] p-1">
         {(
           [
             { key: "photo", label: "Photo", icon: ImagePlus },
@@ -126,10 +126,10 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
       </div>
 
       {/* live preview */}
-      <div className="relative mx-auto aspect-[9/14] w-full max-w-[240px] overflow-hidden rounded-3xl border border-white/10">
+      <div className="relative mx-auto aspect-[9/14] w-full max-w-[240px] overflow-hidden rounded-3xl border border-[#262626]">
         {mode === "photo" && (mediaUrl || localUrl) ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={mediaUrl || localUrl || ""} alt="" className="h-full w-full object-cover" />
+          <img src={mediaUrl || localUrl || ""} alt="" className="h-full w-full object-cover"  loading="lazy" decoding="async" />
         ) : mode === "text" ? (
           <div className="grid h-full w-full place-items-center p-5 text-center" style={{ background: storyGradient(bgStyle) }}>
             <p className="text-lg font-black leading-snug text-white drop-shadow">
@@ -215,7 +215,7 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
                     value={mediaUrl}
                     onChange={(e) => setMediaUrl(e.target.value)}
                     placeholder="https://.../photo.jpg"
-                    className="w-full rounded-xl border border-white/10 bg-zinc-950/60 py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+                    className="w-full rounded-xl border border-[#262626] bg-[#1a1a1a] py-2.5 pl-9 pr-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
                   />
                 </div>
               ) : (
@@ -256,7 +256,7 @@ export function CreateStoryModal({ open, onClose, onCreated }: { open: boolean; 
           rows={2}
           maxLength={CAPTION_MAX}
           placeholder={mode === "text" ? "What's the story? #vibes" : "Add a caption... (optional)"}
-          className="w-full resize-none rounded-2xl border border-white/10 bg-zinc-950/60 p-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+          className="w-full resize-none rounded-2xl border border-[#262626] bg-[#1a1a1a] p-3 text-sm text-zinc-100 outline-none focus:border-indigo-500"
         />
         <div className="flex items-center justify-between text-[11px] text-zinc-500">
           <span>

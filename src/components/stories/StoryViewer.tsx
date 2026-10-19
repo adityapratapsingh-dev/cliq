@@ -144,7 +144,7 @@ export function StoryViewer({
   }
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95">
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black">
       <div
         className="relative flex h-full w-full max-w-[440px] flex-col overflow-hidden bg-black sm:h-[92vh] sm:rounded-3xl"
         onPointerDown={() => setPaused(true)}
@@ -179,7 +179,7 @@ export function StoryViewer({
               type="button"
               onClick={() => void removeStory()}
               aria-label="Delete story"
-              className="grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white/90 backdrop-blur transition hover:text-rose-300"
+              className="grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white/90 transition hover:text-rose-300"
             >
               <Trash2 size={15} />
             </button>
@@ -188,7 +188,7 @@ export function StoryViewer({
             type="button"
             onClick={onClose}
             aria-label="Close story"
-            className="grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white/90 backdrop-blur transition hover:text-white"
+            className="grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white/90 transition hover:text-white"
           >
             <X size={16} />
           </button>
@@ -198,7 +198,7 @@ export function StoryViewer({
         <div className="relative flex-1">
           {story.mediaUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={story.mediaUrl} alt="" className="h-full w-full object-cover" />
+            <img src={story.mediaUrl} alt="" className="h-full w-full object-cover"  loading="lazy" decoding="async" />
           ) : (
             <div className="grid h-full w-full place-items-center px-8 text-center" style={{ background: gradient }}>
               <p className="text-2xl font-black leading-snug text-white drop-shadow">{story.caption}</p>
@@ -231,7 +231,7 @@ export function StoryViewer({
         {/* footer */}
         <div className="relative z-20 flex items-center gap-2 p-3">
           {mine ? (
-            <div className="flex w-full items-center justify-center gap-1.5 rounded-full bg-white/10 py-2.5 text-xs font-semibold text-white/80 backdrop-blur">
+            <div className="flex w-full items-center justify-center gap-1.5 rounded-full bg-white/10 py-2.5 text-xs font-semibold text-white/80">
               <Eye size={14} /> {story.viewsCount} view{story.viewsCount === 1 ? "" : "s"}
             </div>
           ) : (

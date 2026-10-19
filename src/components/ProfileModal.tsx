@@ -74,7 +74,7 @@ export function ProfileModal({
           <div className="h-24 w-full overflow-hidden rounded-lg">
             {profile.bannerUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.bannerUrl} alt="" className="h-full w-full object-cover" />
+              <img src={profile.bannerUrl} alt="" className="h-full w-full object-cover"  loading="lazy" decoding="async" />
             ) : (
               <div className="h-full w-full" style={{ backgroundImage: meshGradient(profile.username || profile.id) }} />
             )}
@@ -143,7 +143,7 @@ export function ProfileModal({
                 <div key={post.id} className="relative aspect-square overflow-hidden bg-[#121216]">
                   {post.mediaUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={post.mediaUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={post.mediaUrl} alt="" className="h-full w-full object-cover"  loading="lazy" decoding="async" />
                   ) : (
                     <span className="grid h-full w-full place-items-center text-zinc-700">
                       <Send size={18} strokeWidth={1.5} />

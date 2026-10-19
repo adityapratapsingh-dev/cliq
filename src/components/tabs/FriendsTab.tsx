@@ -19,7 +19,6 @@ import {
   X,
 } from "lucide-react";
 import { useCliq } from "@/components/CliqProvider";
-import { StoryNotesBar } from "@/components/stories/StoryNotesBar";
 import { GroupChats } from "@/components/chats/GroupChats";
 import { api } from "@/lib/api-client";
 import { parseSharedPost } from "@/lib/shared-post";
@@ -59,11 +58,18 @@ export function FriendsTab({
   }, [chatTarget, clearChatTarget]);
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] flex-col pb-[60px] md:h-dvh md:pb-0">
+    /*
+     * Mobile: a normal document-flow column. The page itself scrolls, so native
+     * momentum and the URL-bar collapse behave as users expect, and there is no
+     * inner scroller fighting the browser.
+     * Desktop (md+): a fixed-height 2-pane split, where the panes scroll
+     * independently because the page does not.
+     */
+    <div className="flex min-h-[calc(100dvh-3.5rem)] flex-col md:h-dvh md:min-h-0">
       {/* Mode switcher: Messages / Discover / Groups */}
       <div
         className={cx(
-          "flex shrink-0 items-center gap-1 border-b border-white/10 px-3 py-2",
+          "flex shrink-0 items-center gap-1 border-b border-[#262626] px-3 py-2",
           openPartner && "hidden md:flex",
         )}
       >
@@ -96,7 +102,7 @@ export function FriendsTab({
         ))}
       </div>
 
-      <div className={cx("min-h-0 flex-1 overflow-hidden", openPartner && "hidden md:flex")}>
+      <div className={cx("min-h-0 flex-1 md:overflow-hidden", openPartner && "hidden md:flex")}>
         {mode === "discover" ? (
           <Discover
             search={search}
@@ -108,7 +114,7 @@ export function FriendsTab({
             onOpenProfile={onOpenProfile}
           />
         ) : mode === "groups" ? (
-          <div className="cliq-scroll h-full overflow-y-auto p-4">
+          <div className="cliq-scroll p-4 md:h-full md:overflow-y-auto">
             <GroupChats onOpenProfile={onOpenProfile} />
           </div>
         ) : (
@@ -195,7 +201,7 @@ function Discover({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search people"
-          className="h-10 w-full rounded-lg border border-white/10 bg-[#121216] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+          className="h-10 w-full rounded-lg border border-[#262626] bg-[#121216] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
         />
       </div>
 
@@ -244,7 +250,7 @@ function Discover({
             const requested = outgoingIds.has(person.id);
             const shared = (person.interests ?? []).filter((i) => (user?.interests ?? []).includes(i));
             return (
-              <li key={person.id} className="flex items-center gap-3 border-b border-white/10 py-3">
+              <li key={person.id} className="flex items-center gap-3 border-b border-[#262626] py-3">
                 <button
                   type="button"
                   onClick={() => onOpenProfile(person.id)}
@@ -352,11 +358,11 @@ function Chats({
       <aside
         data-testid="conversation-list"
         className={cx(
-          "flex h-full w-full flex-col border-r border-white/10 md:w-[340px]",
+          "flex h-full w-full flex-col border-r border-[#262626] md:w-[340px]",
           openPartner && "hidden md:flex",
         )}
       >
-        <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/10 px-5">
+        <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-[#262626] px-5">
           <span className="text-base font-bold text-white">Messages</span>
           <button
             type="button"
@@ -368,11 +374,6 @@ function Chats({
           </button>
         </div>
 
-        {/* Compact unified Stories + Notes tray */}
-        <div className="shrink-0 border-b border-white/10 px-3 py-2">
-          <StoryNotesBar onOpenProfile={onOpenProfile} compact />
-        </div>
-
         <div className="shrink-0 px-5 py-2.5">
           <div className="relative">
             <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -380,7 +381,7 @@ function Chats({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search messages"
-              className="h-9 w-full rounded-full border border-white/10 bg-[#121216]/90 pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+              className="h-9 w-full rounded-full border border-[#262626] bg-[#121212] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
             />
           </div>
         </div>
@@ -470,7 +471,7 @@ function Chats({
         ) : (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-3 text-center">
-              <span className="grid h-16 w-16 place-items-center rounded-full border border-white/10 text-zinc-600">
+              <span className="grid h-16 w-16 place-items-center rounded-full border border-[#262626] text-zinc-600">
                 <Send size={26} strokeWidth={1.5} />
               </span>
               <p className="text-lg font-semibold text-zinc-200">Your messages</p>
@@ -659,7 +660,7 @@ function ChatWindow({
 
   return (
     <section className="flex h-full min-h-0 flex-1 flex-col bg-[#09090b]">
-      <header className="flex h-[60px] shrink-0 items-center gap-3 border-b border-white/10 px-4">
+      <header className="flex h-[60px] shrink-0 items-center gap-3 border-b border-[#262626] px-4">
         <button
           type="button"
           onClick={onBack}
@@ -742,7 +743,7 @@ function ChatWindow({
       </div>
 
       {replyTo ? (
-        <div className="flex shrink-0 items-center gap-2 border-t border-white/10 px-4 py-2">
+        <div className="flex shrink-0 items-center gap-2 border-t border-[#262626] px-4 py-2">
           <CornerUpLeft size={14} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold text-zinc-400">
@@ -757,7 +758,7 @@ function ChatWindow({
       ) : null}
 
       {mediaUrl ? (
-        <div className="flex shrink-0 items-center gap-2 border-t border-white/10 px-4 py-2">
+        <div className="flex shrink-0 items-center gap-2 border-t border-[#262626] px-4 py-2">
           <ImageIcon size={14} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold text-zinc-400">Image attached</p>
@@ -769,7 +770,7 @@ function ChatWindow({
         </div>
       ) : null}
 
-      <footer className="shrink-0 border-t border-white/10 p-3 md:p-4">
+      <footer className="shrink-0 border-t border-[#262626] p-3 md:p-4">
         {voice.recording ? (
           <div className="flex items-center gap-2">
             <button
@@ -799,7 +800,7 @@ function ChatWindow({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#121216] px-4 py-2.5">
+          <div className="flex items-center gap-3 rounded-full border border-[#262626] bg-[#121216] px-4 py-2.5">
             <label className="cursor-pointer text-zinc-400 transition hover:text-white" aria-label="Attach media">
               <ImageIcon size={20} strokeWidth={1.75} />
               <input
@@ -866,7 +867,7 @@ function ChatWindow({
 
       {/* Zoomable image lightbox */}
       {lightboxUrl ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95 p-4">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black p-4">
           <button
             type="button"
             aria-label="Close image"
@@ -878,21 +879,21 @@ function ChatWindow({
             src={lightboxUrl}
             alt="Shared media"
             className="relative z-10 max-h-full max-w-full rounded-2xl object-contain"
-          />
+           loading="lazy" decoding="async" />
           <div className="absolute right-4 top-4 z-20 flex gap-2">
             <a
               href={lightboxUrl}
               download
               target="_blank"
               rel="noreferrer"
-              className="rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-md"
+              className="rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-bold text-white"
             >
               Download
             </a>
             <button
               type="button"
               onClick={() => setLightboxUrl(null)}
-              className="rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-md"
+              className="rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-bold text-white"
             >
               Close
             </button>
@@ -982,7 +983,7 @@ function MessageBubble({
               <button
                 type="button"
                 onClick={() => onViewMedia?.(message.mediaUrl as string)}
-                className="relative mb-1.5 block overflow-hidden rounded-2xl border border-white/10 shadow-lg"
+                className="relative mb-1.5 block overflow-hidden rounded-2xl border border-[#262626] shadow-lg"
                 aria-label="Open image"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -990,8 +991,8 @@ function MessageBubble({
                   src={message.mediaUrl}
                   alt="Shared media"
                   className="max-h-64 w-full max-w-xs object-cover sm:max-w-sm"
-                />
-                <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                 loading="lazy" decoding="async" />
+                <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-white">
                   {clockTime(message.createdAt)}
                 </span>
               </button>
@@ -1031,11 +1032,11 @@ function MessageBubble({
             />
             <div
               className={cx(
-                "cliq-pop absolute z-20 w-max rounded-xl border border-white/10 bg-[#121216] p-1 shadow-2xl",
+                "cliq-pop absolute z-20 w-max rounded-xl border border-[#262626] bg-[#121216] p-1 shadow-2xl",
                 mine ? "right-0 top-full mt-1" : "left-0 top-full mt-1",
               )}
             >
-              <div className="flex gap-0.5 border-b border-white/10 pb-1">
+              <div className="flex gap-0.5 border-b border-[#262626] pb-1">
                 {MESSAGE_REACTIONS.map((emoji) => (
                   <button
                     key={emoji}

@@ -33,7 +33,7 @@ export function EmbeddedPostCard({
 
   if (isLoading) {
     return (
-      <span className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-[11px] text-white/70">
+      <span className="flex items-center gap-2 rounded-2xl border border-[#262626] bg-black/20 px-3 py-3 text-[11px] text-white/70">
         <Spinner className="h-3 w-3" /> Loading shared post...
       </span>
     );
@@ -41,7 +41,7 @@ export function EmbeddedPostCard({
 
   if (error || !post) {
     return (
-      <span className="block rounded-2xl border border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-white/60">
+      <span className="block rounded-2xl border border-[#262626] bg-black/20 px-3 py-2.5 text-[11px] text-white/60">
         This post is no longer available.
       </span>
     );
@@ -55,7 +55,7 @@ export function EmbeddedPostCard({
       data-testid="embedded-post-card"
       onClick={() => onView?.(post.id)}
       className={cx(
-        "block w-full max-w-[280px] overflow-hidden rounded-2xl border border-white/10 text-left shadow-lg transition hover:border-white/25",
+        "block w-full max-w-[280px] overflow-hidden rounded-2xl border border-[#262626] text-left shadow-lg transition hover:border-white/25",
         mine ? "bg-black/25" : "bg-black/40",
       )}
     >
@@ -77,18 +77,18 @@ export function EmbeddedPostCard({
             <>
               <video src={post.mediaUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
               <span className="pointer-events-none absolute inset-0 grid place-items-center">
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-black/50 text-white backdrop-blur">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-black/50 text-white">
                   <Play size={14} className="ml-0.5" fill="currentColor" />
                 </span>
               </span>
             </>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={post.mediaUrl} alt="" className="h-full w-full object-cover" />
+            <img src={post.mediaUrl} alt="" className="h-full w-full object-cover"  loading="lazy" decoding="async" />
           )}
         </span>
       ) : (
-        <span className="block border-y border-white/10 bg-black/20 px-3 py-3">
+        <span className="block border-y border-[#262626] bg-black/20 px-3 py-3">
           <span className="line-clamp-3 text-[11px] leading-relaxed text-white/80">
             {post.content || "No caption"}
           </span>

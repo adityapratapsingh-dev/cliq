@@ -147,12 +147,12 @@ export function SearchPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-[85] flex justify-center bg-black/70 backdrop-blur-sm sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[85] flex justify-center bg-black sm:p-6" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="cliq-pop flex h-full w-full flex-col overflow-hidden border-white/10 bg-[#0d0d10]/95 backdrop-blur-xl sm:h-auto sm:max-h-[80vh] sm:max-w-lg sm:rounded-2xl sm:border"
+        className="cliq-pop flex h-full w-full flex-col overflow-hidden border-[#262626] bg-[#0d0d10]/95 sm:h-auto sm:max-h-[80vh] sm:max-w-lg sm:rounded-2xl sm:border"
       >
-        <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3">
+        <div className="flex shrink-0 items-center gap-3 border-b border-[#262626] px-4 py-3">
           <Search size={18} strokeWidth={1.75} className="text-zinc-500" />
           <input
             ref={inputRef}
@@ -178,7 +178,7 @@ export function SearchPanel({
                         key={r}
                         type="button"
                         onClick={() => setQuery(r)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300 transition hover:bg-white/10"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[#262626] bg-white/5 px-3 py-1 text-xs text-zinc-300 transition hover:bg-white/10"
                       >
                         <Clock size={11} /> {r}
                       </button>
@@ -244,7 +244,7 @@ export function SearchPanel({
                           className={cx(
                             "shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition",
                             following
-                              ? "border border-white/10 text-zinc-400 hover:text-zinc-200"
+                              ? "border border-[#262626] text-zinc-400 hover:text-zinc-200"
                               : "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20 hover:bg-indigo-500",
                           )}
                         >
@@ -299,7 +299,7 @@ export function SearchPanel({
                       onClick={() => goToHashtag(tag)}
                       className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition hover:bg-zinc-900"
                     >
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 text-zinc-400">
+                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[#262626] text-zinc-400">
                         <Hash size={16} strokeWidth={1.75} />
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">#{tag}</span>
@@ -323,9 +323,9 @@ export function SearchPanel({
                     >
                       {post.mediaUrl && post.type !== "chat" ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={post.mediaUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                        <img src={post.mediaUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover"  loading="lazy" decoding="async" />
                       ) : (
-                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-white/10 text-zinc-500">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-[#262626] text-zinc-500">
                           <User size={16} strokeWidth={1.75} />
                         </span>
                       )}

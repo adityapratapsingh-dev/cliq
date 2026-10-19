@@ -79,7 +79,7 @@ export function NotificationBanner({ onOpenCenter }: { onOpenCenter: () => void 
     <div className="pointer-events-none fixed inset-x-0 top-3 z-[95] flex justify-center px-3">
       <div
         data-testid="notification-banner"
-        className="cliq-toast pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl border border-zinc-700/60 bg-zinc-900/90 p-3 shadow-2xl backdrop-blur-xl"
+        className="cliq-toast pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl border border-[#262626] bg-[#121212] p-3 shadow-2xl"
       >
         <button type="button" onClick={() => void open()} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           {current.actor ? <Avatar user={current.actor} size={40} /> : <span className="h-10 w-10 rounded-full bg-zinc-800" />}

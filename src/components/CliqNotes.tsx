@@ -80,7 +80,7 @@ export function CliqNotes({
   return (
     <div
       className={
-        inline ? "no-scrollbar flex shrink-0 items-center gap-3 overflow-x-auto" : bare ? "" : "mb-3 rounded-2xl border border-white/10 bg-[#121216]/90 px-3 py-3"
+        inline ? "no-scrollbar flex shrink-0 items-center gap-3 overflow-x-auto" : bare ? "" : "mb-3 rounded-2xl border border-[#262626] bg-[#121212] px-3 py-3"
       }
     >
       <div className="no-scrollbar flex gap-3 overflow-x-auto">
@@ -170,7 +170,7 @@ export function CliqNotes({
               onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX_LENGTH))}
               autoFocus
               placeholder="🎮 Grinding ranked"
-              className="w-full rounded-xl border border-white/10 bg-zinc-950/60 px-3 py-2.5 pr-14 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+              className="w-full rounded-xl border border-[#262626] bg-[#1a1a1a] px-3 py-2.5 pr-14 text-sm text-zinc-100 outline-none focus:border-indigo-500"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] tabular-nums text-zinc-500">
               {text.length}/{NOTE_MAX_LENGTH}
@@ -191,7 +191,7 @@ export function CliqNotes({
                 type="button"
                 onClick={() => void clearNote()}
                 disabled={busy}
-                className="rounded-xl border border-white/10 px-3 py-2.5 text-sm font-semibold text-zinc-400 transition hover:text-rose-300"
+                className="rounded-xl border border-[#262626] px-3 py-2.5 text-sm font-semibold text-zinc-400 transition hover:text-rose-300"
               >
                 Clear
               </button>
@@ -214,7 +214,7 @@ export function CliqNotes({
             onChange={(e) => setText(e.target.value.slice(0, 200))}
             autoFocus
             placeholder="Send a quick reply..."
-            className="w-full rounded-xl border border-white/10 bg-zinc-950/60 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-indigo-500"
+            className="w-full rounded-xl border border-[#262626] bg-[#1a1a1a] px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-indigo-500"
           />
           <div className="flex gap-2">
             <button
@@ -241,7 +241,7 @@ export function CliqNotes({
                 if (replyTo) onOpenProfile(replyTo.id);
                 setReplyTo(null);
               }}
-              className="rounded-xl border border-white/10 px-3 py-2.5 text-sm font-semibold text-zinc-300 transition hover:border-indigo-500"
+              className="rounded-xl border border-[#262626] px-3 py-2.5 text-sm font-semibold text-zinc-300 transition hover:border-indigo-500"
             >
               View Profile
             </button>
