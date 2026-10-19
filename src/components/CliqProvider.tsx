@@ -37,6 +37,8 @@ interface CliqContextValue {
   setTab: (tab: TabKey) => void;
   createOpen: boolean;
   setCreateOpen: (open: boolean) => void;
+  /** Send a friendly one-tap wave (a DM) to a friend. */
+  sendWave: (userId: string) => Promise<void>;
   /** Open the Profile tab straight into its Settings panel. */
   settingsOpen: boolean;
   openSettings: () => void;
@@ -347,6 +349,20 @@ export function CliqProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
+  /**
+   * One-tap wave.
+   *
+   * Just a DM with a friendly greeting — kept in the provider so both the
+   * Online rail and the profile card can use it without duplicating the API call.
+   */
+  const sendWave = useCallback(
+    async (userId: string) => {
+      await api.sendMessage({ receiverId: userId, content: "\u{1F44B} Wave!" });
+      bump();
+    },
+    [bump],
+  );
+
   const settings = user?.settings ?? DEFAULT_SETTINGS;
 
   const value = useMemo<CliqContextValue>(
@@ -368,6 +384,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       chatTarget,
       openChat,
       clearChatTarget,
+      sendWave,
       toasts,
       toast,
       dismissToast,
@@ -403,6 +420,7 @@ export function CliqProvider({ children }: { children: ReactNode }) {
       chatTarget,
       openChat,
       clearChatTarget,
+      sendWave,
       toasts,
       toast,
       dismissToast,

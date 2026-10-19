@@ -35,7 +35,8 @@ const CENTER_WIDTH: Record<string, string> = {
 };
 
 export function CliqApp() {
-  const { user, loading, settings, tab, setTab, refreshUser, bump, markTabSeen, search } = useCliq();
+  const { user, loading, settings, tab, setTab, refreshUser, bump, markTabSeen, search, setSearch, setCreateOpen } =
+    useCliq();
   const [searchOpen, setSearchOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   // Which user's public profile is open, if any.
@@ -99,7 +100,16 @@ export function CliqApp() {
           )}
         </main>
 
-        {tab !== "friends" ? <RightSidebar onOpenProfile={openProfile} onOpenSearch={() => setSearchOpen(true)} /> : null}
+        {tab !== "friends" ? <RightSidebar
+          onOpenProfile={openProfile}
+          onOpenSearch={() => setSearchOpen(true)}
+          onCreateWithFlair={(flair) => {
+            // Jump to Chat Posts with the hashtag applied, then open the composer.
+            setSearch(flair);
+            setTab("chatposts");
+            setCreateOpen(true);
+          }}
+        /> : null}
       </div>
 
       <BottomNav />

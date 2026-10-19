@@ -27,7 +27,8 @@ export function PhotosTab({ search, onOpenProfile }: { search: string; onOpenPro
   const { setCreateOpen } = useCliq();
   const [draft, setDraft] = useState("");
   const [commentTarget, setCommentTarget] = useState<Post | null>(null);
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [hidden] = useState<string[]>([]);
+  const [lightboxPost, setLightboxPost] = useState<Post | null>(null);
 
   const visible = posts.filter((p) => !hidden.includes(p.id) && matchesSearch(p, search));
 
@@ -55,16 +56,33 @@ export function PhotosTab({ search, onOpenProfile }: { search: string; onOpenPro
   }
 
   return (
-    <div className="mx-auto w-full max-w-[620px] py-4">
-      {visible.map((post) => (
-        <PhotoCard
-          key={post.id}
-          post={post}
-          onComment={() => setCommentTarget(post)}
-          onHide={() => setHidden((prev) => [...prev, post.id])}
+    <div className="mx-auto w-full max-w-[620px] px-2 py-4">
+      {/*
+        Masonry via CSS columns: each tile keeps its natural aspect ratio, which
+        reads as a bento grid without needing measured heights in JS.
+      */}
+      <div className="columns-2 gap-2 sm:columns-3">
+        {visible.map((post) => (
+          <BentoTile
+            key={post.id}
+            post={post}
+            onOpen={() => setLightboxPost(post)}
+            onOpenProfile={onOpenProfile}
+          />
+        ))}
+      </div>
+
+      {lightboxPost ? (
+        <PhotoLightbox
+          post={lightboxPost}
+          onClose={() => setLightboxPost(null)}
+          onComment={() => {
+            setCommentTarget(lightboxPost);
+            setLightboxPost(null);
+          }}
           onOpenProfile={onOpenProfile}
         />
-      ))}
+      ) : null}
 
       <CommentModal post={commentTarget} onClose={() => setCommentTarget(null)} draft={draft} setDraft={setDraft} />
     </div>
@@ -354,5 +372,150 @@ export function CommentModal({
         </button>
       </div>
     </Modal>
+  );
+}
+
+/* ---------------------------------------------------------------- bento grid */
+
+/**
+ * Masonry tile with a hover overlay showing engagement and author.
+ *
+ * The image keeps its intrinsic aspect ratio (`w-full h-auto`) so CSS columns
+ * produce a real bento layout rather than a uniform grid.
+ */
+function BentoTile({
+  post,
+  onOpen,
+  onOpenProfile,
+}: {
+  post: Post;
+  onOpen: () => void;
+  onOpenProfile: (id: string) => void;
+}) {
+  const [broken, setBroken] = useState(false);
+  const cover = post.mediaUrl;
+
+  return (
+    <div className="group relative mb-2 break-inside-avoid overflow-hidden rounded-xl border border-white/10 bg-[#121216]">
+      <button type="button" onClick={onOpen} className="block w-full" aria-label="Open photo">
+        {cover && !broken ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cover}
+            alt={post.content || "Photo"}
+            className="w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <span className="grid aspect-square w-full place-items-center text-2xl text-zinc-600">📸</span>
+        )}
+
+        {/* Hover overlay with counts + author */}
+        <span className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/20 to-transparent p-2.5 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+          <span className="flex items-center gap-3 text-[11px] font-bold text-white">
+            <span className="inline-flex items-center gap-1">
+              <Heart size={12} className="fill-current" /> {formatCount(post.likesCount)}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <MessageCircle size={12} /> {formatCount(post.commentCount)}
+            </span>
+          </span>
+          {post.author ? (
+            <span className="mt-1 truncate text-[10px] font-semibold text-white/80">@{post.author.username}</span>
+          ) : null}
+        </span>
+      </button>
+
+      {/* Author chip is a separate tap target so it does not open the lightbox. */}
+      {post.author ? (
+        <button
+          type="button"
+          onClick={() => onOpenProfile(post.author!.id)}
+          aria-label={`Open ${post.author.displayName}'s profile`}
+          className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-bold text-white opacity-0 backdrop-blur-md transition group-hover:opacity-100"
+        >
+          @{post.author.username}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Full-screen photo viewer with actions. */
+function PhotoLightbox({
+  post,
+  onClose,
+  onComment,
+  onOpenProfile,
+}: {
+  post: Post;
+  onClose: () => void;
+  onComment: () => void;
+  onOpenProfile: (id: string) => void;
+}) {
+  const { savedIds, toggleSaved, toast } = useCliq();
+  const saved = savedIds.includes(post.id);
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95 p-4">
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default" />
+
+      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#121216]">
+        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+          {post.author ? (
+            <button
+              type="button"
+              onClick={() => onOpenProfile(post.author!.id)}
+              aria-label="Open profile"
+              className="shrink-0 rounded-full"
+            >
+              <Avatar user={post.author} size={36} />
+            </button>
+          ) : null}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-zinc-100">{post.author?.displayName ?? "Photo"}</p>
+            <p className="truncate text-[11px] text-zinc-500">
+              @{post.author?.username ?? "unknown"} · {timeAgo(post.createdAt)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              toggleSaved(post.id);
+              toast(saved ? "Removed from Saved" : "Saved to your profile 🔖", saved ? "default" : "success");
+            }}
+            aria-label="Save"
+            className={cx("rounded-full p-2 transition", saved ? "text-[#ff3040]" : "text-zinc-400 hover:text-zinc-100")}
+          >
+            <Bookmark size={18} className={cx(saved && "fill-current")} />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close viewer"
+            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-zinc-400 transition hover:text-zinc-100"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {post.mediaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={post.mediaUrl} alt={post.content || "Photo"} className="max-h-[60vh] w-full object-contain" />
+        ) : null}
+
+        <div className="px-4 py-3">
+          {post.content ? <p className="text-sm leading-relaxed text-zinc-200">{post.content}</p> : null}
+          <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-zinc-400">
+            <span className="inline-flex items-center gap-1">
+              <Heart size={13} /> {formatCount(post.likesCount)}
+            </span>
+            <button type="button" onClick={onComment} className="inline-flex items-center gap-1 transition hover:text-zinc-100">
+              <MessageCircle size={13} /> {formatCount(post.commentCount)} comments
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

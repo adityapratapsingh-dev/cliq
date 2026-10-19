@@ -20,11 +20,14 @@ import { cx } from "@/lib/utils";
 export function RightSidebar({
   onOpenProfile,
   onOpenSearch,
+  onCreateWithFlair,
 }: {
   onOpenProfile: (id: string) => void;
   onOpenSearch: () => void;
+  /** Opens the composer pre-filled with a hashtag (used by empty trends). */
+  onCreateWithFlair: (flair: string) => void;
 }) {
-  const { user, followingIds, toggleFollow, openChat, setSearch } = useCliq();
+  const { user, followingIds, toggleFollow, openChat, setSearch, toast, sendWave } = useCliq();
 
   const { data } = useSWR<{ users: PublicUser[] }>(user ? ["/api/users", undefined] : null, swrFetcher, {
     revalidateOnFocus: false,
@@ -37,8 +40,18 @@ export function RightSidebar({
     const mine = new Set(user?.interests ?? []);
     return (data?.users ?? [])
       .filter((p) => p.id !== user?.id)
-      .map((p) => ({ person: p, shared: p.interests.filter((i) => mine.has(i)).length }))
-      .sort((a, b) => b.shared - a.shared || a.person.username.localeCompare(b.person.username))
+      .map((p) => {
+        const matching = p.interests.filter((i) => mine.has(i));
+        // Percent of this person's interests we share — the sort key.
+        const percent = p.interests.length > 0 ? Math.round((matching.length / p.interests.length) * 100) : 0;
+        return { person: p, shared: matching.length, matching, percent };
+      })
+      .sort(
+        (a, b) =>
+          b.percent - a.percent ||
+          b.shared - a.shared ||
+          a.person.username.localeCompare(b.person.username),
+      )
       .slice(0, 4);
   }, [data, user]);
 
@@ -86,10 +99,10 @@ export function RightSidebar({
           {people.length === 0 ? (
             <li className="py-3 text-xs text-zinc-500">No suggestions yet — invite a friend to Cliq.</li>
           ) : (
-            people.map(({ person, shared }) => {
+            people.map(({ person, matching, percent }) => {
               const following = followingIds.includes(person.id);
               return (
-                <li key={person.id} className="flex items-center gap-3 py-2">
+                <li key={person.id} className="flex items-start gap-3 py-2">
                   <button
                     type="button"
                     onClick={() => onOpenProfile(person.id)}
@@ -98,16 +111,35 @@ export function RightSidebar({
                   >
                     <Avatar user={person} size={40} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onOpenProfile(person.id)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <span className="block truncate text-sm font-semibold text-zinc-100">{person.username}</span>
-                    <span className="block truncate text-[11px] text-zinc-500">
-                      {shared > 0 ? `${shared} shared interest${shared > 1 ? "s" : ""}` : person.displayName}
-                    </span>
-                  </button>
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => onOpenProfile(person.id)}
+                      className="block w-full truncate text-left text-sm font-semibold text-zinc-100"
+                    >
+                      @{person.username}
+                    </button>
+                    {matching.length > 0 ? (
+                      <>
+                        <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                          <span className="text-[10px] font-bold text-indigo-300">✨ Matches:</span>
+                          {matching.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full border border-indigo-500/40 bg-indigo-500/15 px-1.5 py-0.5 text-[9px] font-bold text-indigo-200 shadow-sm shadow-indigo-500/20"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] tabular-nums text-zinc-500">
+                          {percent}% vibe match
+                        </span>
+                      </>
+                    ) : (
+                      <span className="block truncate text-[11px] text-zinc-500">{person.displayName}</span>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => toggleFollow(person.id)}
@@ -137,13 +169,24 @@ export function RightSidebar({
             <li key={trend.label}>
               <button
                 type="button"
-                onClick={() => setSearch(trend.label)}
+                onClick={() => {
+                  if (trend.count === 0) {
+                    // Nothing to filter to yet — open the composer pre-filled.
+                    onCreateWithFlair(trend.label);
+                    return;
+                  }
+                  setSearch(trend.label);
+                }}
                 className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-zinc-800/60"
               >
                 <span className="text-sm font-semibold text-zinc-200">{trend.label}</span>
-                <span className="text-[11px] tabular-nums text-zinc-500">
-                  {trend.count} {trend.count === 1 ? "post" : "posts"}
-                </span>
+                {trend.count === 0 ? (
+                  <span className="text-[10px] font-bold text-indigo-300">Be first to post →</span>
+                ) : (
+                  <span className="text-[11px] tabular-nums text-zinc-500">
+                    {trend.count} {trend.count === 1 ? "post" : "posts"}
+                  </span>
+                )}
               </button>
             </li>
           ))}
@@ -158,21 +201,38 @@ export function RightSidebar({
         ) : (
           <div className="mt-3 flex flex-wrap gap-3">
             {friends.map((person) => (
-              <button
-                key={person.id}
-                type="button"
-                onClick={() => openChat(person)}
-                title={`Message @${person.username}`}
-                className="group flex flex-col items-center gap-1"
-              >
+              <div key={person.id} className="group flex flex-col items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => openChat(person)}
+                  title={`Message @${person.username}`}
+                  className="flex flex-col items-center gap-1"
+                >
                 <span className="relative">
                   <Avatar user={person} size={44} online />
                   <span className="absolute -bottom-1 left-1/2 hidden -translate-x-1/2 items-center gap-0.5 rounded-full bg-zinc-900 px-1.5 py-0.5 text-[9px] font-bold text-zinc-200 ring-1 ring-zinc-700 group-hover:flex">
                     <MessageSquare size={9} /> DM
                   </span>
                 </span>
-                <span className="w-12 truncate text-center text-[10px] text-zinc-500">{person.username}</span>
-              </button>
+                  <span className="w-12 truncate text-center text-[10px] text-zinc-500">{person.username}</span>
+                </button>
+                {/* One-tap wave: sends a friendly hello without opening the thread. */}
+                <button
+                  type="button"
+                  aria-label={`Wave at ${person.username}`}
+                  onClick={async () => {
+                    try {
+                      await sendWave(person.id);
+                      toast(`Waved at @${person.username} 👋`, "success");
+                    } catch {
+                      toast("Could not send the wave — try again.", "danger");
+                    }
+                  }}
+                  className="rounded-full border border-white/10 px-2 py-0.5 text-[9px] font-bold text-zinc-400 transition hover:border-indigo-500 hover:text-zinc-100"
+                >
+                  👋 Wave
+                </button>
+              </div>
             ))}
           </div>
         )}
