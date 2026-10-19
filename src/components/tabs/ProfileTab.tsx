@@ -18,6 +18,7 @@ import {
   Play,
   Settings as SettingsIcon,
   Shield,
+  Sparkles,
   UploadCloud,
   User,
 } from "lucide-react";
@@ -148,7 +149,7 @@ function ProfileTabs({
   const activeIndex = tabs.findIndex((t) => t.key === active);
 
   return (
-    <div className="relative flex border-b border-white/10">
+    <div className="relative flex border-b border-[#262626]">
       {tabs.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
@@ -194,7 +195,7 @@ function MediaGrid({ posts }: { posts: Post[] }) {
                 <video src={post.mediaUrl} className="h-full w-full object-cover" muted loop playsInline preload="metadata" />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={post.mediaUrl} alt={post.content || "media"} className="h-full w-full object-cover" />
+                <img src={post.mediaUrl} alt={post.content || "media"} className="h-full w-full object-cover"  loading="lazy" decoding="async" />
               )
             ) : (
               <span className="grid h-full w-full place-items-center text-zinc-700">
@@ -235,13 +236,13 @@ function MediaModal({ post, onClose }: { post: Post; onClose: () => void }) {
       maxWidth="max-w-lg"
     >
       <div className="space-y-3">
-        <div className="overflow-hidden rounded-lg border border-white/10 bg-black">
+        <div className="overflow-hidden rounded-lg border border-[#262626] bg-black">
           {post.mediaUrl ? (
             post.type === "video" ? (
               <video src={post.mediaUrl} className="max-h-[60vh] w-full object-contain" controls playsInline />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={post.mediaUrl} alt={post.content || "media"} className="max-h-[60vh] w-full object-contain" />
+              <img src={post.mediaUrl} alt={post.content || "media"} className="max-h-[60vh] w-full object-contain"  loading="lazy" decoding="async" />
             )
           ) : (
             <div className="grid h-48 place-items-center text-zinc-600">No media attached</div>
@@ -280,9 +281,9 @@ function PostList({ posts, emptyKind }: { posts: Post[]; emptyKind: "posts" | "s
     );
   }
   return (
-    <div className="border-t border-white/10">
+    <div className="border-t border-[#262626]">
       {visible.map((post) => (
-        <article key={post.id} className="flex gap-3 border-b border-white/10 px-1 py-4">
+        <article key={post.id} className="flex gap-3 border-b border-[#262626] px-1 py-4">
           {user ? <Avatar user={user} size={40} /> : null}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
@@ -339,11 +340,11 @@ function ProfileHeader({
   onOpenScore: () => void;
 }) {
   const [bannerBroken, setBannerBroken] = useState(false);
+  const [showAllTags, setShowAllTags] = useState(false);
   const banner = user.bannerUrl && !bannerBroken ? user.bannerUrl : null;
 
   const stats = [
     { label: "Posts", value: postCount, onClick: undefined as undefined | (() => void), glow: false },
-    { label: "Cliq Score", value: cliqScore, onClick: onOpenScore, glow: true },
     { label: "Friends", value: followers, onClick: onOpenFollowers, glow: false },
     { label: "Following", value: following, onClick: onOpenFollowing, glow: false },
   ];
@@ -354,7 +355,7 @@ function ProfileHeader({
       <div className="relative h-32 w-full overflow-hidden rounded-b-2xl sm:h-44 lg:rounded-2xl">
         {banner ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={banner} alt="" className="h-full w-full object-cover" onError={() => setBannerBroken(true)} />
+          <img src={banner} alt="" className="h-full w-full object-cover" loading="eager" decoding="async" onError={() => setBannerBroken(true)} />
         ) : (
           <div
             className="cliq-mesh h-full w-full"
@@ -394,6 +395,15 @@ function ProfileHeader({
               </button>
             </div>
 
+            {/* Cliq Score — one small chip, not a fourth bulky stat block. */}
+            <button
+              type="button"
+              onClick={onOpenScore}
+              className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-200 transition hover:bg-indigo-500/20"
+            >
+              <Sparkles size={12} /> Cliq Score {formatCount(cliqScore)}
+            </button>
+
             {/* Compact inline stats row */}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               {stats.map(({ label, value, onClick, glow }) => {
@@ -426,15 +436,25 @@ function ProfileHeader({
               <p className="text-sm font-semibold text-white">{user.displayName}</p>
               {user.bio ? <p className="mt-0.5 whitespace-pre-line text-sm text-zinc-200">{user.bio}</p> : null}
               {(user.interests ?? []).length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {(user.interests ?? []).map((i) => (
+                /* At most three tags unless the user asks for the rest. */
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {(showAllTags ? (user.interests ?? []) : (user.interests ?? []).slice(0, 3)).map((i) => (
                     <span
                       key={i}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300 transition hover:bg-white/10"
+                      className="rounded-full border border-[#262626] px-3 py-1 text-xs text-zinc-300"
                     >
                       #{i}
                     </span>
                   ))}
+                  {(user.interests ?? []).length > 3 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllTags((v) => !v)}
+                      className="rounded-full px-2 py-1 text-xs font-semibold text-zinc-400 transition hover:text-zinc-100"
+                    >
+                      {showAllTags ? "less" : `+${(user.interests ?? []).length - 3} more`}
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -502,12 +522,12 @@ function EditProfileModal({
   }
 
   const inputClass =
-    "w-full rounded-lg border border-white/10 bg-[#121216] px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-600";
+    "w-full rounded-lg border border-[#262626] bg-[#121216] px-3 py-2.5 text-sm text-white outline-none focus:border-zinc-600";
 
   return (
     <Modal open={open} onClose={onClose} title="Edit profile">
       <div className="space-y-4">
-        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#121216] p-3">
+        <div className="flex items-center gap-3 rounded-lg border border-[#262626] bg-[#121216] p-3">
           <Avatar
             user={{ id: user.id, username: user.username, displayName: displayName || user.displayName, avatarUrl: avatarUrl || null }}
             size={52}
@@ -556,11 +576,11 @@ function EditProfileModal({
           </label>
         </div>
 
-        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#121216] p-3">
+        <div className="flex items-center gap-3 rounded-lg border border-[#262626] bg-[#121216] p-3">
           <span className="h-12 w-20 shrink-0 overflow-hidden rounded-md" style={{ backgroundImage: bannerUrl ? undefined : meshGradient(user.username) }}>
             {bannerUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+              <img src={bannerUrl} alt="" className="h-full w-full object-cover"  loading="lazy" decoding="async" />
             ) : null}
           </span>
           <span className="min-w-0 flex-1 text-xs text-zinc-500">Cover banner — leave empty for an auto gradient</span>
@@ -709,7 +729,7 @@ function SettingsPanel({
             label="Private profile"
             hint="Only approved followers can see your posts"
           />
-          <div className="border-b border-white/10 py-3.5">
+          <div className="border-b border-[#262626] py-3.5">
             <p className="text-sm font-medium text-zinc-100">Who can message me</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {MESSAGE_SCOPES.map((scope) => (
@@ -768,7 +788,7 @@ function SettingsPanel({
                 }}
                 className={cx(
                   "rounded-lg border px-3 py-2 text-left transition",
-                  settings.accent === accent.key ? "border-white" : "border-white/10 hover:border-zinc-600",
+                  settings.accent === accent.key ? "border-white" : "border-[#262626] hover:border-zinc-600",
                 )}
               >
                 <span className="block h-2 w-full rounded-full" style={{ background: accent.gradient }} />

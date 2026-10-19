@@ -291,7 +291,7 @@ export function Reel({
                     setMenuOpen(false);
                     void remove(post.id);
                   }}
-                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-white/10 bg-[#121216] px-3 py-2 text-left text-xs font-semibold text-[#ff3040] shadow-2xl"
+                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-[#262626] bg-[#121216] px-3 py-2 text-left text-xs font-semibold text-[#ff3040] shadow-2xl"
                 >
                   Delete
                 </button>
@@ -303,7 +303,7 @@ export function Reel({
                     setMenuOpen(false);
                     if (post.author) onOpenProfile(post.author.id);
                   }}
-                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-white/10 bg-[#121216] px-3 py-2 text-left text-xs font-semibold text-zinc-200 shadow-2xl"
+                  className="cliq-pop absolute bottom-0 right-12 z-20 w-32 rounded-lg border border-[#262626] bg-[#121216] px-3 py-2 text-left text-xs font-semibold text-zinc-200 shadow-2xl"
                 >
                   View profile
                 </button>

@@ -56,7 +56,7 @@ export function ReelCommentsSheet({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="grid h-8 w-8 place-items-center rounded-full border border-zinc-700/60 text-zinc-400 transition hover:text-zinc-100"
+            className="grid h-8 w-8 place-items-center rounded-full border border-[#262626] text-zinc-400 transition hover:text-zinc-100"
           >
             <X size={15} />
           </button>
@@ -81,7 +81,7 @@ export function ReelCommentsSheet({
               if (e.key === "Enter") void submit();
             }}
             placeholder="Add a comment on Cliq..."
-            className="min-w-0 flex-1 rounded-full border border-zinc-700/60 bg-zinc-950/70 px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
+            className="min-w-0 flex-1 rounded-full border border-[#262626] bg-[#1a1a1a] px-3.5 py-2 text-sm text-zinc-100 outline-none focus:border-[var(--accent)]"
           />
           <button
             type="button"

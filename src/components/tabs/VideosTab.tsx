@@ -75,7 +75,7 @@ export function VideosTab({ search, onOpenProfile }: { search: string; onOpenPro
 
   return (
     <div className="flex w-full justify-center py-4">
-      <div className="relative aspect-[9/16] h-[calc(100dvh-9.5rem)] max-h-[840px] w-auto overflow-hidden rounded-xl border border-white/10 bg-[#0d0d10] md:h-[calc(100dvh-6rem)]">
+      <div className="relative aspect-[9/16] h-[calc(100dvh-9.5rem)] max-h-[840px] w-auto overflow-hidden rounded-xl border border-[#262626] bg-[#0d0d10] md:h-[calc(100dvh-6rem)]">
         {/* Top overlay */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between p-3">
           <div className="pointer-events-auto flex gap-4">
@@ -106,7 +106,7 @@ export function VideosTab({ search, onOpenProfile }: { search: string; onOpenPro
             type="button"
             aria-label={muted ? "Unmute" : "Mute"}
             onClick={() => setMuted((m) => !m)}
-            className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full bg-black/60 text-white transition hover:bg-black/80"
+            className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full bg-black/60 text-white transition hover:bg-black"
           >
             {muted ? <VolumeX size={17} strokeWidth={1.75} /> : <Volume2 size={17} strokeWidth={1.75} />}
           </button>

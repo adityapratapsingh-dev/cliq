@@ -65,7 +65,7 @@ export function CommentThread({
   }
 
   const renderComment = (comment: Comment, depth = 0): ReactNode => (
-    <div key={comment.id} className={cx("space-y-2", depth > 0 && "ml-6 border-l border-white/10 pl-3")}>
+    <div key={comment.id} className={cx("space-y-2", depth > 0 && "ml-6 border-l border-[#262626] pl-3")}>
       <div className="flex items-start gap-2.5">
         {comment.author ? (
           <Avatar user={comment.author} size={depth > 0 ? 26 : 30} />
@@ -101,7 +101,7 @@ export function CommentThread({
                   if (e.key === "Enter") void submitReply(comment.id);
                 }}
                 placeholder="Write a reply..."
-                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#121216] px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-zinc-600"
+                className="min-w-0 flex-1 rounded-lg border border-[#262626] bg-[#121216] px-3 py-1.5 text-xs text-zinc-100 outline-none focus:border-zinc-600"
               />
               <button
                 type="button"
@@ -140,7 +140,7 @@ export function VoteBar({
   size?: "sm" | "md";
 }) {
   return (
-    <div className="inline-flex items-center rounded-full border border-white/10 bg-[#121216]">
+    <div className="inline-flex items-center rounded-full border border-[#262626] bg-[#121216]">
       <button
         type="button"
         onClick={onUp}

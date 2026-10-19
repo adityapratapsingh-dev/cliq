@@ -14,12 +14,12 @@ export function ToastHost() {
           type="button"
           onClick={() => dismissToast(t.id)}
           className={cx(
-            "cliq-toast pointer-events-auto inline-flex max-w-sm items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold shadow-2xl backdrop-blur-xl",
+            "cliq-toast pointer-events-auto inline-flex max-w-sm items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold shadow-2xl",
             t.tone === "success"
               ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200"
               : t.tone === "danger"
                 ? "border-rose-500/40 bg-rose-500/15 text-rose-200"
-                : "border-zinc-700/70 bg-zinc-900/90 text-zinc-100",
+                : "border-zinc-700/70 bg-[#121212] text-zinc-100",
           )}
         >
           {t.tone === "success" ? (

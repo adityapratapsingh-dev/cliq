@@ -73,18 +73,18 @@ export function RightSidebar({
   );
 
   return (
-    <aside className="no-scrollbar sticky top-0 hidden h-dvh w-[320px] shrink-0 flex-col gap-4 overflow-y-auto px-6 pt-6 pb-10 min-[1150px]:flex">
+    <aside className="no-scrollbar sticky top-0 hidden h-dvh w-[320px] shrink-0 flex-col gap-4 overflow-y-auto px-6 pt-6 pb-10 min-[1100px]:flex">
       <button
         type="button"
         onClick={onOpenSearch}
-        className="flex w-full items-center gap-2 rounded-full border border-white/10 bg-[#121216]/90 px-4 py-2 text-sm text-zinc-500 transition hover:border-zinc-700"
+        className="flex w-full items-center gap-2 rounded-full border border-[#262626] bg-[#121212] px-4 py-2 text-sm text-zinc-500 transition hover:border-zinc-700"
       >
         <Search size={16} strokeWidth={1.75} />
         <span>Search</span>
       </button>
 
       {/* People to Cliq With */}
-      <section className="rounded-2xl border border-white/10 bg-[#121216]/90 p-4">
+      <section className="rounded-2xl border border-[#262626] bg-[#121212] p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-100">People to Cliq With</h2>
           <button
@@ -146,7 +146,7 @@ export function RightSidebar({
                     className={cx(
                       "shrink-0 rounded-full px-3 py-1 text-[11px] font-bold transition",
                       following
-                        ? "border border-white/10 text-zinc-400 hover:text-zinc-200"
+                        ? "border border-[#262626] text-zinc-400 hover:text-zinc-200"
                         : "bg-indigo-600 text-white shadow-sm shadow-indigo-500/20 hover:bg-indigo-500",
                     )}
                   >
@@ -160,7 +160,7 @@ export function RightSidebar({
       </section>
 
       {/* Trending on Cliq */}
-      <section className="rounded-2xl border border-white/10 bg-[#121216]/90 p-4">
+      <section className="rounded-2xl border border-[#262626] bg-[#121212] p-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
           <TrendingUp size={15} strokeWidth={2} className="text-indigo-400" /> Trending on Cliq
         </h2>
@@ -194,7 +194,7 @@ export function RightSidebar({
       </section>
 
       {/* Online in Your Cliq */}
-      <section className="rounded-2xl border border-white/10 bg-[#121216]/90 p-4">
+      <section className="rounded-2xl border border-[#262626] bg-[#121212] p-4">
         <h2 className="text-sm font-semibold text-zinc-100">Online in Your Cliq</h2>
         {friends.length === 0 ? (
           <p className="mt-2 text-xs text-zinc-500">Follow people to see them here for quick chats.</p>
@@ -228,7 +228,7 @@ export function RightSidebar({
                       toast("Could not send the wave — try again.", "danger");
                     }
                   }}
-                  className="rounded-full border border-white/10 px-2 py-0.5 text-[9px] font-bold text-zinc-400 transition hover:border-indigo-500 hover:text-zinc-100"
+                  className="rounded-full border border-[#262626] px-2 py-0.5 text-[9px] font-bold text-zinc-400 transition hover:border-indigo-500 hover:text-zinc-100"
                 >
                   👋 Wave
                 </button>

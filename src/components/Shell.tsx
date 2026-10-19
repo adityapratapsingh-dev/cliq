@@ -53,7 +53,7 @@ export function LeftRail({ onOpenSearch, onOpenNotifications }: ShellHandlers) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden h-dvh w-[68px] flex-col border-r border-white/10 bg-[#09090b] px-3 py-5 md:flex min-[1150px]:w-[240px]">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden h-dvh w-[68px] flex-col border-r border-[#262626] bg-[#09090b] px-3 py-5 md:flex min-[1150px]:w-[240px]">
       <div className="mb-6 flex h-8 items-center justify-center px-2 min-[1150px]:justify-start">
         <span className="text-xl font-bold tracking-tight text-white min-[1150px]:hidden">C</span>
         <span className="hidden min-[1150px]:inline">
@@ -140,7 +140,7 @@ export function LeftRail({ onOpenSearch, onOpenNotifications }: ShellHandlers) {
               onClick={() => setMenuOpen(false)}
               className="fixed inset-0 z-10 cursor-default"
             />
-            <div className="cliq-pop absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#121216] py-1 shadow-2xl">
+            <div className="cliq-pop absolute bottom-full left-0 z-20 mb-2 w-52 overflow-hidden rounded-xl border border-[#262626] bg-[#121216] py-1 shadow-2xl">
               <button
                 type="button"
                 onClick={() => {
@@ -211,7 +211,7 @@ export function MobileTopBar({ onOpenSearch, onOpenNotifications }: ShellHandler
   const { unreadCount } = useNotificationCenter();
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/10 bg-black/80 px-4 backdrop-blur-md md:hidden">
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#262626] bg-black px-4 md:hidden">
       <button type="button" onClick={() => setTab("chatposts")} aria-label="Cliq home" className="flex items-center">
         <CliqLogo />
       </button>
@@ -281,7 +281,7 @@ export function BottomNav() {
   const badges = useNavBadges();
 
   return (
-    <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-black/90 backdrop-blur-lg md:hidden">
+    <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-[#262626] bg-black md:hidden">
       <div className="flex h-[60px] items-center justify-around">
         <MobileTab
           active={tab === "chatposts"}

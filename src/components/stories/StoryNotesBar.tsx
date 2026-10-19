@@ -39,7 +39,7 @@ export function StoryNotesBar({
   );
 
   return (
-    <div className={compact ? "" : "rounded-2xl border border-white/10 bg-[#121216]/90 px-2 py-1"}>
+    <div className={compact ? "" : "rounded-2xl border border-[#262626] bg-[#121212] px-2 py-1"}>
       {compact ? (
         <div className="no-scrollbar flex h-24 items-center gap-3 overflow-x-auto">
           {storyBar}
@@ -49,7 +49,7 @@ export function StoryNotesBar({
       ) : (
         <>
           {storyBar}
-          <div className="border-t border-white/10" />
+          <div className="border-t border-[#262626]" />
           <div className="pt-3">
             <CliqNotes onOpenProfile={onOpenProfile} />
           </div>

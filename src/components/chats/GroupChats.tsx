@@ -68,7 +68,7 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search groups"
-            className="h-10 w-full rounded-lg border border-white/10 bg-[#121216] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
+            className="h-10 w-full rounded-lg border border-[#262626] bg-[#121216] pl-9 pr-3 text-sm text-white outline-none focus:border-zinc-600"
           />
         </div>
         <button
@@ -83,7 +83,7 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
       {loading ? (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-3 border-b border-white/10 py-3">
+            <div key={i} className="flex items-center gap-3 border-b border-[#262626] py-3">
               <Skeleton className="h-11 w-11 rounded-lg" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-3 w-32" />
@@ -107,7 +107,7 @@ export function GroupChats({ onOpenProfile }: { onOpenProfile: (id: string) => v
               key={group.id}
               type="button"
               onClick={() => setOpen(group)}
-              className="flex w-full items-center gap-3 border-b border-white/10 py-3 text-left transition hover:bg-[#121216]"
+              className="flex w-full items-center gap-3 border-b border-[#262626] py-3 text-left transition hover:bg-[#121216]"
             >
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#121216] text-zinc-300">
                 <Users size={20} strokeWidth={1.75} />
@@ -181,7 +181,7 @@ function CreateGroupModal({
   }
 
   const inputClass =
-    "w-full rounded-lg border border-white/10 bg-[#121216] px-3 text-sm text-white outline-none focus:border-zinc-600";
+    "w-full rounded-lg border border-[#262626] bg-[#121216] px-3 text-sm text-white outline-none focus:border-zinc-600";
 
   return (
     <Modal open onClose={onClose} title="New group">
@@ -339,7 +339,7 @@ function GroupRoom({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex h-[60px] items-center gap-3 border-b border-white/10 px-4">
+      <header className="flex h-[60px] items-center gap-3 border-b border-[#262626] px-4">
         <button type="button" onClick={onBack} aria-label="Back" className="text-zinc-300 transition hover:text-white">
           <ArrowLeft size={20} strokeWidth={1.75} />
         </button>
@@ -386,7 +386,7 @@ function GroupRoom({
                   >
                     {msg.mediaUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={msg.mediaUrl} alt="" className="mb-1.5 max-h-56 rounded-xl object-cover" />
+                      <img src={msg.mediaUrl} alt="" className="mb-1.5 max-h-56 rounded-xl object-cover"  loading="lazy" decoding="async" />
                     ) : null}
                     {msg.content ? <p className="whitespace-pre-wrap break-words">{msg.content}</p> : null}
                     <span className={cx("mt-0.5 block text-[9px]", mine ? "text-white/60" : "text-zinc-500")}>
@@ -447,7 +447,7 @@ function GroupRoom({
         )}
       </div>
 
-      <div className="flex items-center gap-3 border-t border-white/10 p-4">
+      <div className="flex items-center gap-3 border-t border-[#262626] p-4">
         <input
           ref={fileRef}
           type="file"
@@ -468,7 +468,7 @@ function GroupRoom({
         >
           {uploading ? <Spinner className="h-4 w-4" /> : <ImageIcon size={20} strokeWidth={1.75} />}
         </button>
-        <div className="flex flex-1 items-center gap-3 rounded-full border border-white/10 bg-[#121216] px-4 py-2.5">
+        <div className="flex flex-1 items-center gap-3 rounded-full border border-[#262626] bg-[#121216] px-4 py-2.5">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

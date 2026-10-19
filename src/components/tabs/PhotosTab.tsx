@@ -115,7 +115,7 @@ export function PhotoCard({
   const saved = savedIds.includes(post.id);
 
   return (
-    <article className="border-b border-white/10 pb-5 mb-5">
+    <article className="border-b border-[#262626] pb-5 mb-5">
       <header className="flex items-center justify-between py-3">
         <button
           type="button"
@@ -141,7 +141,7 @@ export function PhotoCard({
           {menuOpen ? (
             <>
               <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-10 cursor-default" />
-              <div className="cliq-pop absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-white/10 bg-[#121216] py-1 shadow-2xl">
+              <div className="cliq-pop absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-[#262626] bg-[#121216] py-1 shadow-2xl">
                 <button
                   type="button"
                   onClick={() => {
@@ -181,7 +181,7 @@ export function PhotoCard({
       </header>
 
       <div
-        className="relative w-full cursor-zoom-in overflow-hidden rounded-[4px] border border-white/10 bg-[#121216]"
+        className="relative w-full cursor-zoom-in overflow-hidden rounded-[4px] border border-[#262626] bg-[#121216]"
         onDoubleClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           burstId.current += 1;
@@ -207,7 +207,7 @@ export function PhotoCard({
           <img
             src={post.mediaUrl}
             alt={post.content || "Cliq photo"}
-            className="max-h-[600px] w-full object-cover"
+            className="max-h-[600px] w-full object-cover" loading="lazy" decoding="async"
             onError={() => setBroken(true)}
           />
         ) : (
@@ -298,7 +298,7 @@ export function PhotoCard({
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} post={post} />
 
       {lightbox && post.mediaUrl ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95 p-4">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black p-4">
           <button
             type="button"
             aria-label="Close"
@@ -308,7 +308,7 @@ export function PhotoCard({
             <X size={22} strokeWidth={1.75} />
           </button>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={post.mediaUrl} alt={post.content || "Photo"} className="max-h-full max-w-full object-contain" />
+          <img src={post.mediaUrl} alt={post.content || "Photo"} className="max-h-full max-w-full object-contain"  loading="lazy" decoding="async" />
         </div>
       ) : null}
     </article>
@@ -343,7 +343,7 @@ export function CommentModal({
         canInteract={Boolean(user)}
         toxicFilter
       />
-      <div className="sticky bottom-0 mt-4 flex items-center gap-2 border-t border-white/10 bg-[#121216] pt-3">
+      <div className="sticky bottom-0 mt-4 flex items-center gap-2 border-t border-[#262626] bg-[#121216] pt-3">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -354,7 +354,7 @@ export function CommentModal({
             }
           }}
           placeholder="Add a comment..."
-          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#121216] px-3.5 py-2 text-sm text-white outline-none focus:border-zinc-600"
+          className="min-w-0 flex-1 rounded-lg border border-[#262626] bg-[#121216] px-3.5 py-2 text-sm text-white outline-none focus:border-zinc-600"
         />
         <button
           type="button"
@@ -396,14 +396,14 @@ function BentoTile({
   const cover = post.mediaUrl;
 
   return (
-    <div className="group relative mb-2 break-inside-avoid overflow-hidden rounded-xl border border-white/10 bg-[#121216]">
+    <div className="group relative mb-2 break-inside-avoid overflow-hidden rounded-xl border border-[#262626] bg-[#121216]">
       <button type="button" onClick={onOpen} className="block w-full" aria-label="Open photo">
         {cover && !broken ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={cover}
             alt={post.content || "Photo"}
-            className="w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="w-full object-cover transition duration-300 group-hover:scale-[1.03]" loading="lazy" decoding="async"
             onError={() => setBroken(true)}
           />
         ) : (
@@ -432,7 +432,7 @@ function BentoTile({
           type="button"
           onClick={() => onOpenProfile(post.author!.id)}
           aria-label={`Open ${post.author.displayName}'s profile`}
-          className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-bold text-white opacity-0 backdrop-blur-md transition group-hover:opacity-100"
+          className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[9px] font-bold text-white opacity-0 transition group-hover:opacity-100"
         >
           @{post.author.username}
         </button>
@@ -457,11 +457,11 @@ function PhotoLightbox({
   const saved = savedIds.includes(post.id);
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/95 p-4">
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black p-4">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default" />
 
-      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#121216]">
-        <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+      <div className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-[#262626] bg-[#121216]">
+        <div className="flex items-center gap-3 border-b border-[#262626] px-4 py-3">
           {post.author ? (
             <button
               type="button"
@@ -493,7 +493,7 @@ function PhotoLightbox({
             type="button"
             onClick={onClose}
             aria-label="Close viewer"
-            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-zinc-400 transition hover:text-zinc-100"
+            className="grid h-9 w-9 place-items-center rounded-full border border-[#262626] text-zinc-400 transition hover:text-zinc-100"
           >
             <X size={16} />
           </button>
@@ -501,7 +501,7 @@ function PhotoLightbox({
 
         {post.mediaUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.mediaUrl} alt={post.content || "Photo"} className="max-h-[60vh] w-full object-contain" />
+          <img src={post.mediaUrl} alt={post.content || "Photo"} className="max-h-[60vh] w-full object-contain"  loading="lazy" decoding="async" />
         ) : null}
 
         <div className="px-4 py-3">

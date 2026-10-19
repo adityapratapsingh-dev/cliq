@@ -35,7 +35,7 @@ const CENTER_WIDTH: Record<string, string> = {
 };
 
 export function CliqApp() {
-  const { user, loading, settings, tab, setTab, refreshUser, bump, markTabSeen, search, setSearch, setCreateOpen } =
+  const { user, loading, settings, tab, setTab, refreshUser, bump, markTabSeen, search, setSearch, setCreateOpen, createOpen } =
     useCliq();
   const [searchOpen, setSearchOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
@@ -100,6 +100,11 @@ export function CliqApp() {
           )}
         </main>
 
+        {/*
+          Right rail only on large desktop (>1100px). Hiding it in CSS rather than
+          with a resize listener keeps this out of the render path entirely — the
+          element is simply `display:none` on smaller screens.
+        */}
         {tab !== "friends" ? <RightSidebar
           onOpenProfile={openProfile}
           onOpenSearch={() => setSearchOpen(true)}
@@ -114,12 +119,19 @@ export function CliqApp() {
 
       <BottomNav />
       <NotificationBanner onOpenCenter={() => setBellOpen(true)} />
-      <CreateModal />
+      {/* Mounted only while open — keeps the feed's DOM small and instant. */}
+      {createOpen ? <CreateModal /> : null}
       {searchOpen ? <SearchPanel onClose={() => setSearchOpen(false)} onOpenProfile={openProfile} /> : null}
       {bellOpen ? (
         <NotificationCenter onClose={() => setBellOpen(false)} onNavigate={(next) => setTab(next)} />
       ) : null}
-      <ProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} onMessage={() => setTab("friends")} />
+      {profileUserId ? (
+        <ProfileModal
+          userId={profileUserId}
+          onClose={() => setProfileUserId(null)}
+          onMessage={() => setTab("friends")}
+        />
+      ) : null}
       <ToastHost />
     </div>
   );

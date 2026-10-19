@@ -61,7 +61,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
   }
 
   const inputClass =
-    "w-full rounded-lg border border-white/10 bg-[#121216] px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-zinc-600";
+    "w-full rounded-lg border border-[#262626] bg-[#121216] px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-zinc-600";
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-black px-4 py-10">
@@ -75,7 +75,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
 
         <form onSubmit={submit} className="space-y-3">
           {mode === "signup" ? (
-            <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#121216] p-3">
+            <div className="flex items-center gap-3 rounded-lg border border-[#262626] bg-[#121216] p-3">
               <Avatar user={preview} size={52} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">{preview.displayName}</p>
@@ -207,7 +207,7 @@ export function AuthScreen({ onAuthed }: { onAuthed: (user: SessionUser) => void
           </button>
         </form>
 
-        <div className="mt-5 flex items-center justify-center gap-1 rounded-lg border border-white/10 bg-[#121216] py-3 text-sm">
+        <div className="mt-5 flex items-center justify-center gap-1 rounded-lg border border-[#262626] bg-[#121216] py-3 text-sm">
           <span className="text-zinc-500">{mode === "signup" ? "Have an account?" : "New to Cliq?"}</span>
           <button
             type="button"
